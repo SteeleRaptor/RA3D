@@ -16,7 +16,13 @@ class SerialController:
 
     def connectPort(self, port):
         self.port = port
+        print(self.port)
         try:
+            ### TODO: Edge case not caught by this try is if connecting to port, 
+            # unplug & replug board on same port, disconnect, 
+            # then connecting again doesn't throw error even though it 
+            # doesn't actually connect to the port and essentially bricks 
+            # the program from connecting to another port until restarted
             tempBoard = serial.Serial(self.port, self.baud)
             print(f"Port {port} opened successfully")
             self.board = tempBoard

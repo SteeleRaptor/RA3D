@@ -30,6 +30,9 @@ class ArmController:
 
     def calibrateArm(self):
         print("\n=====| Starting Full Calibration |=====\n")
+        if self.serialController.boardConnected is False:
+            print("Error: No board connected, exiting calibration")
+            return
         # Taken from AR4.py, line 8308
         # command = "LL"+"A"+str(CAL['J1CalStatVal'].get())+"B"+str(CAL['J2CalStatVal'].get())+"C"+str(CAL['J3CalStatVal'].get())+"D"+str(CAL['J4CalStatVal'].get())+"E"+str(CAL['J5CalStatVal'].get())+"F"+str(CAL['J6CalStatVal'].get())+"G"+str(CAL['J7CalStatVal'].get())+"H"+str(CAL['J8CalStatVal'].get())+"I"+str(CAL['J9CalStatVal'].get())+"J"+str(CAL['J1calOff'])+"K"+str(CAL['J2calOff'])+"L"+str(CAL['J3calOff'])+"M"+str(CAL['J4calOff'])+"N"+str(CAL['J5calOff'])+"O"+str(CAL['J6calOff'])+"P"+str(CAL['J7calOff'])+"Q"+str(CAL['J8calOff'])+"R"+str(CAL['J9calOff'])+"\n" 
         calJStage1 = [1, 1, 1, 0, 0, 0]
@@ -120,6 +123,10 @@ class ArmController:
         self.root.RzCurCoord.config(text=self.curRz)
 
     def sendML(self, X, Y, Z, Rx, Ry, Rz):
+        print("Sending ML command...")
+        if self.serialController.boardConnected is False:
+            print("Error: No board connected, cancelling ML command")
+            return
         # Taken from AR4.py, line XXXX
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         # Create the command
@@ -135,6 +142,10 @@ class ArmController:
         self.processPosition(response)
 
     def sendRJ(self, J1, J2, J3, J4, J5, J6):
+        print("Sending RJ command...")
+        if self.serialController.boardConnected is False:
+            print("Error: No board connected, cancelling RJ command")
+            return
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
         command = f"RJA{J1}B{J2}C{J3}D{J4}E{J5}F{J6}J7{0}J8{0}J9{0}Sp{self.speed}Ac{self.acceleration}Dc{self.deceleration}Rm{self.ramp}WNLm000000\n"
         # Send the command

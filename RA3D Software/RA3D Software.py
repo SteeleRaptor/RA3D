@@ -34,21 +34,25 @@ class TkWindow(Tk):
         self.serialFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+N+E+S)
         # Create label for Serial Frame
         self.serialLabel = Label(self.serialFrame, text="Serial Frame")
-        self.serialLabel.grid(row=1, column=1, padx=5, pady=5)
+        self.serialLabel.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+        # Refresh button
+        self.refreshCOMButton = Button(self.serialFrame, text="⟳", command=self.refreshCOMPorts, width=2)
+        self.refreshCOMButton.grid(row=2, column=1, padx=5, pady=5)
         # Create dropdown list of all serial COM ports
-        self.portList = ["Select Port"] # Default value of "Select Port"
-        self.portList = self.portList + self.getCOMPorts() # Concatenate all found COM ports to portList
-        self.portSelection = StringVar(value=self.portList[0]) # Create a StringVar to hold the current dropdown selection
-        self.portSelection.trace("w", self.portSelectionChanged)
-        self.portDropdown = OptionMenu(self.serialFrame, self.portSelection, *self.portList) # Create the dropdown
-        self.portDropdown.config(width=10) # Set the dropdown width
-        self.portDropdown.grid(row=2, column=1, padx=5, pady=5)
+        self.portList = self.getCOMPorts() # Make options list from found COM ports
+        self.portSelection = StringVar(value="Select Port") # Create a StringVar to hold the current dropdown selection
+        self.portSelection.trace("w", self.portSelectionChanged) # Connect portSelection changing to a function call to detect when the selected option changes
+        self.portDropdown = ttk.Combobox(self.serialFrame, width=10, textvariable=self.portSelection, state="readonly") # Create the dropdown
+        self.portDropdown["values"] = self.portList
+        self.portDropdown.grid(row=2, column=2, padx=5, pady=5)
+
+        
         # Create button for connecting to port
         self.connectButton = Button(self.serialFrame, text="Connect", command=self.serialConnect, width=10, state="disabled")
-        self.connectButton.grid(row=2, column=2, padx=5, pady=5)
+        self.connectButton.grid(row=2, column=3, padx=5, pady=5)
         # Status label
         self.portStatusLabel = Label(self.serialFrame, text="Status: Disconnected")
-        self.portStatusLabel.grid(row=3, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+        self.portStatusLabel.grid(row=3, column=1, columnspan=3, padx=5, pady=5, sticky=W)
 
         # Control Frame
         self.controlFrame = Frame(self.root, bg="#00FF00", highlightthickness=2, highlightbackground="#000000")
@@ -154,6 +158,11 @@ class TkWindow(Tk):
         self.progressBar.grid(row=5, column=1, columnspan=3, padx=5, pady=5)
         self.progressBar['value'] = 40
 
+    def refreshCOMPorts(self):
+        self.portList = self.getCOMPorts() # Create options list from found COM ports
+        self.portSelection.set("Select Port") # Create a StringVar to hold the current dropdown selection
+        self.portDropdown["values"] = self.portList
+        self.portDropdown["textvariable"] = self.portSelection
 
     # Returns a list of all COM ports with a device connected
     def getCOMPorts(self):
@@ -171,9 +180,9 @@ class TkWindow(Tk):
     # Called whenever the selection in the port dropdown is changed
     def portSelectionChanged(self, *args):
         print("Port Selection Changed")
-        # Check if the selected port is the "Select Port" text (first option in portList)
-        if self.portSelection.get() == self.portList[0]:
-            # If so, disable the connect button
+        # Check if the selected port is the default "Select Port" text
+        if self.portSelection.get() == "Select Port":
+            # If so, disable the connect button to avoid connecting to nothing
             self.connectButton.config(state="disabled")
         else:
             # If not, enable the connect button
@@ -190,13 +199,15 @@ class TkWindow(Tk):
             if self.serialController.boardConnected:
                 self.connectButton.config(text="Disconnect") # Change button text
                 self.portDropdown.config(state="disabled") # Disable port dropdown
+                self.refreshCOMButton.config(state="disabled") # Disable refresh button
                 self.portStatusLabel.config(text="Status: Connected") # Change port status text
         else:
             # If so, disconnect from the port
             self.serialController.disconnectPort()
             print(f"Connection Status: {self.serialController.boardConnected}")
             self.connectButton.config(text="Connect") # Change button text
-            self.portDropdown.config(state="normal") # Enable port dropdown
+            self.portDropdown.config(state="readonly") # Enable port dropdown
+            self.refreshCOMButton.config(state="normal") # Enable refresh button
             self.portStatusLabel.config(text="Status: Disconnected") # Change port status text
 
     def sendMoveCommand(self):
@@ -238,14 +249,21 @@ class TkWindow(Tk):
         else:
             print("ML command not sent due to a value not being a number")
         
+    # TODO: Probably move these functions to some form of a print controller that handles all the parsing information
     def selectFile(self):
         pass
 
     def startPrint(self):
-        pass
+        # Temporary to test progress bar
+        self.progressBar["value"] = self.progressBar["value"] + 5
+        if self.progressBar["value"] > 100:
+            self.progressBar["value"] = 100
 
     def pausePrint(self):
-        pass
+        # Temporary to test progress bar
+        self.progressBar["value"] = self.progressBar["value"] - 5
+        if self.progressBar["value"] < 0:
+            self.progressBar["value"] = 0
 
     def cancelPrint(self):
         pass

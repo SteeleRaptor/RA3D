@@ -5,6 +5,7 @@ import serial.tools.list_ports
 
 from SerialController import SerialController
 from ArmController import ArmController
+from PrintController import PrintController
 
 class TkWindow(Tk):
     def __init__(self):
@@ -20,10 +21,11 @@ class TkWindow(Tk):
         x = int((ws/2) - (w/2)) # Calculate x position for window to be in the center of the screen
         y = int((hs/2) - (h/2)) # Calculate y position for window to be in the center of the screen
         self.geometry(f"{w}x{h}+{x}+{y}") # Set the width, height, x, and y values
-
+        
         # Instantiate objects for the various controller classes
         self.serialController = SerialController(self.root)
         self.armController = ArmController(self.root, self.serialController)
+        self.printController = PrintController(self.root)
 
         # Create and draw widgets onto the window
         self.createWidgets()
@@ -63,6 +65,8 @@ class TkWindow(Tk):
         # Create calibration button
         self.calibrateButton = Button(self.controlFrame, text="Calibrate", command=self.armController.calibrateArm, width=10)
         self.calibrateButton.grid(row=2, column=1, columnspan=3, padx=5, pady=5)
+        self.extraCalibrateButton = Button(self.controlFrame, text="Extra Calibrate", command=self.extraCalibrate, width=11)
+        self.extraCalibrateButton.grid(row=2, column=4, columnspan=3, padx=5, pady=5)
         # Move Linear label
         self.moveLabel = Label(self.controlFrame, text="Move:")
         self.moveLabel.grid(row=3, column=1, columnspan=2, padx=5, pady=5)
@@ -136,19 +140,19 @@ class TkWindow(Tk):
         self.printingLabel = Label(self.printingFrame, text="Printing")
         self.printingLabel.grid(row=1, column=1, padx=5, pady=5)
         # Select file button
-        self.selectFileButton = Button(self.printingFrame, text="Select File", width=10, command=self.selectFile)
+        self.selectFileButton = Button(self.printingFrame, text="Select File", width=10, command=self.printController.selectFile)
         self.selectFileButton.grid(row=2, column=1, padx=5, pady=5)
         # Selected file label
         self.selectedFileLabel = Label(self.printingFrame, text="Please select file")
         self.selectedFileLabel.grid(row=2, column=2, columnspan=2, padx=5, pady=5, sticky=W)
         # Start button
-        self.startPrintButton = Button(self.printingFrame, text="Start", width=10, command=self.startPrint)
+        self.startPrintButton = Button(self.printingFrame, text="Start", width=10, command=self.printController.startPrint)
         self.startPrintButton.grid(row=3, column=1, padx=5, pady=5)
         # Pause button
-        self.pausePrintButton = Button(self.printingFrame, text="Pause", width=10, command=self.pausePrint)
+        self.pausePrintButton = Button(self.printingFrame, text="Pause", width=10, command=self.printController.pausePrint)
         self.pausePrintButton.grid(row=3, column=2, padx=5, pady=5)
         # Cancel button
-        self.cancelPrintButton = Button(self.printingFrame, text="Cancel", width=10, command=self.cancelPrint)
+        self.cancelPrintButton = Button(self.printingFrame, text="Cancel", width=10, command=self.printController.cancelPrint)
         self.cancelPrintButton.grid(row=3, column=3, padx=5, pady=5)
         # Progress Label
         self.progressLabel = Label(self.printingFrame, text="Progress:")
@@ -157,6 +161,16 @@ class TkWindow(Tk):
         self.progressBar = ttk.Progressbar(self.printingFrame, orient=HORIZONTAL, length=300, mode="determinate")
         self.progressBar.grid(row=5, column=1, columnspan=3, padx=5, pady=5)
         self.progressBar['value'] = 40
+
+        self.textBox = Text(self.printingFrame,
+                            wrap=NONE,
+                            undo=True,
+                            tabs=20,
+                            width=50,
+                            height=10,
+                            state="disabled"
+                            )
+        self.textBox.grid(row=6, column=1, columnspan=5, padx=5, pady=5)
 
     def refreshCOMPorts(self):
         self.portList = self.getCOMPorts() # Create options list from found COM ports
@@ -249,24 +263,25 @@ class TkWindow(Tk):
         else:
             print("ML command not sent due to a value not being a number")
         
-    # TODO: Probably move these functions to some form of a print controller that handles all the parsing information
-    def selectFile(self):
-        pass
+    def extraCalibrate(self):
+        print("extraCalibrate")
+        # Create another window for extra calibration
+        self.extraCalibrateTop = Toplevel(self.root)
+        # Create buttons for J1-6 calibration
+        self.calJ1Button = Button(self.extraCalibrateTop, text="Cal J1", command=lambda: self.armController.calibrateJoints(1, 0, 0, 0, 0, 0))
+        self.calJ2Button = Button(self.extraCalibrateTop, text="Cal J2", command=lambda: self.armController.calibrateJoints(0, 1, 0, 0, 0, 0))
+        self.calJ3Button = Button(self.extraCalibrateTop, text="Cal J3", command=lambda: self.armController.calibrateJoints(0, 0, 1, 0, 0, 0))
+        self.calJ4Button = Button(self.extraCalibrateTop, text="Cal J4", command=lambda: self.armController.calibrateJoints(0, 0, 0, 1, 0, 0))
+        self.calJ5Button = Button(self.extraCalibrateTop, text="Cal J5", command=lambda: self.armController.calibrateJoints(0, 0, 0, 0, 1, 0))
+        self.calJ6Button = Button(self.extraCalibrateTop, text="Cal J6", command=lambda: self.armController.calibrateJoints(0, 0, 0, 0, 0, 1))
 
-    def startPrint(self):
-        # Temporary to test progress bar
-        self.progressBar["value"] = self.progressBar["value"] + 5
-        if self.progressBar["value"] > 100:
-            self.progressBar["value"] = 100
-
-    def pausePrint(self):
-        # Temporary to test progress bar
-        self.progressBar["value"] = self.progressBar["value"] - 5
-        if self.progressBar["value"] < 0:
-            self.progressBar["value"] = 0
-
-    def cancelPrint(self):
-        pass
+        # Place buttons on the window
+        self.calJ1Button.grid(row=0, column=0, padx=5, pady=5)
+        self.calJ2Button.grid(row=0, column=1, padx=5, pady=5)
+        self.calJ3Button.grid(row=1, column=0, padx=5, pady=5)
+        self.calJ4Button.grid(row=1, column=1, padx=5, pady=5)
+        self.calJ5Button.grid(row=2, column=0, padx=5, pady=5)
+        self.calJ6Button.grid(row=2, column=1, padx=5, pady=5)
 
 if __name__ == "__main__":
     app = TkWindow()

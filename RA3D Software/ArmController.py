@@ -73,6 +73,22 @@ class ArmController:
             self.armCalibrated = True
             return True
         
+    def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
+        if self.serialController.boardConnected is False:
+            print("Error: No board connected, exiting calibration")
+            return
+
+        command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J0K0L0M0N0O0P0Q0\n"
+        response = self.serialController.sendSerial(command)
+
+        # Check if calibration was a success
+        if (response[:1] == 'A'):
+            print("Joint(s) Calibrated Successfully")
+        else:
+            print("Joint(s) Calibration FAILED")
+            # Turn on the warning lights on the UI or something
+        return response
+
     def processPosition(self, response):
         # Collect all the indexes for finding values
         # General formatting of a response: A[val]B[val]C[val]D[val]E[val]F[val]G[val]H[val]I[val]J[val]K[val]L[val]M[val]N[val]O[val]P[val]Q[val]R[val]

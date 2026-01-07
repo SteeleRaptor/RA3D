@@ -1,0 +1,142 @@
+from tkinter import *
+from tkinter import filedialog
+import os
+import re
+
+class PrintController:
+    def __init__(self, root):
+        self.root = root
+
+        self.selectedFilepath = None
+        self.gcodeLines = []
+        self.teensyLines = []
+
+        self.fileOpen = False
+        self.printing = False
+        self.printPaused = False
+
+        # Parameters for printing coordinates
+        self.xBounds = [300, 500] # X Min & X Max
+        self.yBounds = [-100, 100] # Y Min & Y Max
+        self.zBounds = [100, 300] # Z Min & Z Max
+        self.xyCenter = [(self.xBounds[0] + self.xBounds[1]) / 2, (self.yBounds[0] + self.yBounds[1]) / 2]
+        # Parameters used for saving the last used coordinate information
+        self.lastX = self.xBounds[0]
+        self.lastY = self.yBounds[1]
+        self.lastZ = self.zBounds[0]
+        self.lastF = 0.0
+        self.lastE = 0.0
+
+
+    def selectFile(self):
+        # This list contains valid file types
+        filetypes = [
+            ("GCode Files", "*.gcode"),
+            ("All Files", "*.*")
+        ]
+        self.selectedFilepath = filedialog.askopenfilename(filetypes=filetypes)
+        if (self.selectedFilepath == ""):
+            print("No file selected")
+            self.root.selectedFileLabel.config(text="No file selected")
+            self.root.textBox.config(state="normal")
+            self.root.textBox.delete("1.0", END) # Clear text box
+            self.root.textBox.config(state="disabled")
+            self.fileOpen = False
+            return
+        self.root.selectedFileLabel.config(text=os.path.basename(self.selectedFilepath))
+        print(self.selectedFilepath)
+        self.fileOpen = True
+        with open(self.selectedFilepath, "r") as file:
+            self.gcodeLines = file.readlines()
+        self.root.textBox.config(state="normal")
+        self.root.textBox.delete("1.0", END) # Clear text box
+        for i in range(0, len(self.gcodeLines) - 1):
+            self.root.textBox.insert(END, self.gcodeLines[i])
+        self.root.textBox.config(state="disabled")
+
+    def startPrint(self):
+
+        if self.printPaused == True and self.printing == True:
+            self.printPaused = False
+        # When starting print, reset the "last*" parameters
+        self.lastX = self.xBounds[0]
+        self.lastY = self.yBounds[1]
+        self.lastZ = self.zBounds[0]
+        self.lastF = 0.0
+        self.lastE = 0.0
+
+        self.printing = True
+
+    def pausePrint(self):
+        self.printPaused = True
+
+    def cancelPrint(self):
+        self.gcodeToTeensy() # Temp
+
+    # Converts a GCode instruction to the instruction to send over serial
+    def gcodeToTeensy(self, lineToConvert):
+        if lineToConvert[0] == ';': # Line is comment
+            return "" # Don't convert
+        elif lineToConvert == "\n": # Line is newline
+            return "" # Don't convert
+        # Actual instructions to convert
+        elif lineToConvert[0:3] == "G28": # Home the printer
+            return ""
+        elif lineToConvert[0:3] == "G90": # Absolute positioning
+            # TODO: This needs handling or removal
+            return ""
+        elif lineToConvert[0:2] == "G0" or lineToConvert[0:2] == "G1": # Move (treating G0 & G1 as equal)
+            xMatch = re.search(r"X(-?\d+\.?\d*)", lineToConvert)
+            yMatch = re.search(r"Y(-?\d+\.?\d*)", lineToConvert)
+            zMatch = re.search(r"Z(-?\d+\.?\d*)", lineToConvert)
+            fMatch = re.search(r"F(-?\d+\.?\d*)", lineToConvert)
+            eMatch = re.search(r"E(-?\d+\.?\d*)", lineToConvert)
+
+            x = float(xMatch.group(1)) if xMatch else None
+            y = float(yMatch.group(1)) if yMatch else None
+            z = float(zMatch.group(1)) if zMatch else None
+            f = float(fMatch.group(1)) if fMatch else None
+            e = float(eMatch.group(1)) if eMatch else None
+            # TODO: Temporary rotation information
+            Rz = 0
+            Ry = 180
+            Rx = 0
+
+            # If GCode instruction didn't contain a parameter, pull from last saved value
+            # If instruction DID contain a parameter, offset the value to put it in the build volume
+            if x == None:
+                x = self.lastX
+            else:
+                x += self.xyCenter[0]
+                self.lastX = x
+            if y == None:
+                y = self.lastY
+            else:
+                y += self.xyCenter[1]
+                self.lastY = y
+            if z == None:
+                z = self.lastZ
+            else:
+                z += self.zBounds[0]
+                self.lastZ = z
+            if f == None:
+                f = self.lastF
+            else:
+                self.lastF = f
+            if e == None:
+                e = self.lastE
+            else:
+                self.lastE = e
+
+            # TODO: Additional processing to ensure X, Y, and Z are within build volume
+            # TODO: Additional processing for F to control speed or something
+            # Note that F is in units per minute (per LinuxCNC specifications)
+            # https://linuxcnc.org/docs/html/gcode/machining-center.html#sub:feed-rate
+            # TODO: Note that it is pointless to convert to strings because to send the instruction to the arm (through current methods) we give the coordinates
+            # TODO: Might make a custom datatype for storing position data that can be used
+            newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
+            return newLine
+
+    # This is the main function that will loop when printing a file
+    def printLoop(self):
+        pass

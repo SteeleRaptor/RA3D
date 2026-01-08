@@ -4,7 +4,7 @@
     Copyright (c) 2024, Chris Annin
     All rights reserved.
 
-    You are free to share, copy and redistribute in any medium
+    You are free to sharde, copy and redistribute in any medium
     or format.  You are free to remix, transform and build upon
     this material.
 
@@ -201,6 +201,29 @@ float J6axisLim = J6axisLimPos + J6axisLimNeg;
 float J7axisLim = J7axisLimPos + J7axisLimNeg;
 float J8axisLim = J8axisLimPos + J8axisLimNeg;
 float J9axisLim = J9axisLimPos + J9axisLimNeg;
+
+// ==================== ANGLE & ORIENTATION HELPERS ====================
+// Prevents 360° flips during MoveL
+
+float wrapAngle(float a) {
+  while (a > 180.0f) a -= 360.0f;
+  while (a < -180.0f) a += 360.0f;
+  return a;
+}
+
+float shortestDelta(float from, float to) {
+  return wrapAngle(to - from);
+}
+
+struct Quaternion {
+  float w, x, y, z;
+};
+
+Quaternion quatNormalize(Quaternion q) {
+  float n = sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+  q.w /= n; q.x /= n; q.y /= n; q.z /= n;
+  return q;
+}
 
 //motor steps per degree
 float J1StepDeg = 88.888;
@@ -857,6 +880,54 @@ void xyzuvw_2_pose(const T xyzuvw[6], Matrix4x4 pose) {
   pose[12] = xyzuvw[0];
   pose[13] = xyzuvw[1];
   pose[14] = xyzuvw[2];
+}
+Quaternion eulerToQuat(float u, float v, float w) {
+  float cu = cos(radians(u) * 0.5);
+  float su = sin(radians(u) * 0.5);
+  float cv = cos(radians(v) * 0.5);
+  float sv = sin(radians(v) * 0.5);
+  float cw = cos(radians(w) * 0.5);
+  float sw = sin(radians(w) * 0.5);
+
+  Quaternion q;
+  q.w = cu*cv*cw + su*sv*sw;
+  q.x = su*cv*cw - cu*sv*sw;
+  q.y = cu*sv*cw + su*cv*sw;
+  q.z = cu*cv*sw - su*sv*cw;
+  return quatNormalize(q);
+}
+
+void quatToEuler(Quaternion q, float &u, float &v, float &w) {
+  u = degrees(atan2(2*(q.w*q.x + q.y*q.z),
+                    1 - 2*(q.x*q.x + q.y*q.y)));
+
+  float s = 2*(q.w*q.y - q.z*q.x);
+  s = constrain(s, -1.0f, 1.0f);
+  v = degrees(asin(s));
+
+  w = degrees(atan2(2*(q.w*q.z + q.x*q.y),
+                    1 - 2*(q.y*q.y + q.z*q.z)));
+}
+
+Quaternion quatSlerp(Quaternion q1, Quaternion q2, float t) {
+  float dot = q1.w*q2.w + q1.x*q2.x + q1.y*q2.y + q1.z*q2.z;
+  if (dot < 0.0f) {
+    dot = -dot;
+    q2.w = -q2.w; q2.x = -q2.x;
+    q2.y = -q2.y; q2.z = -q2.z;
+  }
+  float theta = acos(dot);
+  if (theta < 0.001f) return q1;
+  float s1 = sin((1 - t) * theta);
+  float s2 = sin(t * theta);
+  float s = sin(theta);
+
+  Quaternion q;
+  q.w = (q1.w*s1 + q2.w*s2) / s;
+  q.x = (q1.x*s1 + q2.x*s2) / s;
+  q.y = (q1.y*s1 + q2.y*s2) / s;
+  q.z = (q1.z*s1 + q2.z*s2) / s;
+  return q;
 }
 
 
@@ -2179,7 +2250,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     }
 
     //send move command if no axis limit error
-    if (TotalAxisFault == 0 && KinematicError == 0) {
+    if (TotalAxisFault == 0 && KinematicError == 0) {//Fix 6
       resetEncoders();
       if (simspeed) {
         driveMotorsG(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
@@ -4965,7 +5036,13 @@ void loop() {
       float RZstart = xyzuvw_Out[3];
       float RYstart = xyzuvw_Out[4];
       float RXstart = xyzuvw_Out[5];
+      float rzBeg = xyzuvw_Out[3];
+      float ryBeg = xyzuvw_Out[4];
+      float rxBeg = xyzuvw_Out[5];
 
+      float rzEnd = xyzuvw_In[3] * M_PI / 180;
+      float ryEnd = xyzuvw_In[4] * M_PI / 180;
+      float rxEnd = xyzuvw_In[5] * M_PI / 180;
 
       //line dist and determine way point gap
       float lineDist = pow((pow((Xvect), 2) + pow((Yvect), 2) + pow((Zvect), 2) + pow((RZvect), 2) + pow((RYvect), 2) + pow((RXvect), 2)), .5);
@@ -5117,32 +5194,72 @@ void loop() {
 
 
           curDelay = calcStepGap;
-
+          Quaternion qStart = eulerToQuat(rzBeg, ryBeg, rxBeg);
+          Quaternion qEnd   = eulerToQuat(rzEnd, ryEnd, rxEnd);
           float curWayPerc = wayPerc * i;
           xyzuvw_In[0] = Xstart + (Xvect * curWayPerc);
           xyzuvw_In[1] = Ystart + (Yvect * curWayPerc);
           xyzuvw_In[2] = Zstart + (Zvect * curWayPerc);
-          xyzuvw_In[3] = RZstart + (RZvect * curWayPerc);
-          xyzuvw_In[4] = RYstart + (RYvect * curWayPerc);
-          xyzuvw_In[5] = RXstart + (RXvect * curWayPerc);
+          
+          //slerp for wrist rotation
+          Quaternion qCur = quatSlerp(qStart, qEnd, curWayPerc);
+
+          quatToEuler(qCur,
+            xyzuvw_In[3],
+            xyzuvw_In[4],
+            xyzuvw_In[5]);
 
           SolveInverseKinematics();
+          if (KinematicError == 0) {
+            static float lastJointAngle[6];
+            static bool lastJointValid = false;
 
+            if (lastJointValid) {
+              for (int j = 0; j < 6; j++) {
+                float d = shortestDelta(lastJointAngle[j], JangleOut[j]);
+                JangleOut[j] = lastJointAngle[j] + d;
+              }
+            }
+
+            for (int j = 0; j < 6; j++) {
+              JangleOut[j] = wrapAngle(JangleOut[j]);
+              lastJointAngle[j] = JangleOut[j];
+            }
+            lastJointValid = true;
+          }
+          if (abs(JangleOut[4]) > 85.0f) {
+              JangleOut[5] = lastJointAngle[5];
+          }
           //calc destination motor steps
-          int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
+          
+          /*int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
           int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
           int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
           int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
           int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-          int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+          int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;*/
+          //Jangle Out is desired joint angles
+          //Jangle In is current joint angles I think
 
           //calc delta from current to destination
-          int J1stepDif = J1StepM - J1futStepM;
+          /*int J1stepDif = J1StepM - J1futStepM;
           int J2stepDif = J2StepM - J2futStepM;
           int J3stepDif = J3StepM - J3futStepM;
           int J4stepDif = J4StepM - J4futStepM;
           int J5stepDif = J5StepM - J5futStepM;
-          int J6stepDif = J6StepM - J6futStepM;
+          int J6stepDif = J6StepM - J6futStepM;*/
+          AxisLimNeg = [J1axisLimNeg, J2axisLimNeg, J3axisLimNeg, J4axisLimNeg, J5axisLimNeg, J6axisLimNeg];
+          for (int j = 0; j < 6; j++) {
+            degDelta = JangleIn[j] - JangleOut[j] + AxisLimNeg[j];
+            degDelta = wrapAngle(degDelta);
+            stepDiff[j] = degDelta * JStepDegArr[j];
+          }
+          int J1StepDif = stepDiff[0];
+          int J2stepDif = stepDiff[1];
+          int J3stepDif = stepDiff[2];
+          int J4stepDif = stepDiff[3];
+          int J5stepDif = stepDiff[4];
+          int J6stepDif = stepDiff[5];
 
           //determine motor directions
           J1dir = (J1stepDif <= 0) ? 1 : 0;
@@ -5795,6 +5912,9 @@ void loop() {
         int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
 
         //calc delta from current to destination
+        float degDelta = JointAngle[i] - currentJointAngle[i];
+        degDelta = wrapAngle(degDelta);
+        stepDif = degDelta * stepsPerDegree[i];
         int J1stepDif = J1StepM - J1futStepM;
         int J2stepDif = J2StepM - J2futStepM;
         int J3stepDif = J3StepM - J3futStepM;
@@ -5945,7 +6065,7 @@ void loop() {
       int LoopModeStart = inData.indexOf("Lm");
 
       updatePos();
-
+      
       float xBeg = xyzuvw_Out[0];
       float yBeg = xyzuvw_Out[1];
       float zBeg = xyzuvw_Out[2];
@@ -5953,6 +6073,8 @@ void loop() {
       float ryBeg = xyzuvw_Out[4];
       float rxBeg = xyzuvw_Out[5];
 
+      Quaternion qStart = eulerToQuat(rzBeg, ryBeg, rxBeg);
+      Quaternion qEnd   = eulerToQuat(rzEnd, ryEnd, rxEnd);
 
       float xMid = inData.substring(xMidIndex + 1, yMidIndex).toFloat();
       float yMid = inData.substring(yMidIndex + 1, zMidIndex).toFloat();
@@ -6153,7 +6275,7 @@ void loop() {
         DestPt[0] = (Rotation[0][0] * startVect[0]) + (Rotation[0][1] * startVect[1]) + (Rotation[0][2] * startVect[2]);
         DestPt[1] = (Rotation[1][0] * startVect[0]) + (Rotation[1][1] * startVect[1]) + (Rotation[1][2] * startVect[2]);
         DestPt[2] = (Rotation[2][0] * startVect[0]) + (Rotation[2][1] * startVect[1]) + (Rotation[2][2] * startVect[2]);
-
+        
         ////DELAY CALC/////
         if (rndTrue == true) {
           curDelay = rndSpeed;
@@ -6170,12 +6292,34 @@ void loop() {
         xyzuvw_In[0] = (DestPt[0]) + Px;
         xyzuvw_In[1] = (DestPt[1]) + Py;
         xyzuvw_In[2] = (DestPt[2]) + Pz;
-        xyzuvw_In[3] = rzBeg - (RZvect * curWayPerc);
-        xyzuvw_In[4] = ryBeg - (RYvect * curWayPerc);
-        xyzuvw_In[5] = rxBeg - (RXvect * curWayPerc);
+        Quaternion qCur = quatSlerp(qStart, qEnd, curWayPerc);
 
+        quatToEuler(qCur,
+          xyzuvw_In[3],
+          xyzuvw_In[4],
+          xyzuvw_In[5]);
 
         SolveInverseKinematics();
+        if (KinematicError == 0) {
+          static float lastJointAngle[6];
+          static bool lastJointValid = false;
+
+          if (lastJointValid) {
+            for (int i = 0; i < 6; i++) {
+              float d = shortestDelta(lastJointAngle[i], JangleOut[i]);
+              JangleOut[i] = lastJointAngle[i] + d;
+            }
+          }
+
+          for (int i = 0; i < 6; i++) {
+            JangleOut[i] = wrapAngle(JangleOut[i]);
+            lastJointAngle[i] = JangleOut[i];
+          }
+          lastJointValid = true;
+        }
+        if (abs(JangleOut[4]) > 85.0f) {
+            JangleOut[5] = lastJointAngle[5];
+        }
 
         //calc destination motor steps
         int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;

@@ -26,6 +26,13 @@ class ArmController:
         self.curRx = None
         self.curRy = None
         self.curRz = None
+
+        self.J1CalOffset = 0
+        self.J2CalOffset = 0
+        self.J3CalOffset = 0
+        self.J4CalOffset = 0
+        self.J5CalOffset = 0
+        self.J6CalOffset = 0
         
 
     def calibrateArm(self):
@@ -40,8 +47,10 @@ class ArmController:
         stage1CalSuccess = False
         stage2CalSuccess = False
 
-        command = f"LLA{calJStage1[0]}B{calJStage1[1]}C{calJStage1[2]}D{calJStage1[3]}E{calJStage1[4]}F{calJStage1[5]}G0H0I0J0K0L0M0N0O0P0Q0\n"
-        response = self.serialController.sendSerial(command)
+        response = self.calibrateJoints(calJStage1[0], calJStage1[1], calJStage1[2], calJStage1[3], calJStage1[4], calJStage1[5])
+
+        # command = f"LLA{calJStage1[0]}B{calJStage1[1]}C{calJStage1[2]}D{calJStage1[3]}E{calJStage1[4]}F{calJStage1[5]}G0H0I0J0K0L0M0N0O0P0Q0\n"
+        # response = self.serialController.sendSerial(command)
 
         # Check if Stage 1 calibration was successful
         if (response[:1] == 'A'):
@@ -54,8 +63,9 @@ class ArmController:
         
         # If Stage 1 calibration successful, start stage 2 calibration
         if (stage1CalSuccess):
-            command = f"LLA{calJStage2[0]}B{calJStage2[1]}C{calJStage2[2]}D{calJStage2[3]}E{calJStage2[4]}F{calJStage2[5]}G0H0I0J0K0L0M0N0O0P0Q0\n"
-            response = self.serialController.sendSerial(command)
+            # command = f"LLA{calJStage2[0]}B{calJStage2[1]}C{calJStage2[2]}D{calJStage2[3]}E{calJStage2[4]}F{calJStage2[5]}G0H0I0J0K0L0M0N0O0P0Q0\n"
+            # response = self.serialController.sendSerial(command)
+            response = self.calibrateJoints(calJStage2[0], calJStage2[1], calJStage2[2], calJStage2[3], calJStage2[4], calJStage2[5])
 
             if (response[:1] == 'A'):
                 print("Stage 2 Calibration Successful")
@@ -80,7 +90,7 @@ class ArmController:
             print("Error: No board connected, exiting calibration")
             return
 
-        command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J0K0L0M0N0O0P0Q0\n"
+        command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
         response = self.serialController.sendSerial(command)
 
         # Check if calibration was a success
@@ -175,3 +185,12 @@ class ArmController:
         else:
             print("No error executing MJ command")
         self.processPosition(response)
+
+    def getCalOffsets(self):
+        # Grab values from the entry fields, convert to integers, and save
+        self.J1CalOffset = int(self.root.J1OffsetEntry.get())
+        self.J2CalOffset = int(self.root.J2OffsetEntry.get())
+        self.J3CalOffset = int(self.root.J3OffsetEntry.get())
+        self.J4CalOffset = int(self.root.J4OffsetEntry.get())
+        self.J5CalOffset = int(self.root.J5OffsetEntry.get())
+        self.J6CalOffset = int(self.root.J6OffsetEntry.get())

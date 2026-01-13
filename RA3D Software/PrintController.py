@@ -31,6 +31,8 @@ class PrintController:
 
 
     def selectFile(self):
+        # TODO: Needs some form of garbage collection as Python holds onto the memory allocated when opening a file
+        # TODO: One possibility is utilizing "yield" command (or other methods) to only read one line at a time
         # This list contains valid file types
         filetypes = [
             ("GCode Files", "*.gcode"),
@@ -40,11 +42,13 @@ class PrintController:
         self.selectedFilepath = filedialog.askopenfilename(filetypes=filetypes)
         # Check if user actually selected a file
         if (self.selectedFilepath == ""):
+            self.root.terminalPrint("No file selected")
             print("No file selected")
             self.root.selectedFileLabel.config(text="No file selected")
             self.root.textBox.config(state="normal")
             self.root.textBox.delete("1.0", END) # Clear text box
             self.root.textBox.config(state="disabled")
+            self.gcodeLines = [""]
             self.fileOpen = False
             # Disable the buttons
             self.root.startPrintButton.config(state="disabled")
@@ -53,12 +57,16 @@ class PrintController:
             self.root.cancelPrintButton.config(state="disabled")
             return
         # Change selectedFileLabel to have filename
+        self.root.terminalPrint(f"Selected \"{os.path.basename(self.selectedFilepath)}\"")
         self.root.selectedFileLabel.config(text=os.path.basename(self.selectedFilepath))
         self.fileOpen = True
         self.currentInstruction = 0 # Reset the currentInstruction counter
+
         # Read all lines of the file into gcodeLines
-        with open(self.selectedFilepath, "r") as file:
-            self.gcodeLines = file.readlines()
+        selectedFile = open(self.selectedFilepath, "r")
+        self.gcodeLines = selectedFile.readlines()
+        selectedFile.close()
+
         # Change the text box text to be the lines of the file
         self.root.textBox.config(state="normal") # Need to enable to modify
         self.root.textBox.delete("1.0", END) # Clear text box
@@ -88,8 +96,10 @@ class PrintController:
         self.currentInstruction = 0
 
     def stepPrint(self):
+        self.root.terminalPrint("stepPrint()")
         # Convert a line of gcode to teensy
         if self.currentInstruction > len(self.gcodeLines) - 1:
+            self.root.terminalPrint("End of program reached")
             print("End of program reached")
             return
         
@@ -97,8 +107,10 @@ class PrintController:
         self.currentInstruction += 1 # Increment currentInstruction
         self.root.progressBar["value"] = (self.currentInstruction / len(self.gcodeLines)) * 100 # Update progress bar to match
         print(f"Line: {lineToConvert}") # Print the line we're converting
+        self.root.terminalPrint(f"Line: {lineToConvert}")
         point = self.gcodeToTeensy(lineToConvert) # Convert line to [X, Y, Z, Rx, Ry, Rz]
         print(f"Point: {point}") # Print the returned point list
+        self.root.terminalPrint(f"Point: {point}")
         if point == "": # If the point is blank, don't try to send a command
             return
         # Send the command to the arm

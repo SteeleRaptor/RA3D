@@ -31,6 +31,7 @@ class TkWindow(Tk):
 
         # Create and draw widgets onto the window
         self.createWidgets()
+        self.root.terminalPrint("GUI created")
         self.refreshCOMPorts()
 
     def createWidgets(self):
@@ -212,15 +213,19 @@ class TkWindow(Tk):
         self.progressBar.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
         self.progressBar['value'] = 40
 
+        self.textScroll = Scrollbar(self.printingFrame, orient="vertical")
         self.textBox = Text(self.printingFrame,
                             wrap=NONE,
                             undo=True,
                             tabs=20,
                             width=50,
-                            height=10,
+                            height=20,
+                            yscrollcommand=self.textScroll.set,
                             state="disabled"
                             )
-        self.textBox.grid(row=5, column=0, columnspan=5, padx=5, pady=5)
+        self.textScroll.config(command=self.textBox.yview)
+        self.textBox.grid(row=5, column=0, columnspan=5, padx=(5,0), pady=5)
+        self.textScroll.grid(row=5, column=6, padx=(0, 5), pady=5, sticky=N+S)
 
         # ==========| Terminal Panel |==========
         self.termFrame = Frame(self.root, bg="#00FFFF", highlightthickness=2, highlightbackground="#000000")
@@ -229,26 +234,26 @@ class TkWindow(Tk):
         #self.termLabel.grid(row=0, column=0, sticky=W)
         #self.termLabel.pack()
 
+        self.termVertScroll = Scrollbar(self.termFrame, orient="vertical")
+        self.termHorzScroll = Scrollbar(self.termFrame, orient="horizontal")
+
         self.terminal = Text(self.termFrame,
                             wrap=NONE,
                             width=80,
                             height=10,
+                            yscrollcommand=self.termVertScroll.set,
+                            xscrollcommand=self.termHorzScroll.set,
                             state="disabled"
                             )
         
-        self.termVertScroll = Scrollbar(self.termFrame)
+        
         self.termVertScroll.pack(side=RIGHT, fill=Y)
         self.termVertScroll.config(command=self.terminal.yview)
-        self.termHorzScroll = Scrollbar(self.termFrame)
+        
         self.termHorzScroll.pack(side=BOTTOM, fill=X)
         self.termHorzScroll.config(command=self.terminal.xview)
         #self.terminal.grid(row=1, column=0, columnspan=5, padx=5, pady=5)
         self.terminal.pack(fill=BOTH)
-
-        
-
-
-        self.terminalPrint("GUI Created")
 
     def refreshCOMPorts(self):
         self.portList = self.getCOMPorts() # Create options list from found COM ports
@@ -264,7 +269,7 @@ class TkWindow(Tk):
             self.terminalPrint("No serial ports w/ connected devices found")
             print("No serial ports w/ connected devices found")
         else:
-            self.terminalPrint(f"Found {len(ports)} connected device(s):\n")
+            self.terminalPrint(f"Found {len(ports)} connected device(s):")
             print(f"Found {len(ports)} connected device(s):\n")
             for port in ports:
                 self.terminalPrint(f"Name: {port.device}\nDescription: {port.description}\nID: {port.hwid}\n\n")
@@ -341,8 +346,10 @@ class TkWindow(Tk):
         
         if allValuesNumeric:
             print("All values numeric, sending ML command")
+            self.terminalPrint("All values numeric, sending ML command")
             self.armController.sendML(x, y, z, Rx, Ry, Rz)
         else:
+            self.root.terminalPrint("ML command not sent due to a value not being a number")
             print("ML command not sent due to a value not being a number")
         
     def extraCalibrate(self):
@@ -368,7 +375,7 @@ class TkWindow(Tk):
 
     def terminalPrint(self, message):
         self.terminal.config(state="normal") # Need to enable to modify
-        self.terminal.insert(END, f"{datetime.now().now()}: {message}\n") # Print the message with the current time fixated at the front
+        self.terminal.insert(END, f"{datetime.now().now()}| {message}\n") # Print the message with the current time fixated at the front
         self.terminal.config(state="disabled") # Disable again to avoid user changes
 
 if __name__ == "__main__":

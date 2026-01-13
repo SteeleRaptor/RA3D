@@ -37,9 +37,7 @@ class ArmController:
 
     def calibrateArm(self):
         print("\n=====| Starting Full Calibration |=====\n")
-        if self.serialController.boardConnected is False:
-            print("Error: No board connected, exiting calibration")
-            return
+        self.root.terminalPrint("=====| Starting Full Calibration |=====")
         # Taken from AR4.py, line 8308
         # command = "LL"+"A"+str(CAL['J1CalStatVal'].get())+"B"+str(CAL['J2CalStatVal'].get())+"C"+str(CAL['J3CalStatVal'].get())+"D"+str(CAL['J4CalStatVal'].get())+"E"+str(CAL['J5CalStatVal'].get())+"F"+str(CAL['J6CalStatVal'].get())+"G"+str(CAL['J7CalStatVal'].get())+"H"+str(CAL['J8CalStatVal'].get())+"I"+str(CAL['J9CalStatVal'].get())+"J"+str(CAL['J1calOff'])+"K"+str(CAL['J2calOff'])+"L"+str(CAL['J3calOff'])+"M"+str(CAL['J4calOff'])+"N"+str(CAL['J5calOff'])+"O"+str(CAL['J6calOff'])+"P"+str(CAL['J7calOff'])+"Q"+str(CAL['J8calOff'])+"R"+str(CAL['J9calOff'])+"\n" 
         calJStage1 = [1, 1, 1, 0, 0, 0]
@@ -55,10 +53,12 @@ class ArmController:
         # Check if Stage 1 calibration was successful
         if (response[:1] == 'A'):
             print("Stage 1 Calibration Successful")
+            self.root.terminalPrint("Stage 1 Calibration Successful")
             self.processPosition(response)
             stage1CalSuccess = True
         else:
             print("Stage 1 Calibration FAILED")
+            self.root.terminalPrint("Stage 1 Calibration FAILED")
             # Turn on the warning lights on the UI or something
         
         # If Stage 1 calibration successful, start stage 2 calibration
@@ -69,29 +69,37 @@ class ArmController:
 
             if (response[:1] == 'A'):
                 print("Stage 2 Calibration Successful")
+                self.root.terminalPrint("Stage 2 Calibration Successful")
                 self.processPosition(response)
                 stage2CalSuccess = True
             else:
                 print("Stage 2 Calibration FAILED")
+                self.root.terminalPrint("Stage 2 Calibration FAILED")
                 # Turn on the warning lights on the UI or something
 
         if (not (stage1CalSuccess and stage2CalSuccess)):
             print("Error during calibration")
+            self.root.terminalPrint("Error during calibration")
             self.armCalibrated = False # Keep armCalibrated flag False
             # Could force a port disconnect here as an extra measure of protecting the arm
             return False
         else:
             print("Arm Calibrated Successfully")
+            self.root.terminalPrint("Arm Calibrated Successfully")
             self.armCalibrated = True
             return True
         
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
-        if self.serialController.boardConnected is False:
-            print("Error: No board connected, exiting calibration")
-            return
 
         command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
+        self.root.terminalPrint("Command to send: ")
+        self.root.terminalPrint(command[0:-2])
+        if self.serialController.boardConnected is False:
+            self.root.terminalPrint("Command not sent due to no board connected")
+            return "E"
         response = self.serialController.sendSerial(command)
+        self.root.terminalPrint("Response received: ")
+        self.root.terminalPrint(response)
 
         # Check if calibration was a success
         if (response[:1] == 'A'):
@@ -158,7 +166,7 @@ class ArmController:
         # Create the command
         command = f"MLX{X}Y{Y}Z{Z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.speed}Ac{self.acceleration}Dc{self.deceleration}Rm{self.ramp}Rnd0WFLm000000Q0\n"
         self.root.terminalPrint("Command to send:")
-        self.root.terminalPrint(command)
+        self.root.terminalPrint(command[0:-2])
         # Check if board is not connected or arm is not calibrated
         if self.serialController.boardConnected is False:
             # Inform user in terminal then quit function to avoid sending instruction
@@ -171,6 +179,8 @@ class ArmController:
         
         # Send the serial command
         response = self.serialController.sendSerial(command)
+        self.root.terminalPrint("Response received: ")
+        self.root.terminalPrint(response)
 
         # Check for any errors
         if (response[:1] == 'E'):

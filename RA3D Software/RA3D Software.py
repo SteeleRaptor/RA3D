@@ -14,10 +14,10 @@ class TkWindow(Tk):
         self.title("RA3D Control Software")
         # (TEMP) Set window as topmost
         self.attributes('-topmost', True)
-        self.updateDelay = 500 # Delay between update function calls in milliseconds
+        self.updateDelay = 200 # Delay between update function calls in milliseconds
         # Set the window dimensions and position on screen
-        w = 675 # Window width
-        h = 725 # Window height
+        w = 800 # Window width
+        h = 515 # Window height
         ws = self.winfo_screenwidth() # Get screen width
         hs = self.winfo_screenheight() # Get screen height
         x = int((ws/2) - (w/2)) # Calculate x position for window to be in the center of the screen
@@ -30,15 +30,104 @@ class TkWindow(Tk):
         self.printController = PrintController(self.root)
 
         # Create and draw widgets onto the window
-        self.createWidgets()
+        self.createTabs()
         self.root.terminalPrint("GUI created")
         self.serialController.refreshCOMPorts()
         # Set up a call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)
+        
 
-    def createWidgets(self):
+    # Creates the interface tabs
+    def createTabs(self):
+        # Create a notebook to manage the tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill="both", expand=True)
+        # Create the tabs
+        self.printTab = Frame(self.notebook, bg="#FF0000")
+        self.armTab = Frame(self.notebook, bg="#00FF00")
+        self.debugTab = Frame(self.notebook, bg="#0000FF")
+        self.settingsTab = Frame(self.notebook, bg="#FFFF00")
+        # Put the tabs on screen
+        self.printTab.pack(fill="both", expand=True)
+        self.armTab.pack(fill="both", expand=True)
+        self.debugTab.pack(fill="both", expand=True)
+        self.settingsTab.pack(fill="both", expand=True)
+        # Add the tabs to the notebook
+        self.notebook.add(self.printTab, text="Printing")
+        self.notebook.add(self.armTab, text="Arm Control")
+        self.notebook.add(self.debugTab, text="Debug")
+        self.notebook.add(self.settingsTab, text="Settings")
+        # Call the various functions for creating the widgets in each tab
+        self.fillPrintTab()
+        self.fillArmTab()
+        self.fillDebugTab()
+        self.fillSettingsTab()
+
+        # Create a status label for immediate user response
+        self.statusBarFrame = Frame(self.root, height=20, bg="#FF0DEB")
+        self.statusBarFrame.pack(fill="both", expand=True, side="bottom")
+        self.statusLabel = Label(self.statusBarFrame, text="Status: Example")
+        self.statusLabel.grid(row=0, column=0, sticky=W+N+S)
+
+    def fillPrintTab(self):
+        # ==========| File Selection Frame |==========
+        self.fileSelFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000", width=250, height=80)
+        self.fileSelFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
+        self.fileSelFrame.grid_propagate(False)
+        # Select file button
+        self.selectFileButton = Button(self.fileSelFrame, text="Select File", width=10, command=self.printController.selectFile)
+        self.selectFileButton.grid(row=0, column=0, padx=5, pady=5, sticky=W)
+        # Selected file label
+        self.selectedFileLabel = Label(self.fileSelFrame, text="Please select file")
+        self.selectedFileLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
+
+        # ==========| Print Control Frame |==========
+        self.printControlFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000", width=500, height=80)
+        self.printControlFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
+        self.printControlFrame.grid_propagate(False)
+        # Start button
+        self.startPrintButton = Button(self.printControlFrame, text="Start", width=10, command=self.printController.startPrint, state="disabled")
+        self.startPrintButton.grid(row=0, column=0, padx=5, pady=5, sticky=N+S)
+        # Step button
+        self.stepPrintButton = Button(self.printControlFrame, text="Step", width=10, command=self.printController.stepPrint, state="disabled")
+        self.stepPrintButton.grid(row=0, column=1, padx=5, pady=5, sticky=N+S)
+        # Pause button
+        self.pausePrintButton = Button(self.printControlFrame, text="Pause", width=10, command=self.printController.pausePrint, state="disabled")
+        self.pausePrintButton.grid(row=0, column=2, padx=5, pady=5, sticky=N+S)
+        # Cancel button
+        self.cancelPrintButton = Button(self.printControlFrame, text="Cancel", width=10, command=self.printController.cancelPrint, state="disabled")
+        self.cancelPrintButton.grid(row=0, column=3, padx=5, pady=5, sticky=N+S)
+
+        # ==========| Temperatures Frame |==========
+        self.temperatureFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
+        self.temperatureFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
+
+        # ==========| Monitoring Frame |==========
+        self.printMonitorFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
+        self.printMonitorFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
+        # Progress Label
+        self.progressLabel = Label(self.printMonitorFrame, text="Progress:")
+        self.progressLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
+        # Progress bar
+        self.progressBar = ttk.Progressbar(self.printMonitorFrame, orient=HORIZONTAL, length=400, mode="determinate")
+        self.progressBar.grid(row=1, column=0, columnspan=3, padx=5, pady=5)
+        self.progressBar['value'] = 100
+
+        self.textScroll = Scrollbar(self.printMonitorFrame, orient="vertical")
+        self.textBox = Text(self.printMonitorFrame,
+                            wrap=NONE,
+                            width=49,
+                            height=18,
+                            yscrollcommand=self.textScroll.set,
+                            state="disabled"
+                            )
+        self.textScroll.config(command=self.textBox.yview)
+        self.textBox.grid(row=2, column=0, columnspan=5, padx=(5,0), pady=5)
+        self.textScroll.grid(row=2, column=1, padx=(0, 5), pady=5, sticky=N+S)
+
+    def fillArmTab(self):
         # ==========| Serial Frame |==========
-        self.serialFrame = Frame(self.root, bg="#FF0000", highlightthickness=2, highlightbackground="#000000")
+        self.serialFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
         self.serialFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+N+E+S)
         # Create label for Serial Frame
         self.serialLabel = Label(self.serialFrame, text="Serial Frame")
@@ -61,22 +150,87 @@ class TkWindow(Tk):
         self.portStatusLabel = Label(self.serialFrame, text="Status: Disconnected")
         self.portStatusLabel.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky=W)
 
+        # ==========| Reported Position Frame |==========
+        self.reportedPosFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.reportedPosFrame.grid(row=0, column=1, columnspan=2, padx=5, pady=5, sticky=W+N+E+S)
+        # Reported Position label
+        self.reportedPosLabel = Label(self.reportedPosFrame, text="Reported Position:")
+        self.reportedPosLabel.grid(row=0, column=0, columnspan=5, padx=5, pady=5, sticky=W)
 
-        # ==========| Control Frame |==========
-        self.controlFrame = Frame(self.root, bg="#00FF00", highlightthickness=2, highlightbackground="#000000")
-        self.controlFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+N+E+S)
-        # Create label fro Control Frame
-        self.controlLabel = Label(self.controlFrame, text="Control Frame")
-        self.controlLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        # Create calibration button
-        self.calibrateButton = Button(self.controlFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10)
-        self.calibrateButton.grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        self.extraCalibrateButton = Button(self.controlFrame, text="Extra Calibrates", command=self.extraCalibrate, width=11)
-        self.extraCalibrateButton.grid(row=1, column=1, padx=5, pady=5, sticky=W)
+        # Reported position coordinate labels
+        # XYZ
+        self.xyzPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground="#000000")
+        self.xyzPosFrame.grid(row=1, column=0, padx=5, pady=5)
+        # Create them
+        self.xCurCoordLabel = Label(self.xyzPosFrame, text="X:")
+        self.xCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        self.yCurCoordLabel = Label(self.xyzPosFrame, text="Y:")
+        self.yCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        self.zCurCoordLabel = Label(self.xyzPosFrame, text="Z:")
+        self.zCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        self.RxCurCoordLabel = Label(self.xyzPosFrame, text="Rx:")
+        self.RxCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        self.RyCurCoordLabel = Label(self.xyzPosFrame, text="Ry:")
+        self.RyCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        self.RzCurCoordLabel = Label(self.xyzPosFrame, text="Rz:")
+        self.RzCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        # Display them
+        self.xCurCoordLabel.grid(row=0, column=0, padx=5, pady=5)
+        self.xCurCoord.grid(row=0, column=1, padx=5, pady=5)
+        self.yCurCoordLabel.grid(row=0, column=2, padx=5, pady=5)
+        self.yCurCoord.grid(row=0, column=3, padx=5, pady=5)
+        self.zCurCoordLabel.grid(row=0, column=4, padx=5, pady=5)
+        self.zCurCoord.grid(row=0, column=5, padx=5, pady=5)
+        self.RxCurCoordLabel.grid(row=1, column=0, padx=5, pady=5)
+        self.RxCurCoord.grid(row=1, column=1, padx=5, pady=5)
+        self.RyCurCoordLabel.grid(row=1, column=2, padx=5, pady=5)
+        self.RyCurCoord.grid(row=1, column=3, padx=5, pady=5)
+        self.RzCurCoordLabel.grid(row=1, column=4, padx=5, pady=5)
+        self.RzCurCoord.grid(row=1, column=5, padx=5, pady=5)
+        
+        # Angles
+        self.jointPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground="#000000")
+        self.jointPosFrame.grid(row=1, column=1, padx=5, pady=5)
+        # Create them
+        self.J1CurCoordLabel = Label(self.jointPosFrame, text="J1:")
+        self.J1CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        self.J2CurCoordLabel = Label(self.jointPosFrame, text="J2:")
+        self.J2CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        self.J3CurCoordLabel = Label(self.jointPosFrame, text="J3:")
+        self.J3CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        self.J4CurCoordLabel = Label(self.jointPosFrame, text="J4:")
+        self.J4CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        self.J5CurCoordLabel = Label(self.jointPosFrame, text="J5:")
+        self.J5CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        self.J6CurCoordLabel = Label(self.jointPosFrame, text="J6:")
+        self.J6CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        # Display them
+        # Display them
+        self.J1CurCoordLabel.grid(row=0, column=0, padx=5, pady=5)
+        self.J1CurCoord.grid(row=0, column=1, padx=5, pady=5)
+        self.J2CurCoordLabel.grid(row=0, column=2, padx=5, pady=5)
+        self.J2CurCoord.grid(row=0, column=3, padx=5, pady=5)
+        self.J3CurCoordLabel.grid(row=0, column=4, padx=5, pady=5)
+        self.J3CurCoord.grid(row=0, column=5, padx=5, pady=5)
+        self.J4CurCoordLabel.grid(row=1, column=0, padx=5, pady=5)
+        self.J4CurCoord.grid(row=1, column=1, padx=5, pady=5)
+        self.J5CurCoordLabel.grid(row=1, column=2, padx=5, pady=5)
+        self.J5CurCoord.grid(row=1, column=3, padx=5, pady=5)
+        self.J6CurCoordLabel.grid(row=1, column=4, padx=5, pady=5)
+        self.J6CurCoord.grid(row=1, column=5, padx=5, pady=5)
 
-        # Offsets
-        self.calOffsetFrame = Frame(self.controlFrame)
-        self.calOffsetFrame.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky=W+E)
+        # ==========| Calibration Frame |==========
+        self.calibrationFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.calibrationFrame.grid(row=1, column=0, padx=5, pady=5)
+        # Calibration label
+        self.calibrationLabel = Label(self.calibrationFrame, text="Calibration:")
+        self.calibrationLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W+N)
+        # Full calibration button
+        self.calibrateButton = Button(self.calibrationFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10)
+        self.calibrateButton.grid(row=1, column=0, padx=5, pady=5, sticky=W+E)
+        # Calibration offsets
+        self.calOffsetFrame = Frame(self.calibrationFrame)
+        self.calOffsetFrame.grid(row=2, column=0, padx=5, pady=5, sticky=W+E)
         self.offsetLabel = Label(self.calOffsetFrame, text="Joint Offsets:")
         self.offsetLabel.grid(row=0, column=0, columnspan=5, padx=5, pady=5, sticky=W)
         # Make the widgets
@@ -105,7 +259,7 @@ class TkWindow(Tk):
         self.J5OffsetEntry.grid(row=2, column=3, padx=5, pady=5)
         self.J6OffsetLabel.grid(row=2, column=4, padx=5, pady=5)
         self.J6OffsetEntry.grid(row=2, column=5, padx=5, pady=5)
-
+        # Auto fill a value of '0'
         self.J1OffsetEntry.insert(0, "0")
         self.J2OffsetEntry.insert(0, "0")
         self.J3OffsetEntry.insert(0, "0")
@@ -113,10 +267,102 @@ class TkWindow(Tk):
         self.J5OffsetEntry.insert(0, "0")
         self.J6OffsetEntry.insert(0, "0")
 
-        # Move Linear label
-        self.moveFrame = Frame(self.controlFrame)
-        self.moveFrame.grid(row=3, column=0, columnspan=3, padx=5, pady=5, sticky=W+E)
-        self.moveLabel = Label(self.moveFrame, text="Move:")
+        # Individual calibration buttons
+        self.indivCalFrame = Frame(self.calibrationFrame)
+        self.indivCalFrame.grid(row=3, column=0, padx=5, pady=5, sticky=W+E)
+        # Label
+        self.indivCalLabel = Label(self.indivCalFrame, text="Individual Calibrations:")
+        self.indivCalLabel.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=W)
+        # Make the buttons
+        self.calJ1Button = Button(self.indivCalFrame, text="Cal J1", command=lambda: self.armController.calibrateJoints(1, 0, 0, 0, 0, 0), width=7)
+        self.calJ2Button = Button(self.indivCalFrame, text="Cal J2", command=lambda: self.armController.calibrateJoints(0, 1, 0, 0, 0, 0), width=7)
+        self.calJ3Button = Button(self.indivCalFrame, text="Cal J3", command=lambda: self.armController.calibrateJoints(0, 0, 1, 0, 0, 0), width=7)
+        self.calJ4Button = Button(self.indivCalFrame, text="Cal J4", command=lambda: self.armController.calibrateJoints(0, 0, 0, 1, 0, 0), width=7)
+        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.calibrateJoints(0, 0, 0, 0, 1, 0), width=7)
+        self.calJ6Button = Button(self.indivCalFrame, text="Cal J6", command=lambda: self.armController.calibrateJoints(0, 0, 0, 0, 0, 1), width=7)
+        # Place buttons
+        self.calJ1Button.grid(row=1, column=0, padx=5, pady=5,)
+        self.calJ2Button.grid(row=1, column=1, padx=5, pady=5)
+        self.calJ3Button.grid(row=1, column=2, padx=5, pady=5)
+        self.calJ4Button.grid(row=2, column=0, padx=5, pady=5)
+        self.calJ5Button.grid(row=2, column=1, padx=5, pady=5)
+        self.calJ6Button.grid(row=2, column=2, padx=5, pady=5)
+
+        # ==========| Tests Frame |==========
+        self.armTestsFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.armTestsFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
+        # Label
+        self.armTestsLabel = Label(self.armTestsFrame, text="Arm Tests:")
+        self.armTestsLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W+N)
+
+        # Limit switch test
+        self.limitTestFrame = Frame(self.armTestsFrame)
+        self.limitTestFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W)
+        self.limitTestButton = Button(self.limitTestFrame, text="Test Limit Switches", command=self.armController.toggleLimitTest)
+        self.limitTestButton.grid(row=0, column=0, columnspan=6, sticky=W)
+        # Create the widgets
+        self.J1LimLabel = Label(self.limitTestFrame, text="J1:")
+        self.J1LimState = Label(self.limitTestFrame, text="x")
+        self.J2LimLabel = Label(self.limitTestFrame, text="J2:")
+        self.J2LimState = Label(self.limitTestFrame, text="x")
+        self.J3LimLabel = Label(self.limitTestFrame, text="J3:")
+        self.J3LimState = Label(self.limitTestFrame, text="x")
+        self.J4LimLabel = Label(self.limitTestFrame, text="J4:")
+        self.J4LimState = Label(self.limitTestFrame, text="x")
+        self.J5LimLabel = Label(self.limitTestFrame, text="J5:")
+        self.J5LimState = Label(self.limitTestFrame, text="x")
+        self.J6LimLabel = Label(self.limitTestFrame, text="J6:")
+        self.J6LimState = Label(self.limitTestFrame, text="x")
+        # Display the widgets
+        self.J1LimLabel.grid(row=1, column=0)
+        self.J1LimState.grid(row=1, column=1)
+        self.J2LimLabel.grid(row=1, column=2)
+        self.J2LimState.grid(row=1, column=3)
+        self.J3LimLabel.grid(row=1, column=4)
+        self.J3LimState.grid(row=1, column=5)
+        self.J4LimLabel.grid(row=2, column=0)
+        self.J4LimState.grid(row=2, column=1)
+        self.J5LimLabel.grid(row=2, column=2)
+        self.J5LimState.grid(row=2, column=3)
+        self.J6LimLabel.grid(row=2, column=4)
+        self.J6LimState.grid(row=2, column=5)
+
+        # Encoder test
+        self.encoderTestFrame = Frame(self.armTestsFrame)
+        self.encoderTestFrame.grid(row=2, column=0, padx=5, pady=5, sticky=W)
+        self.encoderTestButton = Button(self.encoderTestFrame, text="Test Encoders", command=self.armController.toggleEncoderTest)
+        self.encoderTestButton.grid(row=0, column=0, columnspan=6, sticky=W)
+        # Create the widgets
+        self.J1EncLabel = Label(self.encoderTestFrame, text="J1:")
+        self.J1EncState = Label(self.encoderTestFrame, text="xxxx")
+        self.J2EncLabel = Label(self.encoderTestFrame, text="J2:")
+        self.J2EncState = Label(self.encoderTestFrame, text="xxxx")
+        self.J3EncLabel = Label(self.encoderTestFrame, text="J3:")
+        self.J3EncState = Label(self.encoderTestFrame, text="xxxx")
+        self.J4EncLabel = Label(self.encoderTestFrame, text="J4:")
+        self.J4EncState = Label(self.encoderTestFrame, text="xxxx")
+        self.J5EncLabel = Label(self.encoderTestFrame, text="J5:")
+        self.J5EncState = Label(self.encoderTestFrame, text="xxxx")
+        self.J6EncLabel = Label(self.encoderTestFrame, text="J6:")
+        self.J6EncState = Label(self.encoderTestFrame, text="xxxx")
+        # Display the widgets
+        self.J1EncLabel.grid(row=1, column=0)
+        self.J1EncState.grid(row=1, column=1)
+        self.J2EncLabel.grid(row=1, column=2)
+        self.J2EncState.grid(row=1, column=3)
+        self.J3EncLabel.grid(row=1, column=4)
+        self.J3EncState.grid(row=1, column=5)
+        self.J4EncLabel.grid(row=2, column=0)
+        self.J4EncState.grid(row=2, column=1)
+        self.J5EncLabel.grid(row=2, column=2)
+        self.J5EncState.grid(row=2, column=3)
+        self.J6EncLabel.grid(row=2, column=4)
+        self.J6EncState.grid(row=2, column=5)
+
+        # ==========| Movement Frame |==========
+        self.moveFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.moveFrame.grid(row=1, column=2, padx=5, pady=5, sticky=W+E+N+S)
+        self.moveLabel = Label(self.moveFrame, text="Movement:")
         self.moveLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
         # Send command button
         self.sendCommandButton = Button(self.moveFrame, text="Send Command", command=self.armController.prepMLCommand)
@@ -148,100 +394,29 @@ class TkWindow(Tk):
         self.RyCoordLabel.grid(row=2, column=2, padx=5, pady=5)
         self.RyCoordEntry.grid(row=2, column=3, padx=5, pady=5)
         self.RzCoordLabel.grid(row=2, column=4, padx=5, pady=5)
-        self.RzCoordEntry.grid(row=2, column=5, padx=5, pady=5)
+        self.RzCoordEntry.grid(row=2, column=5, padx=5, pady=5) 
 
-        # Current Position label
-        self.currentPosFrame = Frame(self.controlFrame)
-        self.currentPosFrame.grid(row=4, column=0, columnspan=3, padx=5, pady=5, sticky=W+E)
-        self.currentPosLabel = Label(self.currentPosFrame, text="Current:")
-        self.currentPosLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        # Current position coordinate labels
-        # Create them
-        self.xCurCoordLabel = Label(self.currentPosFrame, text="X:")
-        self.xCurCoord = Label(self.currentPosFrame, text="xxx")
-        self.yCurCoordLabel = Label(self.currentPosFrame, text="Y:")
-        self.yCurCoord = Label(self.currentPosFrame, text="xxx")
-        self.zCurCoordLabel = Label(self.currentPosFrame, text="Z:")
-        self.zCurCoord = Label(self.currentPosFrame, text="xxx")
-        self.RxCurCoordLabel = Label(self.currentPosFrame, text="Rx:")
-        self.RxCurCoord = Label(self.currentPosFrame, text="xxx")
-        self.RyCurCoordLabel = Label(self.currentPosFrame, text="Ry:")
-        self.RyCurCoord = Label(self.currentPosFrame, text="xxx")
-        self.RzCurCoordLabel = Label(self.currentPosFrame, text="Rz:")
-        self.RzCurCoord = Label(self.currentPosFrame, text="xxx")
-        # Display them
-        self.xCurCoordLabel.grid(row=1, column=0, padx=5, pady=5)
-        self.xCurCoord.grid(row=1, column=1, padx=5, pady=5)
-        self.yCurCoordLabel.grid(row=1, column=2, padx=5, pady=5)
-        self.yCurCoord.grid(row=1, column=3, padx=5, pady=5)
-        self.zCurCoordLabel.grid(row=1, column=4, padx=5, pady=5)
-        self.zCurCoord.grid(row=1, column=5, padx=5, pady=5)
-        self.RxCurCoordLabel.grid(row=2, column=0, padx=5, pady=5)
-        self.RxCurCoord.grid(row=2, column=1, padx=5, pady=5)
-        self.RyCurCoordLabel.grid(row=2, column=2, padx=5, pady=5)
-        self.RyCurCoord.grid(row=2, column=3, padx=5, pady=5)
-        self.RzCurCoordLabel.grid(row=2, column=4, padx=5, pady=5)
-        self.RzCurCoord.grid(row=2, column=5, padx=5, pady=5)
+    def fillDebugTab(self):
+        # ==========| Variables Frame |==========
+        self.debugVarFrame = Frame(self.debugTab, highlightthickness=2, highlightbackground="#000000", width=200, height=460)
+        self.debugVarFrame.grid(row=0, column=0, padx=5, pady=5)
+        self.debugVarFrame.grid_propagate(False)
 
-        # ==========| Printing Frame |==========
-        self.printingFrame = Frame(self.root, bg="#0000FF", highlightthickness=2, highlightbackground="#000000")
-        self.printingFrame.grid(row=0, rowspan=2, column=1, padx=5, pady=5, sticky=W+N+E+S)
-        # Printing frame label
-        self.printingLabel = Label(self.printingFrame, text="Print Panel")
-        self.printingLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        # Select file button
-        self.selectFileButton = Button(self.printingFrame, text="Select File", width=10, command=self.printController.selectFile)
-        self.selectFileButton.grid(row=1, column=0, padx=5, pady=5)
-        # Selected file label
-        self.selectedFileLabel = Label(self.printingFrame, text="Please select file")
-        self.selectedFileLabel.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky=W)
-        # Start button
-        self.startPrintButton = Button(self.printingFrame, text="Start", width=10, command=self.printController.startPrint, state="disabled")
-        self.startPrintButton.grid(row=2, column=0, padx=5, pady=5)
-        self.stepPrintButton = Button(self.printingFrame, text="Step", width=10, command=self.printController.stepPrint, state="disabled")
-        self.stepPrintButton.grid(row=2, column=1, padx=5, pady=5)
-        # Pause button
-        self.pausePrintButton = Button(self.printingFrame, text="Pause", width=10, command=self.printController.pausePrint, state="disabled")
-        self.pausePrintButton.grid(row=2, column=2, padx=5, pady=5)
-        # Cancel button
-        self.cancelPrintButton = Button(self.printingFrame, text="Cancel", width=10, command=self.printController.cancelPrint, state="disabled")
-        self.cancelPrintButton.grid(row=2, column=3, padx=5, pady=5)
-        # Progress Label
-        self.progressLabel = Label(self.printingFrame, text="Progress:")
-        self.progressLabel.grid(row=3, column=0, padx=5, pady=5)
-        # Progress bar
-        self.progressBar = ttk.Progressbar(self.printingFrame, orient=HORIZONTAL, length=300, mode="determinate")
-        self.progressBar.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
-        self.progressBar['value'] = 40
-
-        self.textScroll = Scrollbar(self.printingFrame, orient="vertical")
-        self.textBox = Text(self.printingFrame,
-                            wrap=NONE,
-                            width=50,
-                            height=20,
-                            yscrollcommand=self.textScroll.set,
-                            state="disabled"
-                            )
-        self.textScroll.config(command=self.textBox.yview)
-        self.textBox.grid(row=5, column=0, columnspan=5, padx=(5,0), pady=5)
-        self.textScroll.grid(row=5, column=6, padx=(0, 5), pady=5, sticky=N+S)
-
-        # ==========| Terminal Panel |==========
-        self.termFrame = Frame(self.root, bg="#00FFFF", highlightthickness=2, highlightbackground="#000000")
-        self.termFrame.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky=W+E+N+S)
+        # ==========| Terminal Frame |==========
+        self.termFrame = Frame(self.debugTab, bg="#00FFFF", highlightthickness=2, highlightbackground="#000000")
+        self.termFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
 
         self.termVertScroll = Scrollbar(self.termFrame, orient="vertical")
         self.termHorzScroll = Scrollbar(self.termFrame, orient="horizontal")
 
         self.terminal = Text(self.termFrame,
                             wrap=NONE,
-                            width=80,
-                            height=10,
+                            width=65,
+                            height=27,
                             yscrollcommand=self.termVertScroll.set,
                             xscrollcommand=self.termHorzScroll.set,
                             state="disabled"
                             )
-        
         
         self.termVertScroll.pack(side=RIGHT, fill=Y)
         self.termVertScroll.config(command=self.terminal.yview)
@@ -251,6 +426,10 @@ class TkWindow(Tk):
         #self.terminal.grid(row=1, column=0, columnspan=5, padx=5, pady=5)
         self.terminal.pack(fill=BOTH)
 
+    def fillSettingsTab(self):
+        # Temporary text to inform user that there is nothing here yet
+        Label(self.settingsTab, text="Nothing to see here at the moment (WIP)").pack(fill="both", expand=True)
+       
     def update(self):
         #print("\nUpdate function called:")
 
@@ -262,6 +441,10 @@ class TkWindow(Tk):
             self.armController.calibrateArmUpdate()
         if self.armController.awaitingMoveResponse:
             self.armController.moveUpdate()
+        if self.armController.testingLimitSwitches:
+            self.armController.limitTestUpdate()
+        if self.armController.testingEncoders:
+            self.armController.encoderTestUpdate()
 
         # ==========| PrintController |==========
 
@@ -279,34 +462,22 @@ class TkWindow(Tk):
         else:
             # If not, enable the connect button
             self.connectButton.config(state="normal")
-        
-    def extraCalibrate(self):
-        print("extraCalibrate")
-        self.terminalPrint("Opening extra calibrations window")
-        # Create another window for extra calibration
-        self.extraCalibrateTop = Toplevel(self.root)
-        # Create buttons for J1-6 calibration
-        self.calJ1Button = Button(self.extraCalibrateTop, text="Cal J1", command=lambda: self.armController.calibrateJoints(1, 0, 0, 0, 0, 0))
-        self.calJ2Button = Button(self.extraCalibrateTop, text="Cal J2", command=lambda: self.armController.calibrateJoints(0, 1, 0, 0, 0, 0))
-        self.calJ3Button = Button(self.extraCalibrateTop, text="Cal J3", command=lambda: self.armController.calibrateJoints(0, 0, 1, 0, 0, 0))
-        self.calJ4Button = Button(self.extraCalibrateTop, text="Cal J4", command=lambda: self.armController.calibrateJoints(0, 0, 0, 1, 0, 0))
-        self.calJ5Button = Button(self.extraCalibrateTop, text="Cal J5", command=lambda: self.armController.calibrateJoints(0, 0, 0, 0, 1, 0))
-        self.calJ6Button = Button(self.extraCalibrateTop, text="Cal J6", command=lambda: self.armController.calibrateJoints(0, 0, 0, 0, 0, 1))
-
-        # Place buttons on the window
-        self.calJ1Button.grid(row=0, column=0, padx=5, pady=5)
-        self.calJ2Button.grid(row=0, column=1, padx=5, pady=5)
-        self.calJ3Button.grid(row=1, column=0, padx=5, pady=5)
-        self.calJ4Button.grid(row=1, column=1, padx=5, pady=5)
-        self.calJ5Button.grid(row=2, column=0, padx=5, pady=5)
-        self.calJ6Button.grid(row=2, column=1, padx=5, pady=5)
 
     # Used to print to the in window terminal
     def terminalPrint(self, message):
+        print(message) # Print to the Python terminal as well
         self.terminal.config(state="normal") # Need to enable to modify
         self.terminal.insert(END, f"{datetime.now().now()}| {message}\n") # Print the message with the current time fixated at the front
         self.terminal.config(state="disabled") # Disable again to avoid user changes
         self.terminal.see("end") # Forces terminal to autoscroll with new text. Probably want to make this a toggle option
+
+    # Used to print important info to the status bar
+    def statusPrint(self, message):
+        # TODO: Add extra check for if text is too long and do a fancy '...' or something to show that there is more
+        # Update the status label
+        self.statusLabel.config(text=f"Status: {message}")
+        # Also print the full message to the terminal
+        self.terminalPrint(message)
 
 if __name__ == "__main__":
     app = TkWindow()

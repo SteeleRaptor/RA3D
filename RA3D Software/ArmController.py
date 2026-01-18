@@ -49,13 +49,21 @@ class ArmController:
 
         # Other variables
         self.awaitingMoveResponse = False # Flag for if the ArmController is awaiting a serial response after sending a move command
+        self.testingLimitSwitches = False # Flag for if the limit switch test is being performed
+        self.testingEncoders = False      # Flag for if the encoder test is being performed
+        self.awaitingTestResponse = False # Flag for if we are awaiting a response after sending a test command such as for the limit switches or encoders
+        self.finishTest = False           # Flag for signifying to the program that the user wants to stop a test
 
     def startArmCalibration(self):
         # Check if calibration is already in progress and exit if so
         if self.calibrationInProgress is True:
-            self.root.terminalPrint("Calibration already in progress")
+            self.root.statusPrint("Calibration already in progress")
             return
-        self.root.terminalPrint("Beginning arm calibration")
+        # Check if arm is busy with something else
+        if self.checkIfBusy() is True:
+            self.root.statusPrint("Arm is busy with something else at the moment")
+            return
+        self.root.statusPrint("Beginning arm calibration")
         # Set flag for calibration in progress
         self.calibrationInProgress = True
         # Move to next state of calibration
@@ -67,7 +75,6 @@ class ArmController:
         # Exit the function if calibration is not in progress and exit if so
         if self.calibrationInProgress is False:
             return
-        #print("calibrateArmUpdate called")
         # Check current state and perform associated tasks
         if self.calibrationState is 1: # Send CalStage1
             self.calibrateJoints(calJ1=self.calJStage1[0],
@@ -85,16 +92,14 @@ class ArmController:
                 # Check if the calibration was successful
                 if (response[:1] == 'A'):
                     # Inform user of Stage 1 success
-                    print("Stage 1 Calibration Successful")
-                    self.root.terminalPrint("Stage 1 Calibration Successful")
+                    self.root.statusPrint("Stage 1 Calibration Successful")
                     # Process position response and dispaly
                     self.processPosition(response)
                     # Move to next state
                     self.calibrationState = 3
                 else:
                     # If not, inform user of Stage 1 Failure
-                    print("Stage 1 Calibration FAILED")
-                    self.root.terminalPrint("Stage 1 Calibration FAILED")
+                    self.root.statusPrint("Stage 1 Calibration FAILED")
                     # Exit calibration
                     self.calibrationState = 0
                     self.calibrationInProgress = False
@@ -118,8 +123,7 @@ class ArmController:
                 # Check if the calibration was successful
                 if (response[:1] == 'A'):
                     # Inform user of Stage 1 success
-                    print("Stage 2 Calibration Successful")
-                    self.root.terminalPrint("Stage 2 Calibration Successful")
+                    self.root.statusPrint("Stage 2 Calibration Successful")
                     # Process position response and dispaly
                     self.processPosition(response)
 
@@ -131,8 +135,7 @@ class ArmController:
                     self.armCalibrated = True
                 else:
                     # If not, inform user of Stage 2 Failure
-                    print("Stage 2 Calibration FAILED")
-                    self.root.terminalPrint("Stage 2 Calibration FAILED")
+                    self.root.statusPrint("Stage 2 Calibration FAILED")
                     # Exit calibration
                     self.calibrationState = 0
                     self.calibrationInProgress = False
@@ -146,7 +149,7 @@ class ArmController:
         self.root.terminalPrint("Command to send: ")
         self.root.terminalPrint(command[0:-2])
         if self.serialController.boardConnected is False:
-            self.root.terminalPrint("Command not sent due to no board connected")
+            self.root.statusPrint("Command not sent due to no board connected")
             return "E"
         # Tell the serial controller to send the serial
         self.serialController.sendSerial(command)
@@ -193,29 +196,34 @@ class ArmController:
         self.curRz = response[RzIdx+1:RyIdx].strip()
 
         # Display values on UI
+        # XYZ
         self.root.xCurCoord.config(text=self.curX)
         self.root.yCurCoord.config(text=self.curY)
         self.root.zCurCoord.config(text=self.curZ)
         self.root.RxCurCoord.config(text=self.curRx)
         self.root.RyCurCoord.config(text=self.curRy)
         self.root.RzCurCoord.config(text=self.curRz)
+        # Joint
+        self.root.J1CurCoord.config(text=self.curJ1)
+        self.root.J2CurCoord.config(text=self.curJ2)
+        self.root.J3CurCoord.config(text=self.curJ3)
+        self.root.J4CurCoord.config(text=self.curJ4)
+        self.root.J5CurCoord.config(text=self.curJ5)
+        self.root.J6CurCoord.config(text=self.curJ6)
 
     def moveUpdate(self):
         
         if self.awaitingMoveResponse is False:
             return
-        
-        #print("moveUpdate")
+
         if self.serialController.responseReady:
             response = self.serialController.getLastResponse()
             self.root.terminalPrint(response)
             if (response[:1] == 'E'):
-                self.root.terminalPrint("Error executing ML command")
-                print("Error executing ML command")
+                self.root.statusPrint("Error executing ML command")
                 # Sound the alarms on UI or something
             else:
-                self.root.terminalPrint("ML command executed successfully")
-                print("No error executing ML command")
+                self.root.statusPrint("ML command executed successfully")
                 self.processPosition(response)
             self.awaitingMoveResponse = False
 
@@ -230,43 +238,34 @@ class ArmController:
         # Check if any values are blank
         allValuesNumeric = True
         if not x.isnumeric():
-            print("X is not a number")
             self.root.terminalPrint("X is not a number")
             allValuesNumeric = False
         if not y.isnumeric():
-            print("Y is not a number")
             self.root.terminalPrint("Y is not a number")
             allValuesNumeric = False
         if not z.isnumeric():
-            print("Z is not a number")
             self.root.terminalPrint("Z is not a number")
             allValuesNumeric = False
         if not Rx.isnumeric():
-            print("Rx is not a number")
             self.root.terminalPrint("Rx is not a number")
             allValuesNumeric = False
         if not Ry.isnumeric():
-            print("Ry is not a number")
             self.root.terminalPrint("Ry is not a number")
             allValuesNumeric = False
         if not Rz.isnumeric():
-            print("Rz is not a number")
             self.root.terminalPrint("Rz is not a number")
             allValuesNumeric = False
         
         if allValuesNumeric:
-            print("All values numeric, sending ML command")
             self.root.terminalPrint("All values numeric, sending ML command")
             self.sendML(x, y, z, Rx, Ry, Rz)
         else:
             self.root.terminalPrint("ML command not sent due to a value not being a number")
-            print("ML command not sent due to a value not being a number")
 
     def sendML(self, X, Y, Z, Rx, Ry, Rz):
         if self.awaitingMoveResponse:
-            self.root.terminalPrint("Cannot send ML command as currently awaiting response from a previous move command")
+            self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
-        print("Sending ML command...")
         self.root.terminalPrint("Sending ML command...")
         # Taken from AR4.py, line XXXX
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
@@ -277,16 +276,17 @@ class ArmController:
         # Check if board is not connected or arm is not calibrated
         if self.serialController.boardConnected is False:
             # Inform user in terminal then quit function to avoid sending instruction
-            self.root.terminalPrint("Command not sent due to no board connected")
+            self.root.statusPrint("Command not sent due to no board connected")
             return
         elif self.armCalibrated is False:
             # Inform user in terminal then quit function to avoid sending instruction
-            self.root.terminalPrint("Command not sent due to arm not calibrated")
+            self.root.statusPrint("Command not sent due to arm not calibrated")
             return
         
         # Send the serial command
         self.serialController.sendSerial(command)
 
+    # TODO: This entire function neads to be update to the asynchronous system and terminal/status printing
     def sendRJ(self, J1, J2, J3, J4, J5, J6):
         print("Sending RJ command...")
         if self.serialController.boardConnected is False:
@@ -304,7 +304,6 @@ class ArmController:
             print("No error executing MJ command")
         self.processPosition(response)
 
-
     def getCalOffsets(self):
         # Grab values from the entry fields, convert to integers, and save
         self.J1CalOffset = int(self.root.J1OffsetEntry.get())
@@ -313,3 +312,100 @@ class ArmController:
         self.J4CalOffset = int(self.root.J4OffsetEntry.get())
         self.J5CalOffset = int(self.root.J5OffsetEntry.get())
         self.J6CalOffset = int(self.root.J6OffsetEntry.get())
+    
+    # Checks if any of the flags relating to the arm performing a task are True and if so, return True
+    def checkIfBusy(self):
+        return self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingTestResponse
+    
+    def toggleLimitTest(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed to start limit switch test. No board is connected")
+        # Check if we are already testing limit switches
+        elif self.testingLimitSwitches:
+            self.finishTest = True # Set the flag to finish the test
+            self.root.limitTestButton.configure(relief="raised") # Make the button look un-toggled
+        # If not, check if we are busy with anything else (self.testingLimitSwitches must be False if here)
+        elif self.checkIfBusy() is True:
+            self.root.statusPrint("Failed to start limit switch test. Arm is busy.")
+        # If we reach this, the arm is not busy with anything and we can start the test
+        else:
+            self.testingLimitSwitches = True # set the flag
+            self.root.limitTestButton.configure(relief="ridge") # Make the button look toggled
+            self.root.statusPrint("Starting limit switch test")
+
+    def limitTestUpdate(self):
+        if self.awaitingTestResponse is False:
+            self.serialController.sendSerial("TL\n") # Send instruction
+            self.awaitingTestResponse = True # Set the flag
+            return
+        # Check if serial controller has a response ready
+        if self.serialController.responseReady:
+            # If so, read it in
+            response = self.serialController.getLastResponse()
+            self.root.terminalPrint(response)
+            # Limit switch test will never return an error so we can always directly process
+            self.root.J1LimState.config(text=response[response.find('J1')+5:response.find("   J2")].strip())
+            self.root.J2LimState.config(text=response[response.find('J2')+5:response.find("   J3")].strip())
+            self.root.J3LimState.config(text=response[response.find('J3')+5:response.find("   J4")].strip())
+            self.root.J4LimState.config(text=response[response.find('J4')+5:response.find("   J5")].strip())
+            self.root.J5LimState.config(text=response[response.find('J5')+5:response.find("   J6")].strip())
+            self.root.J6LimState.config(text=response[response.find('J6')+5:].strip())
+            self.awaitingTestResponse = False # Reset the flag
+            # Check if the user wants to stop the test
+            # This is done in here to prevent the program eternally waiting on a response
+            if self.finishTest is True:
+                self.testingLimitSwitches = False # Reset the test flag
+                self.finishTest = False # Reset the finish testing flag
+                self.root.statusPrint("Stopping limit switch test")
+
+    def toggleEncoderTest(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed to start encoder test. No board is connected")
+        # Check if we are already testing encoders
+        elif self.testingEncoders:
+            self.finishTest = True # Set the flag to finish the test
+            self.root.encoderTestButton.configure(relief="raised") # Make the button look un-toggled
+        # If not, check if we are busy with anything else (self.testingEncoders must be False if here)
+        elif self.checkIfBusy():
+            self.root.statusPrint("Failed to start encoder test. Arm is busy.")
+        # If we reach this, the arm is not busy with anything and we can start the test
+        else:
+            self.testingEncoders = True # set the flag
+            self.root.encoderTestButton.configure(relief="ridge") # Make the button look toggled
+            self.root.statusPrint("Starting encoder test")
+            # Send a "Set Encoder" instruction to set all values to 1000
+            # I don't understand the reasoning behind this but this is what the AR4's encoder test code does so it is being included
+            self.serialController.sendSerial("SE\n")
+            # The "Set Encoder" instruction returns a "Done" except it is done with a print instead of println
+            # which makes it so the serial can only be read by a "read" instead of "readline".
+            # Therefore, we forcibly tell the serialController that it isn't waiting for a response
+            self.serialController.waitingForResponse = False
+
+    def encoderTestUpdate(self):
+        if self.awaitingTestResponse is False:
+            self.serialController.sendSerial("RE\n") # Send instruction
+            self.awaitingTestResponse = True # Set the flag
+            return
+        # Check if serial controller has a response ready
+        if self.serialController.responseReady:
+            # If so, read it in
+            response = self.serialController.getLastResponse()
+            self.root.terminalPrint(response)
+            # The "SE" instruction returns 'Done' so we need to watch out for it
+            if response == "Done":
+                self.awaitingTestResponse = False
+                return
+            # Encoder test will never return an error so we can always directly process
+            self.root.J1EncState.config(text=response[response.find('J1')+5:response.find("   J2")].strip())
+            self.root.J2EncState.config(text=response[response.find('J2')+5:response.find("   J3")].strip())
+            self.root.J3EncState.config(text=response[response.find('J3')+5:response.find("   J4")].strip())
+            self.root.J4EncState.config(text=response[response.find('J4')+5:response.find("   J5")].strip())
+            self.root.J5EncState.config(text=response[response.find('J5')+5:response.find("   J6")].strip())
+            self.root.J6EncState.config(text=response[response.find('J6')+5:].strip())
+            self.awaitingTestResponse = False # Reset the flag
+            # Check if the user wants to stop the test
+            # This is done in here to prevent the program eternally waiting on a response
+            if self.finishTest is True:
+                self.testingEncoders = False # Reset the test flag
+                self.finishTest = False # Reset the finish testing flag
+                self.root.statusPrint("Stopping encoder test")

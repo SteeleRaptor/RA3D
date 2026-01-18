@@ -1,11 +1,11 @@
 import serial
 import serial.tools.list_ports
+from serial import SerialException
 import time
 import threading
 import queue
 
-# TODO: Needs threading implemented to prevent GUI from freezing while waiting for a response from the arm
-# TODO: Could include a timeout but some arm move commands (such as calibration) will take much longer than others
+# TODO: Interesting bug that occurs but when connecting, disconnecting, then reconnecting, the entire serial buffer gets messed up resulting in everything being read in as junk. Not sure how it is happening nor how to fix.
 
 class SerialController:
 
@@ -27,14 +27,13 @@ class SerialController:
 
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
-        self.root.terminalPrint("serialConnect()")
         # Check if the serial controller is already connected to a board
         if self.boardConnected == False:
             # If not, connect to the port currently selected in the port dropdown
-            self.root.terminalPrint("Attempting port connection")
+            self.root.statusPrint("Attempting port connection")
             self.connectPort(self.root.portSelection.get())
-            self.root.terminalPrint(f"Connection Status: {self.boardConnected}")
-            print(f"Connection Status: {self.boardConnected}")
+            self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+
             # Perform a check to see if board was actually connected to
             if self.boardConnected:
                 self.root.connectButton.config(text="Disconnect") # Change button text
@@ -43,10 +42,9 @@ class SerialController:
                 self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
         else:
             # If so, disconnect from the port
-            self.root.terminalPrint("Disconnecting from port")
+            self.root.statusPrint("Disconnecting from port")
             self.disconnectPort()
-            print(f"Connection Status: {self.boardConnected}")
-            self.root.terminalPrint(f"Connection Status: {self.boardConnected}")
+            self.root.statusPrint(f"Connection Status: {self.boardConnected}")
             self.root.connectButton.config(text="Connect") # Change button text
             self.root.portDropdown.config(state="readonly") # Enable port dropdown
             self.root.refreshCOMButton.config(state="normal") # Enable refresh button
@@ -54,7 +52,6 @@ class SerialController:
 
     def connectPort(self, port):
         self.port = port
-        print(self.port)
         try:
             ### TODO: Edge case not caught by this try is if connecting to port, 
             # unplug & replug board on same port, disconnect, 
@@ -62,15 +59,23 @@ class SerialController:
             # doesn't actually connect to the port and essentially bricks 
             # the program from connecting to another port until restarted
             tempBoard = serial.Serial(self.port, self.baud)
-            print(f"Port {port} opened successfully")
+            self.root.statusPrint(f"Port {port} opened successfully")
             self.board = tempBoard
+            self.board.reset_output_buffer()
+            self.board.reset_input_buffer()
             self.boardConnected = True
+            self.responseQueue = queue.Queue()
             self.serialThread = threading.Thread(target=self.serialReader, daemon=True)
-        except Exception:
-            print(f"Failed to open port: {port}")
+            self.serialThread.start()
+            self.checkResponseQueue()
+        except SerialException:
+            self.root.statusPrint(f"Failed to open port: {port}")
 
     def disconnectPort(self):
         if self.boardConnected == True:
+            self.boardConnected = False
+            self.board.reset_output_buffer()
+            self.board.reset_input_buffer()
             self.board.close()
 
     # Repeatedly checks the serial port for new responses
@@ -83,15 +88,20 @@ class SerialController:
                     # Read them in and store them in the response queue
                     data = str(self.board.readline().decode('utf-8').strip())
                     self.responseQueue.put(data)
+            else:
+                time.sleep(0.05)
     
     def checkResponseQueue(self):
         # Check if there is anything in the response queue
         try:
             while True:
-                self.lastResponse = self.responseQueue.get_nowait()
-                self.responseReady = True
-                self.waitingForResponse = False
-        except self.responseQueue.empty:
+                if self.boardConnected:
+                    self.lastResponse = self.responseQueue.get_nowait()
+                    self.responseReady = True
+                    self.waitingForResponse = False
+                else:
+                    break
+        except queue.Empty:
             pass
         self.root.after(100, self.checkResponseQueue)
 
@@ -106,15 +116,17 @@ class SerialController:
     def sendSerial(self, command):
         # Check if a board is connected
         if self.boardConnected == False:
-            print("Failed to send command: No board connected")
+            self.root.statusPrint("Failed to send command: No board connected")
             return
         # If a board is connected, check if we are already waiting for a serial response
         if self.waitingForResponse:
-            print("Failed to send command. Currently awaiting serial response")
+            self.root.statusPrint("Failed to send command. Currently awaiting serial response")
             return
+        self.board.reset_input_buffer()
         # If we aren't awaiting for a serial response, then send the command
-        print(f"Sending Command: {command}")
+        self.root.statusPrint(f"Sending Command: {command}")
         self.board.write(command.encode())
+        self.root.terminalPrint("Command sent")
         # Reset the input buffer
         self.board.reset_input_buffer()
         self.waitingForResponse = True # Note that it is always assume that there will be a response to be read back in
@@ -130,13 +142,10 @@ class SerialController:
         ports = list(serial.tools.list_ports.comports())
         returnList = []
         if not ports:
-            self.root.terminalPrint("No serial ports w/ connected devices found")
-            print("No serial ports w/ connected devices found")
+            self.root.statusPrint("No serial ports w/ connected devices found")
         else:
-            self.root.terminalPrint(f"Found {len(ports)} connected device(s):")
-            print(f"Found {len(ports)} connected device(s):\n")
+            self.root.statusPrint(f"Found {len(ports)} connected device(s):")
             for port in ports:
                 self.root.terminalPrint(f"Name: {port.device}\nDescription: {port.description}\nID: {port.hwid}\n\n")
-                print(f"Name: {port.device}\nDescription: {port.description}\nID: {port.hwid}\n\n")
                 returnList.append(port.device)
         return returnList

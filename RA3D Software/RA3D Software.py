@@ -156,7 +156,9 @@ class TkWindow(Tk):
         # Reported Position label
         self.reportedPosLabel = Label(self.reportedPosFrame, text="Reported Position:")
         self.reportedPosLabel.grid(row=0, column=0, columnspan=5, padx=5, pady=5, sticky=W)
-
+        # Request position button
+        self.requestPosButton = Button(self.reportedPosFrame, text="Request Position", command=self.armController.requestPosition, width=15)
+        self.requestPosButton.grid(row=0, column=1, padx=5, pady=5, sticky=W)
         # Reported position coordinate labels
         # XYZ
         self.xyzPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground="#000000")

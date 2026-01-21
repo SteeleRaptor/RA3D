@@ -1,4 +1,4 @@
-
+import re
 from SerialController import SerialController
 
 class ArmController:
@@ -145,6 +145,7 @@ class ArmController:
                 self.root.terminalPrint(response)
 
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
+        self.getCalOffsets() # Update calibration offsets from entry fields
         command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
         self.root.terminalPrint("Command to send: ")
         self.root.terminalPrint(command[0:-2])
@@ -236,23 +237,24 @@ class ArmController:
         Ry = self.root.RyCoordEntry.get()
         Rz = self.root.RzCoordEntry.get()
         # Check if any values are blank
+        pattern = r"^-?\d+\.\d+$"  # Regular expression for a valid float
         allValuesNumeric = True
-        if not x.isnumeric():
+        if not re.match(pattern, x):
             self.root.terminalPrint("X is not a number")
             allValuesNumeric = False
-        if not y.isnumeric():
+        if not re.match(pattern, y):
             self.root.terminalPrint("Y is not a number")
             allValuesNumeric = False
-        if not z.isnumeric():
+        if not re.match(pattern, z):
             self.root.terminalPrint("Z is not a number")
             allValuesNumeric = False
-        if not Rx.isnumeric():
+        if not re.match(pattern, Rx):
             self.root.terminalPrint("Rx is not a number")
             allValuesNumeric = False
-        if not Ry.isnumeric():
+        if not re.match(pattern, Ry):
             self.root.terminalPrint("Ry is not a number")
             allValuesNumeric = False
-        if not Rz.isnumeric():
+        if not re.match(pattern, Rz):
             self.root.terminalPrint("Rz is not a number")
             allValuesNumeric = False
         
@@ -264,36 +266,38 @@ class ArmController:
     
     def prepRJCommand(self):
         # Read the values from each entry box
-        J1  = self.root.xCoordEntry.get()
-        J2  = self.root.yCoordEntry.get()
-        J3  = self.root.zCoordEntry.get()
-        J4 = self.root.RxCoordEntry.get()
-        J5 = self.root.RyCoordEntry.get()
-        J6 = self.root.RzCoordEntry.get()
+        J1 = self.root.J1CoordEntry.get()
+        J2 = self.root.J2CoordEntry.get()
+        J3 = self.root.J3CoordEntry.get()
+        J4 = self.root.J4CoordEntry.get()
+        J5 = self.root.J5CoordEntry.get()
+        J6 = self.root.J6CoordEntry.get()
         # Check if any values are blank
         allValuesNumeric = True
-        if not J1.isnumeric():
+        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
+
+        if not re.match(pattern, J1):
             self.root.terminalPrint("J1 is not a number")
             allValuesNumeric = False
-        if not J2.isnumeric():
+        if not re.match(pattern, J2):
             self.root.terminalPrint("J2 is not a number")
             allValuesNumeric = False
-        if not J3.isnumeric():
+        if not re.match(pattern, J3):
             self.root.terminalPrint("J3 is not a number")
             allValuesNumeric = False
-        if not J4.isnumeric():
+        if not re.match(pattern, J4):
             self.root.terminalPrint("J4 is not a number")
             allValuesNumeric = False
-        if not J5.isnumeric():
+        if not re.match(pattern, J5):
             self.root.terminalPrint("J5 is not a number")
             allValuesNumeric = False
-        if not J6.isnumeric():
+        if not re.match(pattern, J6):
             self.root.terminalPrint("J6 is not a number")
             allValuesNumeric = False
         
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending RJ command")
-            self.sendML(J1, J2, J3, J4, J5, J6)
+            self.sendRJ(J1, J2, J3, J4, J5, J6)
         else:
             self.root.terminalPrint("RJ command not sent due to a value not being a number")
    
@@ -321,44 +325,30 @@ class ArmController:
         # Send the serial command
         self.serialController.sendSerial(command)
 
-    #RJ - Set Joint Angles
+    # TODO: This entire function neads to be update to the asynchronous system and terminal/status printing
     def sendRJ(self, J1, J2, J3, J4, J5, J6):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send MJ command as currently awaiting response from a previous move command")
             return
-        # Create the command
-        command = f"RJA{J1}B{J2}C{J3}D{J4}E{J5}F{J6}J70.00J80.00J90.00Sp{self.speed}Ac{self.acceleration}Dc{self.deceleration}Rm{self.ramp}Rnd0WFLm000000Q0\n"
-        self.root.terminalPrint("Command to send:")
-        self.root.terminalPrint(command[0:-2])
-        # Check if board is not connected or arm is not calibrated
+        print("Sending RJ command...")
         if self.serialController.boardConnected is False:
-            # Inform user in terminal then quit function to avoid sending instruction
-            self.root.statusPrint("Command not sent due to no board connected")
+            print("Error: No board connected, cancelling RJ command")
             return
         elif self.armCalibrated is False:
             # Inform user in terminal then quit function to avoid sending instruction
             self.root.statusPrint("Command not sent due to arm not calibrated")
-            return
-        # Send the serial command
-        self.serialController.sendSerial(command)
-
-    # TODO: This entire function neads to be update to the asynchronous system and terminal/status printing
-    def sendRJ(self, J1, J2, J3, J4, J5, J6):
-        print("Sending RJ command...")
-        if self.serialController.boardConnected is False:
-            print("Error: No board connected, cancelling RJ command")
             return
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
         command = f"RJA{J1}B{J2}C{J3}D{J4}E{J5}F{J6}J7{0}J8{0}J9{0}Sp{self.speed}Ac{self.acceleration}Dc{self.deceleration}Rm{self.ramp}WNLm000000\n"
         # Send the command
         response = self.serialController.sendSerial(command)
         # Check for any errors
-        if (response[:1] == 'E'):
+        '''if (response[:1] == 'E'):
             print("Error executing MJ command")
             # Sound the alarms on UI or something
         else:
             print("No error executing MJ command")
-        self.processPosition(response)
+        self.processPosition(response)'''  
 
     def getCalOffsets(self):
         # Grab values from the entry fields, convert to integers, and save
@@ -368,6 +358,7 @@ class ArmController:
         self.J4CalOffset = int(self.root.J4OffsetEntry.get())
         self.J5CalOffset = int(self.root.J5OffsetEntry.get())
         self.J6CalOffset = int(self.root.J6OffsetEntry.get())
+        self.root.terminalPrint(f"Calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
     
     # Checks if any of the flags relating to the arm performing a task are True and if so, return True
     def checkIfBusy(self):
@@ -465,3 +456,19 @@ class ArmController:
                 self.testingEncoders = False # Reset the test flag
                 self.finishTest = False # Reset the finish testing flag
                 self.root.statusPrint("Stopping encoder test")
+    def requestPosition(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed to request position update. No board is connected")
+            return
+        if self.checkIfBusy() is True:
+            self.root.statusPrint("Failed to request position update. Arm is busy.")
+            return
+        self.root.terminalPrint("Requesting position update...")
+        command = "RP\n"
+        self.serialController.sendSerial(command)
+    #Moves the robot to a safe position to be turned off
+    def MoveSafe(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed")
+            return
+        self.sendRJ(self, 0, -40, 40, 0, 90, 0)

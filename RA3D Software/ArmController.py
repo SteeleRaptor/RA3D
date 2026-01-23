@@ -1,5 +1,6 @@
 import re
 from SerialController import SerialController
+from Kinematics import Kinematics
 
 class ArmController:
     def __init__(self, root, serialController):
@@ -274,10 +275,14 @@ class ArmController:
             # Inform user in terminal then quit function to avoid sending instruction
             self.root.statusPrint("Command not sent due to arm not calibrated")
             return
-        
         # Send the serial command
         self.serialController.sendSerial(command)
-
+    #custom move linear command that calculates inverse kinematics before sending and uses RJ
+    #This function may not be much different but InverseKinematics is needed for printing
+    def moveLinearCustom(self, X, Y, Z, Rx, Ry, Rz):
+        kinematics = Kinematics(self.root)
+        outgoingJointAngles = kinematics.solveInverseKinematics([X, Y, Z, Rx, Ry, Rz])
+        self.sendRJ(outgoingJointAngles[0], outgoingJointAngles[1], outgoingJointAngles[2], outgoingJointAngles[3], outgoingJointAngles[4], outgoingJointAngles[5])
     def prepRJCommand(self):
         # Read the values from each entry box
         J1 = self.root.J1CoordEntry.get()
@@ -462,7 +467,7 @@ class ArmController:
                 self.finishTest = False # Reset the finish testing flag
                 self.root.statusPrint("Stopping encoder test")
     # Request position for debugging purposes
-    def requestPosition(self):
+    def requestPositionManual(self):
         # Check if a board is connected
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed to request position update. No board is connected")

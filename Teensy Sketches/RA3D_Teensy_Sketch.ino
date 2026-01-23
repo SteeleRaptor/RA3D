@@ -1277,22 +1277,34 @@ void xyzuvw_2_pose(const T xyzuvw[6], Matrix4x4 pose) {
 //This function input the JxangleIn into an array, send it to the foward kinematic solver and output the result into the position variables
 void SolveFowardKinematics() {
 
+  // Load and configure Denavit-Hartenberg parameters for robot kinematics
   robot_set_AR();
 
+  // Allocate array for output Cartesian position (x,y,z,rx,ry,rz)
   float target_xyzuvw[6];
+  // Allocate array for joint angles to be input to FK solver (in degrees)
   float joints[ROBOT_nDOFs];
 
+  // Copy current joint angles from global array to local array
   for (int i = 0; i < ROBOT_nDOFs; i++) {
+    // Copy each joint angle for processing
     joints[i] = JangleIn[i];
   }
 
+  // Call forward kinematics solver with joint angles to get Cartesian position
   forward_kinematics_robot_xyzuvw(joints, target_xyzuvw);
 
+  // Store calculated X position (in mm)
   xyzuvw_Out[0] = target_xyzuvw[0];
+  // Store calculated Y position (in mm)
   xyzuvw_Out[1] = target_xyzuvw[1];
+  // Store calculated Z position (in mm)
   xyzuvw_Out[2] = target_xyzuvw[2];
+  // Store calculated Rx rotation (convert from radians to degrees)
   xyzuvw_Out[3] = target_xyzuvw[3] / M_PI * 180;
+  // Store calculated Ry rotation (convert from radians to degrees)
   xyzuvw_Out[4] = target_xyzuvw[4] / M_PI * 180;
+  // Store calculated Rz rotation (convert from radians to degrees)
   xyzuvw_Out[5] = target_xyzuvw[5] / M_PI * 180;
 }
 
@@ -1352,69 +1364,101 @@ void JointEstimate() {
 
 void SolveInverseKinematics() {
 
+  // Allocate array for joint angles solution
   float joints[ROBOT_nDOFs];
+  // Allocate array for target Cartesian position (x,y,z,rx,ry,rz)
   float target[6];
 
+  // Buffer to store solution joint angles
   float solbuffer[ROBOT_nDOFs] = { 0 };
+  // Counter for number of valid inverse kinematics solutions found
   int NumberOfSol = 0;
+  // Index of selected solution from multiple possibilities
   int solVal = 0;
 
+  // Clear any previous kinematic error condition
   KinematicError = 0;
 
+  // Estimate current joint angles as initial guess for IK solver
   JointEstimate();
+  // Extract X position from input target Cartesian command
   target[0] = xyzuvw_In[0];
+  // Extract Y position from input target
   target[1] = xyzuvw_In[1];
+  // Extract Z position from input target
   target[2] = xyzuvw_In[2];
+  // Extract Rx rotation (convert from degrees to radians)
   target[3] = xyzuvw_In[3] * M_PI / 180;
+  // Extract Ry rotation (convert from degrees to radians)
   target[4] = xyzuvw_In[4] * M_PI / 180;
+  // Extract Rz rotation (convert from degrees to radians)
   target[5] = xyzuvw_In[5] * M_PI / 180;
 
   // Serial.println("X : " + String(target[0]) + " Y : " + String(target[1]) + " Z : " + String(target[2]) + " rx : " + String(xyzuvw_In[3]) + " ry : " + String(xyzuvw_In[4]) + " rz : " + String(xyzuvw_In[5]));
 
-
+  // Try multiple wrist configurations to find all valid solutions
+  // Sweep J5 (wrist rotation) from -90 to +90 degrees in 30-degree increments
   for (int i = -3; i <= 3; i++) {
+    // Set wrist joint estimate to current sweep value
     joints_estimate[4] = i * 30;
+    // Attempt to solve inverse kinematics with this wrist configuration
     int success = inverse_kinematics_robot_xyzuvw<float>(target, joints, joints_estimate);
+    // Check if valid solution was found
     if (success) {
+      // Check if new solution is different from previous one
       if (solbuffer[4] != joints[4]) {
+        // Validate that solution is within joint limits
         if (robot_joints_valid(joints)) {
+          // Copy solution to buffer for storage
           for (int j = 0; j < ROBOT_nDOFs; j++) {
+            // Store joint angle from solution
             solbuffer[j] = joints[j];
+            // Add to solution matrix for later selection
             SolutionMatrix[j][NumberOfSol] = solbuffer[j];
           }
+          // Check if solution count has not exceeded maximum
           if (NumberOfSol <= 6) {
+            // Increment number of valid solutions found
             NumberOfSol++;
           }
         }
       }
     } else {
+      // IK solver failed for this configuration
       KinematicError = 1;
     }
   }
 
+  // Restore original J5 estimate for solution selection
   joints_estimate[4] = JangleIn[4];
 
-
+  // Default to first solution
   solVal = 0;
+  // Evaluate which solution is closest to current joint configuration
   for (int i = 0; i < ROBOT_nDOFs; i++) {
+    // Check if first solution is significantly different from estimate
     if ((abs(joints_estimate[i] - SolutionMatrix[i][0]) > 20) and NumberOfSol > 1) {
+      // Use second solution instead
       solVal = 1;
     } else if ((abs(joints_estimate[i] - SolutionMatrix[i][1]) > 20) and NumberOfSol > 1) {
+      // Use first solution instead
       solVal = 0;
     }
-
 
     // Serial.println(String(i) + "  Joint estimate : " + String(joints_estimate[i]) + " // Joint sol 1 : " + String(SolutionMatrix[i][0]) + " // Joint sol 2 : " + String(SolutionMatrix[i][1]));
   }
 
+  // Check if no valid solutions were found
   if (NumberOfSol == 0) {
+    // Set error flag indicating unreachable target position
     KinematicError = 1;
   }
 
-
   // Serial.println("Sol : " + String(solVal) + " Nb sol : " + String(NumberOfSol));
 
+  // Copy selected solution to output array
   for (int i = 0; i < ROBOT_nDOFs; i++) {
+    // Copy joint angle from selected solution to output
     JangleOut[i] = SolutionMatrix[i][solVal];
   }
 }
@@ -1705,12 +1749,19 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
 //
 void sendRobotPos() {
 
+  // Update position from internal step counters
   updatePos();
 
+  // Build position response string with all joint and cartesian data
+  // Format: A<J1>B<J2>...L<Rz>M<speedViolation>N<debug>O<flag>P<J7>Q<J8>R<J9>
   String sendPos = "A" + String(JangleIn[0], 3) + "B" + String(JangleIn[1], 3) + "C" + String(JangleIn[2], 3) + "D" + String(JangleIn[3], 3) + "E" + String(JangleIn[4], 3) + "F" + String(JangleIn[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  // Small delay before transmission for serial stability
   delay(5);
+  // Send position response to host
   Serial.println(sendPos);
+  // Clear speed violation flag after reporting
   speedViolation = "0";
+  // Clear debug message after sending
   flag = "";
 }
 
@@ -1731,17 +1782,27 @@ void sendRobotPosSpline() {
 
 void updatePos() {
 
+  // Convert J1 step count to angle in degrees (relative to zero position)
   JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
+  // Convert J2 step count to angle in degrees
   JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
+  // Convert J3 step count to angle in degrees
   JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
+  // Convert J4 step count to angle in degrees
   JangleIn[3] = (J4StepM - J4zeroStep) / J4StepDeg;
+  // Convert J5 step count to angle in degrees
   JangleIn[4] = (J5StepM - J5zeroStep) / J5StepDeg;
+  // Convert J6 step count to angle in degrees
   JangleIn[5] = (J6StepM - J6zeroStep) / J6StepDeg;
 
+  // Convert J7 step count to position (linear or rotary)
   J7_pos = (J7StepM - J7zeroStep) / J7StepDeg;
+  // Convert J8 step count to position
   J8_pos = (J8StepM - J8zeroStep) / J8StepDeg;
+  // Convert J9 step count to position
   J9_pos = (J9StepM - J9zeroStep) / J9StepDeg;
 
+  // Solve forward kinematics to get Cartesian position from joint angles
   SolveFowardKinematics();
 }
 
@@ -1749,27 +1810,47 @@ void updatePos() {
 
 void correctRobotPos() {
 
+  // Read encoder position and update internal step counters from encoder feedback
+  // This synchronizes the system with actual motor positions
+  // Read J1 encoder and scale by encoder multiplier
   J1StepM = J1encPos.read() / J1encMult;
+  // Read J2 encoder and scale by multiplier
   J2StepM = J2encPos.read() / J2encMult;
+  // Read J3 encoder and scale by multiplier
   J3StepM = J3encPos.read() / J3encMult;
+  // Read J4 encoder and scale by multiplier
   J4StepM = J4encPos.read() / J4encMult;
+  // Read J5 encoder and scale by multiplier
   J5StepM = J5encPos.read() / J5encMult;
+  // Read J6 encoder and scale by multiplier
   J6StepM = J6encPos.read() / J6encMult;
 
+  // Convert updated step counts to joint angles (degrees)
+  // Calculate J1 angle from encoder-based step count
   JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
+  // Calculate J2 angle from encoder-based step count
   JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
+  // Calculate J3 angle from encoder-based step count
   JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
+  // Calculate J4 angle from encoder-based step count
   JangleIn[3] = (J4StepM - J4zeroStep) / J4StepDeg;
+  // Calculate J5 angle from encoder-based step count
   JangleIn[4] = (J5StepM - J5zeroStep) / J5StepDeg;
+  // Calculate J6 angle from encoder-based step count
   JangleIn[5] = (J6StepM - J6zeroStep) / J6StepDeg;
 
-
+  // Solve forward kinematics to get Cartesian position from corrected joint angles
   SolveFowardKinematics();
 
+  // Build corrected position response string
   String sendPos = "A" + String(JangleIn[0], 3) + "B" + String(JangleIn[1], 3) + "C" + String(JangleIn[2], 3) + "D" + String(JangleIn[3], 3) + "E" + String(JangleIn[4], 3) + "F" + String(JangleIn[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  // Brief delay for serial stability
   delay(5);
+  // Send corrected position to host
   Serial.println(sendPos);
+  // Clear speed violation flag
   speedViolation = "0";
+  // Clear status flag
   flag = "";
 }
 
@@ -1825,82 +1906,125 @@ void printDirectory(File dir, int numTabs) {
 
 void driveLimit(const int steps[], float SpeedVal) {
 
+  // Debounce time in microseconds (3ms to filter noise)
   const unsigned long DEBOUNCE_US = 3000;  // 3 ms
+  // Track when each joint's limit switch first went HIGH
   unsigned long firstHighUs[numJoints] = { 0 };
+  // Calculate step gap (delay between pulses) for calibration speed
   int calcStepGap = minSpeedDelay / (SpeedVal / 100);
 
   // Define arrays for calibration directions, motor directions, and direction pins
+  // Expected limit switch state (HIGH = at limit)
   const uint8_t limitSensor[numJoints] = { HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH };
+  // Calibration direction for each joint (0=neg limit first, 1=pos limit first)
   int calDir[numJoints] = { J1CalDir, J2CalDir, J3CalDir, J4CalDir, J5CalDir, J6CalDir, J7CalDir, J8CalDir, J9CalDir };
+  // Motor direction configuration
   int motDir[numJoints] = { J1MotDir, J2MotDir, J3MotDir, J4MotDir, J5MotDir, J6MotDir, J7MotDir, J8MotDir, J9MotDir };
+  // Direction control pins for each motor
   int dirPins[numJoints] = { J1dirPin, J2dirPin, J3dirPin, J4dirPin, J5dirPin, J6dirPin, J7dirPin, J8dirPin, J9dirPin };
 
   // Define arrays for the current state, calibration pins, step pins, steps, completion status, and steps done
+  // Current read state of each limit switch pin
   int curState[numJoints];
+  // Calibration/limit switch pins for each joint
   int calPins[numJoints] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
+  // Step pulse pins for each joint
   int stepPins[numJoints] = { J1stepPin, J2stepPin, J3stepPin, J4stepPin, J5stepPin, J6stepPin, J7stepPin, J8stepPin, J9stepPin };
+  // Counter for steps executed on each joint
   int stepsDone[numJoints] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  // Flag indicating each joint has completed homing (hit limit)
   int complete[numJoints] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+  // Set direction pins for all joints based on calibration direction
   for (int i = 0; i < numJoints; i++) {
+    // Check if calibration and motor direction match
     if ((calDir[i] == 1 && motDir[i] == 1) || (calDir[i] == 0 && motDir[i] == 0)) {
+      // Set direction pin HIGH for forward calibration
       digitalWrite(dirPins[i], HIGH);
     } else {
+      // Set direction pin LOW for reverse calibration
       digitalWrite(dirPins[i], LOW);
     }
   }
 
+  // Initialize completion status based on which axes have motion commands
   for (int i = 0; i < numJoints; i++) {
     // Set complete if joint was not sent a limit value
+    // Axes with 0 steps are not part of this calibration
     if (steps[i] == 0) {
+      // Mark as complete (no motion for this axis)
       complete[i] = 1;
     }
   }
 
   //DRIVE MOTORS FOR CALIBRATION
+  // Main calibration loop - drives motors until all limits are hit
   int DriveLimInProc = 1;
+  // Continue until all joints complete or emergency stop activated
   while (DriveLimInProc == 1 && estopActive == false) {
 
+    // Process each joint independently
     for (int i = 0; i < numJoints; i++) {
       // Evaluate each joint
+      // Read current state of limit switch
       curState[i] = digitalRead(calPins[i]);
 
       // Debounced: set complete only if HIGH is stable for DEBOUNCE_US
+      // Check if switch is in expected state
       if (curState[i] == limitSensor[i]) {
+        // Record time when switch first detected
         if (firstHighUs[i] == 0) firstHighUs[i] = micros();
+        // Check if stable for required debounce time
         if ((micros() - firstHighUs[i]) >= DEBOUNCE_US) {
+          // Mark joint as completed (limit detected)
           complete[i] = 1;
         }
       } else {
+        // reset if it ever goes LOW again
+        // Reset debounce timer if signal is unstable
         firstHighUs[i] = 0;  // reset if it ever goes LOW again
       }
 
       // Step the motor if not complete and curState is LOW
+      // Execute motor step if limit not yet hit and steps remain
       if (stepsDone[i] < steps[i] && complete[i] == 0) {
+        // Pulse step pin HIGH
         digitalWrite(stepPins[i], HIGH);
+        // Allow step width timing
         delayMicroseconds(calcStepGap);
+        // Return step pin LOW to complete pulse
         digitalWrite(stepPins[i], LOW);
+        // Increment step counter
         stepsDone[i]++;
       } else if (stepsDone[i] >= steps[i]) {
         // Steps exceeded, sensor never triggered – consider it failed
+        // Max steps reached without hitting limit - mark as complete anyway
         complete[i] = 1;
       }
     }
 
     // Check if all joints are complete
+    // Scan all axes to see if all are done homing
     int allComplete = 1;
+    // Loop through each joint
     for (int i = 0; i < numJoints; i++) {
+      // Check if this joint is not complete
       if (complete[i] == 0) {
+        // Still have incomplete axes
         allComplete = 0;
+        // Stop checking - at least one axis not done
         break;
       }
     }
 
+    // Exit main loop if all axes are complete
     if (allComplete == 1) {
+      // Set exit condition for main loop
       DriveLimInProc = 0;
     }
 
     // Delay before restarting the loop
+    // Brief pause between step pulse iterations
     delayMicroseconds(100);
   }
 }
@@ -1958,19 +2082,31 @@ void backOff(uint8_t J1req, uint8_t J2req, uint8_t J3req, uint8_t J4req, uint8_t
 //
 void resetEncoders() {
 
+  // Clear all collision detection flags for new motion command
   J1collisionTrue = 0;
+  // Reset J2 collision flag
   J2collisionTrue = 0;
+  // Reset J3 collision flag
   J3collisionTrue = 0;
+  // Reset J4 collision flag
   J4collisionTrue = 0;
+  // Reset J5 collision flag
   J5collisionTrue = 0;
+  // Reset J6 collision flag
   J6collisionTrue = 0;
 
   //set encoders to current position
+  // Synchronize J1 encoder with current step position
   J1encPos.write(J1StepM * J1encMult);
+  // Synchronize J2 encoder with current step position
   J2encPos.write(J2StepM * J2encMult);
+  // Synchronize J3 encoder with current step position
   J3encPos.write(J3StepM * J3encMult);
+  // Synchronize J4 encoder with current step position
   J4encPos.write(J4StepM * J4encMult);
+  // Synchronize J5 encoder with current step position
   J5encPos.write(J5StepM * J5encMult);
+  // Synchronize J6 encoder with current step position
   J6encPos.write(J6StepM * J6encMult);
   //delayMicroseconds(5);
 }
@@ -1990,52 +2126,85 @@ void resetEncoders() {
 //
 void checkEncoders() {
   //read encoders
+  // Read J1 encoder position and scale by multiplier
   J1EncSteps = J1encPos.read() / J1encMult;
+  // Read J2 encoder position and scale by multiplier
   J2EncSteps = J2encPos.read() / J2encMult;
+  // Read J3 encoder position and scale by multiplier
   J3EncSteps = J3encPos.read() / J3encMult;
+  // Read J4 encoder position and scale by multiplier
   J4EncSteps = J4encPos.read() / J4encMult;
+  // Read J5 encoder position and scale by multiplier
   J5EncSteps = J5encPos.read() / J5encMult;
+  // Read J6 encoder position and scale by multiplier
   J6EncSteps = J6encPos.read() / J6encMult;
   //Check for collision and update position based on encoder
+  // Check if J1 encoder position differs significantly from commanded position
   if (abs((J1EncSteps - J1StepM)) >= encOffset) {
+    // If in closed-loop mode, this indicates a collision/stall
     if (J1LoopMode == 0) {
+      // Set collision flag for J1
       J1collisionTrue = 1;
+      // Update step counter to match actual encoder position
       J1StepM = J1encPos.read() / J1encMult;
     }
   }
+  // Check if J2 encoder position differs significantly from commanded position
   if (abs((J2EncSteps - J2StepM)) >= encOffset) {
+    // If in closed-loop mode, this indicates a collision
     if (J2LoopMode == 0) {
+      // Set collision flag for J2
       J2collisionTrue = 1;
+      // Update step counter to match actual encoder position
       J2StepM = J2encPos.read() / J2encMult;
     }
   }
+  // Check if J3 encoder position differs significantly from commanded position
   if (abs((J3EncSteps - J3StepM)) >= encOffset) {
+    // If in closed-loop mode, this indicates a collision
     if (J3LoopMode == 0) {
+      // Set collision flag for J3
       J3collisionTrue = 1;
+      // Update step counter to match actual encoder position
       J3StepM = J3encPos.read() / J3encMult;
     }
   }
+  // Check if J4 encoder position differs significantly from commanded position
   if (abs((J4EncSteps - J4StepM)) >= encOffset) {
+    // If in closed-loop mode, this indicates a collision
     if (J4LoopMode == 0) {
+      // Set collision flag for J4
       J4collisionTrue = 1;
+      // Update step counter to match actual encoder position
       J4StepM = J4encPos.read() / J4encMult;
     }
   }
+  // Check if J5 encoder position differs significantly from commanded position
   if (abs((J5EncSteps - J5StepM)) >= encOffset) {
+    // If in closed-loop mode, this indicates a collision
     if (J5LoopMode == 0) {
+      // Set collision flag for J5
       J5collisionTrue = 1;
+      // Update step counter to match actual encoder position
       J5StepM = J5encPos.read() / J5encMult;
     }
   }
+  // Check if J6 encoder position differs significantly from commanded position
   if (abs((J6EncSteps - J6StepM)) >= encOffset) {
+    // If in closed-loop mode, this indicates a collision
     if (J6LoopMode == 0) {
+      // Set collision flag for J6
       J6collisionTrue = 1;
+      // Update step counter to match actual encoder position
       J6StepM = J6encPos.read() / J6encMult;
     }
   }
 
+  // Calculate total collision count from all joints
   TotalCollision = J1collisionTrue + J2collisionTrue + J3collisionTrue + J4collisionTrue + J5collisionTrue + J6collisionTrue;
+  // Check if any collisions were detected
   if (TotalCollision > 0) {
+    // Build error code string showing which joints have collisions
     flag = "EC" + String(J1collisionTrue) + String(J2collisionTrue) + String(J3collisionTrue) + String(J4collisionTrue) + String(J5collisionTrue) + String(J6collisionTrue);
   }
 }
@@ -2819,59 +2988,92 @@ int32_t modbusQuerry(String inData, int function) {
 // trajectory generation without interruption between moves.
 //
 void processSerial() {
+  // Check if serial data is available and buffer 3 is not full
   if (Serial.available() > 0 and cmdBuffer3 == "") {
+    // Read single character from serial input
     char recieved = Serial.read();
+    // Append character to received data accumulator
     recData += recieved;
     // Process message when new line character is recieved
     if (recieved == '\n') {
       //place data in last position
+      // Store complete command in third buffer position
       cmdBuffer3 = recData;
       //determine if move command
+      // Create copy of received data for command type detection
       recData.trim();
+      // Extract 2-character command code from string
       String procCMDtype = recData.substring(0, 2);
+      // Check if spline sequence is ending
       if (procCMDtype == "SS") {
+        // Disable spline mode
         splineTrue = false;
+        // Mark that end-of-spline has been received
         splineEndReceived = true;
       }
+      // Handle spline lookahead mode command response
       if (splineTrue == true) {
+        // Check if first move has been started
         if (moveSequence == "") {
+          // Mark that first motion command is active
           moveSequence = "firsMoveActive";
         }
         //close serial so next command can be read in
+        // Check if no alarm condition exists
         if (Alarm == "0") {
+          // Send position without clearing speed violation flag (for continuous updates)
           sendRobotPosSpline();
         } else {
+          // Send alarm code instead of position
           Serial.println(Alarm);
+          // Clear alarm for next command
           Alarm = "0";
         }
       }
 
+      // Clear recieved buffer
       recData = "";  // Clear recieved buffer
 
+      // Shift command buffers to process next command
       shiftCMDarray();
 
-
       //if second position is empty and first move command read in process second move ahead of time
+      // Preprocess next motion command during spline execution for lookahead planning
       if (procCMDtype == "MS" and moveSequence == "firsMoveActive" and cmdBuffer2 == "" and cmdBuffer1 != "" and splineTrue == true) {
+        // Mark that second motion has been preprocessed
         moveSequence = "secondMoveProcessed";
+        // Wait for next command to be received
         while (cmdBuffer2 == "") {
+          // Check for serial data availability
           if (Serial.available() > 0) {
+            // Read character from serial port
             char recieved = Serial.read();
+            // Append to received data
             recData += recieved;
+            // Process when complete line received
             if (recieved == '\n') {
+              // Store command in second buffer
               cmdBuffer2 = recData;
+              // Check command type
               recData.trim();
+              // Extract command code
               procCMDtype = recData.substring(0, 2);
+              // Send position update if motion command
               if (procCMDtype == "MS") {
-                //close serial so next command can be read in
+                // Allow time for processing
                 delay(5);
+                // Check for error conditions
                 if (Alarm == "0") {
+                  // Send position for spline lookahead
                   sendRobotPosSpline();
                 } else {
+                  // Send alarm condition
                   Serial.println(Alarm);
+                  // Clear alarm
                   Alarm = "0";
                 }
               }
+              // Clear recieved buffer
               recData = "";  // Clear recieved buffer
             }
           }
@@ -2883,27 +3085,39 @@ void processSerial() {
 
 
 void shiftCMDarray() {
+  // Check if first buffer is empty and there is a second command
   if (cmdBuffer1 == "") {
+    // Promote second buffer to first position
     //shift 2 to 1
     cmdBuffer1 = cmdBuffer2;
+    // Clear second buffer
     cmdBuffer2 = "";
   }
+  // Check if second buffer is empty and there is a third command
   if (cmdBuffer2 == "") {
+    // Promote third buffer to second position
     //shift 3 to 2
     cmdBuffer2 = cmdBuffer3;
+    // Clear third buffer
     cmdBuffer3 = "";
   }
+  // Check again if first buffer is still empty after shifting
   if (cmdBuffer1 == "") {
+    // Promote second to first if needed
     //shift 2 to 1
     cmdBuffer1 = cmdBuffer2;
+    // Clear second buffer
     cmdBuffer2 = "";
   }
 }
 
 
 void EstopProg() {
+  // Set emergency stop active flag to halt all motion
   estopActive = true;
+  // Set error flag code for E-stop
   flag = "EB";
+  // Send current position and error status to host
   sendRobotPos();
 }
 
@@ -2920,13 +3134,13 @@ void setup() {
 
   // Initialize serial communications for main control interface
   Serial.begin(9600);  // Main serial for host communication (USB/debug)
-  
   // Initialize Modbus serial communication for external devices
   Serial8.begin(38400);  // Modbus serial interface (pins 34 and 35)
   // Note: No Serial output before this line to maintain timing/initialization order
   
   // Load persistent configuration from EEPROM
   load_debug_from_eeprom();      // Restore debug mode setting from EEPROM
+  // Restore robot model, version, serial number info from persistent storage
   load_robot_id_from_eeprom();   // Restore robot model, version, serial number info
 
   // Initialize Modbus master node for industrial device communication (slave ID 1)
@@ -2937,22 +3151,39 @@ void setup() {
   // ==================================================================================
   // Set all motor step and direction pins as outputs for PWM control
   pinMode(J1stepPin, OUTPUT);
+  // Configure J1 direction pin for motor control
   pinMode(J1dirPin, OUTPUT);
+  // Configure J2 step pulse pin for stepper motor timing
   pinMode(J2stepPin, OUTPUT);
+  // Set J2 direction control pin as output
   pinMode(J2dirPin, OUTPUT);
+  // Configure J3 step pulse pin for motor stepping
   pinMode(J3stepPin, OUTPUT);
+  // Set J3 direction pin for motor direction control
   pinMode(J3dirPin, OUTPUT);
+  // Configure J4 step pin for motor pulse generation
   pinMode(J4stepPin, OUTPUT);
+  // Set J4 direction control pin as output
   pinMode(J4dirPin, OUTPUT);
+  // Configure J5 step pin for stepper motor control
   pinMode(J5stepPin, OUTPUT);
+  // Set J5 direction pin for motor direction
   pinMode(J5dirPin, OUTPUT);
+  // Configure J6 step pulse pin for motor timing
   pinMode(J6stepPin, OUTPUT);
+  // Set J6 direction control pin as output
   pinMode(J6dirPin, OUTPUT);
+  // Configure J7 step pin for external axis control
   pinMode(J7stepPin, OUTPUT);
+  // Set J7 direction pin for axis direction
   pinMode(J7dirPin, OUTPUT);
+  // Configure J8 step pin for external linear axis
   pinMode(J8stepPin, OUTPUT);
+  // Set J8 direction pin for linear motion control
   pinMode(J8dirPin, OUTPUT);
+  // Configure J9 step pin for external axis control
   pinMode(J9stepPin, OUTPUT);
+  // Set J9 direction pin for axis direction
   pinMode(J9dirPin, OUTPUT);
 
   // ==================================================================================
@@ -2960,13 +3191,21 @@ void setup() {
   // ==================================================================================
   // Set limit switch pins as inputs for detecting home/limit positions
   pinMode(J1calPin, INPUT);
+  // Configure J2 home/limit switch input
   pinMode(J2calPin, INPUT);
+  // Configure J3 home/limit switch input
   pinMode(J3calPin, INPUT);
+  // Configure J4 home/limit switch input
   pinMode(J4calPin, INPUT);
+  // Configure J5 home/limit switch input
   pinMode(J5calPin, INPUT);
+  // Configure J6 home/limit switch input
   pinMode(J6calPin, INPUT);
+  // Configure J7 home/limit switch input
   pinMode(J7calPin, INPUT);
+  // Configure J8 home/limit switch input
   pinMode(J8calPin, INPUT);
+  // Configure J9 home/limit switch input
   pinMode(J9calPin, INPUT);
 
   // ==================================================================================
@@ -2982,13 +3221,21 @@ void setup() {
   // ==================================================================================
   // Set all step pins HIGH (inactive state) - motors step on HIGH->LOW transition
   digitalWrite(J1stepPin, HIGH);
+  // Set J2 step pin to high (inactive)
   digitalWrite(J2stepPin, HIGH);
+  // Set J3 step pin to high (inactive)
   digitalWrite(J3stepPin, HIGH);
+  // Set J4 step pin to high (inactive)
   digitalWrite(J4stepPin, HIGH);
+  // Set J5 step pin to high (inactive)
   digitalWrite(J5stepPin, HIGH);
+  // Set J6 step pin to high (inactive)
   digitalWrite(J6stepPin, HIGH);
+  // Set J7 step pin to high (inactive)
   digitalWrite(J7stepPin, HIGH);
+  // Set J8 step pin to high (inactive)
   digitalWrite(J8stepPin, HIGH);
+  // Set J9 step pin to high (inactive)
   digitalWrite(J9stepPin, HIGH);
 
   // ==================================================================================
@@ -2996,14 +3243,20 @@ void setup() {
   // ==================================================================================
   // Clear command buffers used for lookahead/spline motion sequencing
   cmdBuffer1 = "";
+  // Clear second command buffer for pipelined motion commands
   cmdBuffer2 = "";
+  // Clear third command buffer for lookahead planning
   cmdBuffer3 = "";
   
   // Reset motion control flags and identifiers
   moveSequence = "";            // Clear move sequence identifier
+  // Clear status flag string for error reporting
   flag = "";                    // Clear status flag string
+  // Disable corner rounding (not active on startup)
   rndTrue = false;              // Disable corner rounding (not active on startup)
+  // Disable spline interpolation mode on startup
   splineTrue = false;           // Disable spline interpolation
+  // Clear end-of-spline marker flag
   splineEndReceived = false;    // Clear end-of-spline marker
 }
 
@@ -3020,8 +3273,8 @@ void loop() {
   // SERIAL COMMUNICATION STAGE - Read incoming commands from host
   // ==================================================================================
   // Only read new serial data if not in the middle of a spline sequence
-  // Spline mode allows continuous motion without interruption by command reading
   if (splineEndReceived == false) {
+    // Read incoming serial commands and populate command buffers
     processSerial();  // Read incoming serial commands and populate command buffers
   }
 
@@ -3032,11 +3285,17 @@ void loop() {
   if (cmdBuffer1 != "") {
     // Initialize processing state
     estopActive = false;               // Clear emergency stop flag
+    // Load command from primary buffer
     inData = cmdBuffer1;               // Load command from primary buffer
+    // Remove leading/trailing whitespace
     inData.trim();                     // Remove leading/trailing whitespace
+    // Extract 2-letter function code from command
     String function = inData.substring(0, 2);  // Extract 2-letter function code
+    // Remove function code from data string for parameter parsing
     inData = inData.substring(2);      // Remove function code from data string
+    // Clear kinematic error flag for new motion command
     KinematicError = 0;                // Clear kinematic error flag
+    // Clear debug message for next command
     debug = "";                        // Clear debug message
 
     // ==================================================================================
@@ -3045,13 +3304,16 @@ void loop() {
     // Each command is identified by a 2-letter code followed by parameter data
 
     if (function == "HO") {
+      // Debug output for received command
       DEBUG_PRINTLN("Debug - Received HO command");
+      // Send system identification and status
       handle_hello_command();  // Send system identification and status
     }
 
     else if (function == "RB") {
       // System restart command - reboot Teensy controller
       Serial.println("System Restarting");
+      // Perform software reset of Teensy 4.1
       reboot();
     }
 
@@ -3059,62 +3321,100 @@ void loop() {
       // DEBUG CONFIGURATION COMMAND - Enable/disable debug output and persistence
       // Parameters: [D]<0|1> = debug state, [P]<0|1> = enable persistence across reboots
       String help = "Command DB - Set Debug Parameters\n";
+      // Add help text for debug state parameter
       help += "required [D] - Debug State 0/1 (off/on) Enables / Disabled Serial Debug Mode\n";
+      // Add help text for persistence parameter
       help += "optional [P] - Persistence 0/1 Disable / Enable debug mode persist accross reboots\n\n";
+      // Add example command formats
       help += "Example: DB[D]1[P]1 - Enabled Debug mode with persist\n";
+      // Add alternative example
       help += "Example: DB[0] - Disable debug mode, don't change current persisted value\n\n";
 
-
+      // Find start position of debug parameter in command string
       int debugStart = inData.indexOf("[D]");
+      // Find start position of persistence parameter
       int persistStart = inData.indexOf("[P]", persistStart + 3);
 
       if (debugStart == -1) {
+        // Debug parameter not found - invalid command format
         inData = "";
+        // Clear command buffer
         cmdBuffer1 = "";  // Clear command buffer
+        // Send help information to user
         Serial.println(help);
+        // Return to main loop without processing
         return;
       }
 
+      // Extract debug value from command string
       String debugValue = inData.substring(debugStart + 3, debugStart + 4);
+      // Validate debug value is 0 or 1
       if (debugValue != "0" and debugValue != "1") {
+        // Invalid value provided
         Serial.println("Valid values for debug are 0 and 1\n");
+        // Display help information
         Serial.println(help);
+        // Clear command data
         inData = "";
+        // Clear command buffer
         cmdBuffer1 = "";  // Clear command buffer
+        // Return to main loop
         return;
       }
 
+      // Check if debug value is 0 (disable)
       if (debugValue == "0") {
+        // Disable debug output
         DEBUG = false;
+        // Print debug notification
         DEBUG_PRINTLN("Debug - Debugging Live Toggled Off");
       } else if (debugValue == "1") {
+        // Enable debug output
         DEBUG = true;
+        // Print debug notification
         DEBUG_PRINTLN("Debug - Debugging Live Toggled On");
       }
 
+      // Check if persistence parameter was provided
       if (persistStart > 0) {
+        // Extract persistence value from command
         String persistValue = inData.substring(persistStart + 3, persistStart + 4);
+        // Validate persistence value is 0 or 1
         if (persistValue != "0" and persistValue != "1") {
+          // Invalid value provided
           Serial.println("Valid values for persist are 0 and 1\n");
+          // Display help information
           Serial.println(help);
+          // Clear command data
           inData = "";
+          // Clear command buffer
           cmdBuffer1 = "";  // Clear command buffer
+          // Return to main loop
           return;
         } else {
+          // Log persistence setting action
           DEBUG_PRINT("Setting Debug Persistence to: ");
+          // Print the value being set
           DEBUG_PRINTLN(persistValue);
 
+          // Check if enabling persistence
           if (persistValue == "1") {
+            // Save debug enabled to EEPROM
             save_debug_to_eeprom(true);
           } else {
+            // Save debug disabled to EEPROM
             save_debug_to_eeprom(false);
           }
         }
       }
 
+      // Send success response
       Serial.println("Done");
+      // Clear command data
       inData = "";
+      // clear buffer
       cmdBuffer1 = "";  // clear buffer
+      // Return to main loop
       return;
 
     }
@@ -3122,39 +3422,67 @@ void loop() {
     else if (function == "SR") {
       // SET ROBOT IDENTIFICATION COMMAND - Store hardware/software info to EEPROM
       // Parameters: [M]<model>[V]<version>[B]<board>[S]<serial>[A]<asset_tag>
+      // Log received command with data for debugging
       DEBUG_PRINT("Debug - Received SR command with inData: ");
+      // Print command parameters
       DEBUG_PRINTLN(inData);
 
+      // Find position of model parameter marker in string
       int modelStart = inData.indexOf("[M]");
+      // Find position of version parameter marker
       int versionStart = inData.indexOf("[V]", modelStart + 3);
+      // Find position of driver board parameter marker
       int driverStart = inData.indexOf("[B]", versionStart + 3);
+      // Find position of serial number parameter marker
       int serialStart = inData.indexOf("[S]", driverStart + 3);
+      // Find position of asset tag parameter marker
       int assetStart = inData.indexOf("[A]", serialStart + 3);
 
+      // Validate all required parameters are present
       if (modelStart == -1 || versionStart == -1 || driverStart == -1 || serialStart == -1 || assetStart == -1) {
+        // Display error if format is incorrect
         Serial.println("Error: Invalid format (SR)");
+        // Clear command data
         inData = "";
+        // <-- drop the bad message
         cmdBuffer1 = "";  // <-- drop the bad message
+        // Return to main loop
         return;
       }
 
+      // Extract robot model string from command
       robot_model = inData.substring(modelStart + 3, versionStart);
+      // Extract robot version string from command
       robot_version = inData.substring(versionStart + 3, driverStart);
+      // Extract driver board string from command
       driver_board = inData.substring(driverStart + 3, serialStart);
+      // Extract serial number string from command
       serial_number = inData.substring(serialStart + 3, assetStart);
+      // Extract asset tag string from command
       asset_tag = inData.substring(assetStart + 3);
 
+      // Debug output for extracted robot model
       DEBUG_PRINT("Debug - Robot Model extracted: ");
+      // Print model value
       DEBUG_PRINTLN(robot_model);
+      // Debug output for robot version
       DEBUG_PRINT("Debug - Robot Version extracted: ");
+      // Print version value
       DEBUG_PRINTLN(robot_version);
+      // Debug output for driver board
       DEBUG_PRINT("Debug - Driver Board extracted: ");
+      // Print driver board value
       DEBUG_PRINTLN(driver_board);
+      // Debug output for serial number
       DEBUG_PRINT("Debug - Serial Number: ");
+      // Print serial number value
       DEBUG_PRINTLN(serial_number);
+      // Debug output for asset tag
       DEBUG_PRINT("Debug - Asset Tag extracted: ");
+      // Print asset tag value
       DEBUG_PRINTLN(asset_tag);
 
+      // Call handler to save robot identification to EEPROM
       handle_set_robot_id_command(robot_model, robot_version, driver_board, serial_number, asset_tag);
     }
 
@@ -5522,44 +5850,53 @@ void loop() {
       J5LoopMode = LoopMode.substring(4, 5).toInt();
       J6LoopMode = LoopMode.substring(5).toInt();
 
-
-      ///// rounding logic /////
+      // Extract loop modes for external axes J7, J8, J9 from loop mode string
+      // ===== ROUNDING/LOOKAHEAD CORNER ARC LOGIC ===== 
+      // When splineTrue is enabled, prepare next command from buffer to calculate corner rounding arc
       if (cmdBuffer2 != "") {
+        // Get next command from buffer and extract command type and parameters
         checkData = cmdBuffer2;
         checkData.trim();
+        // Extract command type (first character after space)
         nextCMDtype = checkData.substring(0, 1);
+        // Extract command parameters (skip "X" or other prefix)
         checkData = checkData.substring(2);
       }
+      // If next command is motion (M*) and rounding enabled, calculate corner rounding arc between current and next move
       if (splineTrue == true and Rounding > 0 and nextCMDtype == "M") {
-        //calculate new end point before rounding arc
+        // Update current position before calculating rounding arc
         updatePos();
-        //vector
+        // Calculate direction vector from current endpoint to target position
         float Xvect = xyzuvw_Temp[0] - xyzuvw_Out[0];
         float Yvect = xyzuvw_Temp[1] - xyzuvw_Out[1];
         float Zvect = xyzuvw_Temp[2] - xyzuvw_Out[2];
+        // Calculate rotation vector components for RZ, RY, RX orientations
         float RZvect = xyzuvw_Temp[3] - xyzuvw_Out[3];
         float RYvect = xyzuvw_Temp[4] - xyzuvw_Out[4];
         float RXvect = xyzuvw_Temp[5] - xyzuvw_Out[5];
-        //start pos
+        // Store current position as start point for rounding arc
         float Xstart = xyzuvw_Out[0];
         float Ystart = xyzuvw_Out[1];
         float Zstart = xyzuvw_Out[2];
         float RZstart = xyzuvw_Out[3];
         float RYstart = xyzuvw_Out[4];
         float RXstart = xyzuvw_Out[5];
-        //line dist
+        // Calculate total line distance using 6D norm (XYZ + Rotation components)
         float lineDist = pow((pow((Xvect), 2) + pow((Yvect), 2) + pow((Zvect), 2) + pow((RZvect), 2) + pow((RYvect), 2) + pow((RXvect), 2)), .5);
+        // Limit rounding radius to 45% of line distance to prevent overshooting
         if (Rounding > (lineDist * .45)) {
           Rounding = lineDist * .45;
         }
+        // Calculate percentage distance along line where rounding starts (1 - Rounding/distance)
         float newDistPerc = 1 - (Rounding / lineDist);
-        //cropped destination (new end point before rounding arc)
+        // Calculate cropped destination point (reduced endpoint before rounding arc begins)
         xyzuvw_In[0] = Xstart + (Xvect * newDistPerc);
         xyzuvw_In[1] = Ystart + (Yvect * newDistPerc);
         xyzuvw_In[2] = Zstart + (Zvect * newDistPerc);
         xyzuvw_In[3] = RZstart + (RZvect * newDistPerc);
         xyzuvw_In[4] = RYstart + (RYvect * newDistPerc);
         xyzuvw_In[5] = RXstart + (RXvect * newDistPerc);
+        // Parse next command for its target position to calculate rounding arc
         xStart = checkData.indexOf("X");
         yStart = checkData.indexOf("Y");
         zStart = checkData.indexOf("Z");
@@ -5569,58 +5906,65 @@ void loop() {
         J7Start = checkData.indexOf("J7");
         J8Start = checkData.indexOf("J8");
         J9Start = checkData.indexOf("J9");
-        //get arc end point (next move in queue)
+        // Extract arc endpoint from next command (the far end of the rounding arc)
         rndArcEnd[0] = checkData.substring(xStart + 1, yStart).toFloat();
         rndArcEnd[1] = checkData.substring(yStart + 1, zStart).toFloat();
         rndArcEnd[2] = checkData.substring(zStart + 1, rzStart).toFloat();
         rndArcEnd[3] = checkData.substring(rzStart + 2, ryStart).toFloat();
         rndArcEnd[4] = checkData.substring(ryStart + 2, rxStart).toFloat();
         rndArcEnd[5] = checkData.substring(rxStart + 2, J7Start).toFloat();
-        //arc vector
+        // Calculate vector from current endpoint (xyzuvw_Temp) to the arc endpoint
         Xvect = rndArcEnd[0] - xyzuvw_Temp[0];
         Yvect = rndArcEnd[1] - xyzuvw_Temp[1];
         Zvect = rndArcEnd[2] - xyzuvw_Temp[2];
+        // Calculate rotation vector for arc from current to endpoint
         RZvect = rndArcEnd[3] - xyzuvw_Temp[3];
         RYvect = rndArcEnd[4] - xyzuvw_Temp[4];
         RXvect = rndArcEnd[5] - xyzuvw_Temp[5];
-        //end arc start pos
+        // Store endpoint as start of arc for arc center calculation
         Xstart = xyzuvw_Temp[0];
         Ystart = xyzuvw_Temp[1];
         Zstart = xyzuvw_Temp[2];
         RZstart = xyzuvw_Temp[3];
         RYstart = xyzuvw_Temp[4];
         RXstart = xyzuvw_Temp[5];
-        //line dist
+        // Calculate distance from current position to next endpoint
         lineDist = pow((pow((Xvect), 2) + pow((Yvect), 2) + pow((Zvect), 2) + pow((RZvect), 2) + pow((RYvect), 2) + pow((RXvect), 2)), .5);
+        // Limit arc rounding to 45% of the second line segment distance
         if (Rounding > (lineDist * .45)) {
           Rounding = lineDist * .45;
         }
+        // Calculate arc end point as rounding percentage along second line
         newDistPerc = (Rounding / lineDist);
-        //calculated arc end postion
+        // Calculate where arc ends on the path to next command's target
         rndArcEnd[0] = Xstart + (Xvect * newDistPerc);
         rndArcEnd[1] = Ystart + (Yvect * newDistPerc);
         rndArcEnd[2] = Zstart + (Zvect * newDistPerc);
         rndArcEnd[3] = RZstart + (RZvect * newDistPerc);
         rndArcEnd[4] = RYstart + (RYvect * newDistPerc);
         rndArcEnd[5] = RXstart + (RXvect * newDistPerc);
-        //calculate arc center point
+        // Calculate arc center point (midpoint between cropped endpoint and arc end)
         rndCalcCen[0] = (xyzuvw_In[0] + rndArcEnd[0]) / 2;
         rndCalcCen[1] = (xyzuvw_In[1] + rndArcEnd[1]) / 2;
         rndCalcCen[2] = (xyzuvw_In[2] + rndArcEnd[2]) / 2;
         rndCalcCen[3] = (xyzuvw_In[3] + rndArcEnd[3]) / 2;
         rndCalcCen[4] = (xyzuvw_In[4] + rndArcEnd[4]) / 2;
         rndCalcCen[5] = (xyzuvw_In[5] + rndArcEnd[5]) / 2;
+        // Calculate midpoint of arc for interpolation during motion (Bezier curve approximation)
         rndArcMid[0] = (xyzuvw_Temp[0] + rndCalcCen[0]) / 2;
         rndArcMid[1] = (xyzuvw_Temp[1] + rndCalcCen[1]) / 2;
         rndArcMid[2] = (xyzuvw_Temp[2] + rndCalcCen[2]) / 2;
         rndArcMid[3] = (xyzuvw_Temp[3] + rndCalcCen[3]) / 2;
         rndArcMid[4] = (xyzuvw_Temp[4] + rndCalcCen[4]) / 2;
         rndArcMid[5] = (xyzuvw_Temp[5] + rndCalcCen[5]) / 2;
-        //set arc move to be executed
+        // Construct arc move command with interpolated via point and endpoint
         rndData = "X" + String(rndArcMid[0]) + "Y" + String(rndArcMid[1]) + "Z" + String(rndArcMid[2]) + "Rz" + String(rndArcMid[3]) + "Ry" + String(rndArcMid[4]) + "Rx" + String(rndArcMid[5]) + "Ex" + String(rndArcEnd[0]) + "Ey" + String(rndArcEnd[1]) + "Ez" + String(rndArcEnd[2]) + "Tr" + String(xyzuvw_Temp[6]) + "S" + SpeedType + String(SpeedVal) + "Ac" + String(ACCspd) + "Dc" + String(DCCspd) + "Rm" + String(ACCramp) + "W" + WristCon;
+        // Set function to MA (arc motion) to execute rounding arc
         function = "MA";
+        // Flag that rounding arc is active (used to carry speed information)
         rndTrue = true;
       } else {
+        // No rounding or next command not available, execute straight line motion to target
         updatePos();
         xyzuvw_In[0] = xyzuvw_Temp[0];
         xyzuvw_In[1] = xyzuvw_Temp[1];
@@ -5630,18 +5974,16 @@ void loop() {
         xyzuvw_In[5] = xyzuvw_Temp[5];
       }
 
-
-
-      //xyz vector
+      // Calculate main motion vector from current to target position
       Xvect = xyzuvw_In[0] - xyzuvw_Out[0];
       Yvect = xyzuvw_In[1] - xyzuvw_Out[1];
       Zvect = xyzuvw_In[2] - xyzuvw_Out[2];
+      // Calculate orientation change vectors (RX, RY, RZ rotations)
       RZvect = xyzuvw_In[3] - xyzuvw_Out[3];
       RYvect = xyzuvw_In[4] - xyzuvw_Out[4];
       RXvect = xyzuvw_In[5] - xyzuvw_Out[5];
 
-
-      //start pos
+      // Store current position as starting point for motion calculation
       float Xstart = xyzuvw_Out[0];
       float Ystart = xyzuvw_Out[1];
       float Zstart = xyzuvw_Out[2];
@@ -5649,18 +5991,19 @@ void loop() {
       float RYstart = xyzuvw_Out[4];
       float RXstart = xyzuvw_Out[5];
 
-
-      //line dist and determine way point gap
+      // Calculate total distance for this line movement (6D Euclidean norm)
       float lineDist = pow((pow((Xvect), 2) + pow((Yvect), 2) + pow((Zvect), 2) + pow((RZvect), 2) + pow((RYvect), 2) + pow((RXvect), 2)), .5);
+      // Only proceed if there is actual motion requested
       if (lineDist > 0) {
-
+        // Calculate number of waypoints based on line distance divided by waypoint spacing
         float wayPts = lineDist / linWayDistSP;
+        // Calculate percentage increment between waypoints (1 / number of waypoints)
         float wayPerc = 1 / wayPts;
 
-        //pre calculate entire move and speeds
-
+        // Pre-calculate the entire move and all motion parameters (speeds, accelerations, steps)
+        // Solve inverse kinematics to find joint angles for target position
         SolveInverseKinematics();
-        //calc destination motor steps for precalc
+        // Calculate motor steps required to reach target from solved joint angles
         int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
         int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
         int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
@@ -5668,7 +6011,7 @@ void loop() {
         int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
         int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
 
-        //calc delta from current to destination fpr precalc
+        // Calculate step deltas (difference between current steps and target steps) for each axis
         int J1stepDif = J1StepM - J1futStepM;
         int J2stepDif = J2StepM - J2futStepM;
         int J3stepDif = J3StepM - J3futStepM;
@@ -5676,7 +6019,7 @@ void loop() {
         int J5stepDif = J5StepM - J5futStepM;
         int J6stepDif = J6StepM - J6futStepM;
 
-        //FIND HIGHEST STEP FOR PRECALC
+        // FIND HIGHEST STEP COUNT for acceleration profile calculation (bottleneck axis)
         int HighStep = J1stepDif;
         if (J2stepDif > HighStep) {
           HighStep = J2stepDif;
@@ -5694,124 +6037,149 @@ void loop() {
           HighStep = J6stepDif;
         }
 
-
-        /////PRE CALC SPEEDS//////
+        // PRE-CALCULATE SPEED PROFILES AND ACCELERATION RAMPS
         float calcStepGap;
 
-        //determine steps
+        // Determine acceleration/normal/deceleration steps based on profile percentages
         float ACCStep = HighStep * (ACCspd / 100);
         float NORStep = HighStep * ((100 - ACCspd - DCCspd) / 100);
         float DCCStep = HighStep * (DCCspd / 100);
 
-        //set speed for seconds or mm per sec
+        // Set speed target for seconds mode (multiply by 1.2 for timing calibration)
         if (SpeedType == "s") {
           speedSP = (SpeedVal * 1000000) * 1.2;
         } else if ((SpeedType == "m")) {
+          // Set speed target for mm/sec mode (convert distance to time, multiply by 1.2)
           speedSP = ((lineDist / SpeedVal) * 1000000) * 1.2;
         }
 
-        //calc step gap for seconds or mm per sec
+        // Calculate step gap (delay between steps) for seconds or mm per sec speed modes
         if (SpeedType == "s" or SpeedType == "m") {
+          // Calculate step gap with no acceleration (theoretical constant speed)
           float zeroStepGap = speedSP / HighStep;
+          // Calculate step increment during acceleration phase (how much to reduce delay per step)
           float zeroACCstepInc = (zeroStepGap * (100 / ACCramp)) / ACCStep;
+          // Calculate total acceleration time (ramp up period)
           float zeroACCtime = ((ACCStep)*zeroStepGap) + ((ACCStep - 9) * (((ACCStep) * (zeroACCstepInc / 2))));
+          // Calculate normal speed phase time (constant velocity period)
           float zeroNORtime = NORStep * zeroStepGap;
+          // Calculate step decrement during deceleration phase (how much to increase delay per step)
           float zeroDCCstepInc = (zeroStepGap * (100 / ACCramp)) / DCCStep;
+          // Calculate total deceleration time (ramp down period)
           float zeroDCCtime = ((DCCStep)*zeroStepGap) + ((DCCStep - 9) * (((DCCStep) * (zeroDCCstepInc / 2))));
+          // Calculate total move time across all three phases
           float zeroTOTtime = zeroACCtime + zeroNORtime + zeroDCCtime;
+          // Calculate overclock percentage to hit exact speed target (time adjustment factor)
           float overclockPerc = speedSP / zeroTOTtime;
+          // Apply overclock percentage to final step gap
           calcStepGap = zeroStepGap * overclockPerc;
+          // Enforce minimum speed limit (prevent stepping too fast for microcontroller)
           if (calcStepGap <= minSpeedDelay) {
             calcStepGap = minSpeedDelay;
+            // Flag speed violation for user notification
             speedViolation = "1";
           }
         }
 
-        //calc step gap for percentage
+        // Calculate step gap for percentage speed mode (percentage of max speed)
         else if (SpeedType == "p") {
           calcStepGap = minSpeedDelay / (SpeedVal / 100);
         }
 
-        //calculate final step increments
+        // Calculate final step increments for acceleration and deceleration ramps
         float calcACCstepInc = (calcStepGap * (100 / ACCramp)) / ACCStep;
         float calcDCCstepInc = (calcStepGap * (100 / ACCramp)) / DCCStep;
+        // Calculate starting delay for acceleration (ensures smooth ramp-up from stop)
         float calcACCstartDel = (calcACCstepInc * ACCStep) * 2;
+        // Calculate ending delay for deceleration (ensures smooth ramp-down to stop)
         float calcDCCendDel = (calcDCCstepInc * DCCStep) * 2;
 
-
-        //calc way pt speeds
+        // Calculate waypoint acceleration/normal/deceleration counts
         float ACCwayPts = wayPts * (ACCspd / 100);
         float NORwayPts = wayPts * ((100 - ACCspd - DCCspd) / 100);
         float DCCwayPts = wayPts * (DCCspd / 100);
 
-        //calc way inc for lin way steps
+        // Calculate delay change per waypoint for smooth acceleration ramp
         float ACCwayInc = (calcACCstartDel - calcStepGap) / ACCwayPts;
         float DCCwayInc = (calcDCCendDel - calcStepGap) / DCCwayPts;
 
-        //set starting delsy
+        // Set initial delay for first waypoint (start of acceleration)
         if (rndTrue == true) {
+          // If rounding arc active, use speed from previous arc move
           curDelay = rndSpeed;
         } else {
+          // Otherwise use calculated acceleration start delay
           curDelay = calcACCstartDel;
         }
 
-
-        // calc external axis way pt moves
+        // Calculate external axis (J7, J8, J9) step increments across waypoints
         int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
+        // Distribute J7 steps evenly across waypoints for smooth motion
         int J7stepDif = (J7StepM - J7futStepM) / (wayPts - 1);
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
+        // Distribute J8 steps evenly across waypoints
         int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);
         int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
+        // Distribute J9 steps evenly across waypoints
         int J9stepDif = (J9StepM - J9futStepM) / (wayPts - 1);
 
-
+        // Determine J7 motion direction (1=backward, 0=forward)
         if (J7stepDif <= 0) {
           J7dir = 1;
         } else {
           J7dir = 0;
         }
 
+        // Determine J8 motion direction
         if (J8stepDif <= 0) {
           J8dir = 1;
         } else {
           J8dir = 0;
         }
 
+        // Determine J9 motion direction
         if (J9stepDif <= 0) {
           J9dir = 1;
         } else {
           J9dir = 0;
         }
 
-
+        // Reset encoder fault detection before motion begins
         resetEncoders();
         /////////////////////////////////////////////////
-        //loop through waypoints
+        // Loop through all waypoints to interpolate motion
         for (int i = 0; i <= wayPts + 1; i++) {
 
-          ////DELAY CALC/////
+          // CALCULATE CURRENT WAYPOINT DELAY WITH ACCELERATION/DECELERATION RAMP
+          // During acceleration phase, decrease delay to speed up
           if (i <= ACCwayPts) {
             curDelay = curDelay - (ACCwayInc);
           } else if (i >= (wayPts - DCCwayPts)) {
+            // During deceleration phase, increase delay to slow down
             curDelay = curDelay + (DCCwayInc);
           } else {
+            // During normal speed phase, maintain constant delay
             curDelay = calcStepGap;
           }
 
-
+          // Override with constant delay (ensures motion happens at calculated speed)
           curDelay = calcStepGap;
 
+          // Calculate percentage along line (0 to 1) for this waypoint
           float curWayPerc = wayPerc * i;
+          // Interpolate X, Y, Z position at this waypoint
           xyzuvw_In[0] = Xstart + (Xvect * curWayPerc);
           xyzuvw_In[1] = Ystart + (Yvect * curWayPerc);
           xyzuvw_In[2] = Zstart + (Zvect * curWayPerc);
+          // Interpolate orientation (Rz, Ry, Rx rotation angles)
           xyzuvw_In[3] = RZstart + (RZvect * curWayPerc);
           xyzuvw_In[4] = RYstart + (RYvect * curWayPerc);
           xyzuvw_In[5] = RXstart + (RXvect * curWayPerc);
 
+          // Solve inverse kinematics for this waypoint position
           SolveInverseKinematics();
 
-          //calc destination motor steps
+          // Calculate destination motor steps for this waypoint
           int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
           int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
           int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
@@ -5819,7 +6187,7 @@ void loop() {
           int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
           int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
 
-          //calc delta from current to destination
+          // Calculate step delta from current to target for this waypoint
           int J1stepDif = J1StepM - J1futStepM;
           int J2stepDif = J2StepM - J2futStepM;
           int J3stepDif = J3StepM - J3futStepM;
@@ -5827,7 +6195,7 @@ void loop() {
           int J5stepDif = J5StepM - J5futStepM;
           int J6stepDif = J6StepM - J6futStepM;
 
-          //determine motor directions
+          // Determine motor rotation directions (1=negative direction, 0=positive)
           J1dir = (J1stepDif <= 0) ? 1 : 0;
           J2dir = (J2stepDif <= 0) ? 1 : 0;
           J3dir = (J3stepDif <= 0) ? 1 : 0;
@@ -5835,7 +6203,7 @@ void loop() {
           J5dir = (J5stepDif <= 0) ? 1 : 0;
           J6dir = (J6stepDif <= 0) ? 1 : 0;
 
-          //determine if requested position is within axis limits
+          // Determine if requested position is within axis limits (collision check)
           if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
             J1axisFault = 1;
           }
@@ -5854,6 +6222,7 @@ void loop() {
           if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
             J6axisFault = 1;
           }
+          // Check J7, J8, J9 for axis limit violations
           if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
             J7axisFault = 1;
           }
@@ -5863,20 +6232,26 @@ void loop() {
           if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
             J9axisFault = 1;
           }
+          // Sum all axis faults to determine if move is valid
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
 
-          //send move command if no axis limit error
+          // Execute motion step if no axis limit errors and kinematics valid
           if (TotalAxisFault == 0 && KinematicError == 0) {
+            // Call motion routine with absolute step values and directions
             driveMotorsL(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
+            // Update current position tracking after motion
             updatePos();
+            // Save current delay for rounding arc speed continuity
             rndSpeed = curDelay;
           } else if (KinematicError == 1) {
+            // No solution found in inverse kinematics (unreachable target)
             Alarm = "ER";
             if (splineTrue == false) {
               delay(5);
               Serial.println(Alarm);
             }
           } else {
+            // Axis limit error - report which axes exceeded limits
             Alarm = "EL" + String(J1axisFault) + String(J2axisFault) + String(J3axisFault) + String(J4axisFault) + String(J5axisFault) + String(J6axisFault) + String(J7axisFault) + String(J8axisFault) + String(J9axisFault);
             if (splineTrue == false) {
               delay(5);
@@ -5886,10 +6261,13 @@ void loop() {
         }
       }
 
+      // Check encoders for collision/slip detection after motion complete
       checkEncoders();
+      // If not in spline mode, report final robot position to user
       if (splineTrue == false) {
         sendRobotPos();
       }
+      // Clear input buffer after command processed
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }
@@ -5921,65 +6299,95 @@ void loop() {
     else if (function == "DG") {
       // DELETE PROGRAM - Remove G-code/motion file from SD card
       // Parameter: Fn<filename>
+      // Initialize SD card interface
       SD.begin(BUILTIN_SDCARD);
+      // Find position of Fn parameter in command string
       int fileStart = inData.indexOf("Fn");
+      // Extract filename after Fn prefix
       String filename = inData.substring(fileStart + 2);
+      // Convert String to C-string for SD library compatibility
       const char *fn = filename.c_str();
+      // Check if file exists on SD card before attempting deletion
       if (SD.exists(fn)) {
+        // Call delete function to remove file from SD card
         deleteSD(filename);
+        // Send success response ("P" = Program deleted)
         Serial.println("P");
       } else {
+        // Send failure response ("F" = File not found)
         Serial.println("F");
       }
     }
 
-    //----- READ FILES FROM SD CARD ---------------------------------------------------
-    //-----------------------------------------------------------------------
+    // READ FILES FROM SD CARD - List all files on SD card directory
     else if (function == "RG") {
+      // Declare file object for SD card root directory
       File root;
+      // Initialize SD card interface
       SD.begin(BUILTIN_SDCARD);
+      // Open root directory "/" to list all files
       root = SD.open("/");
+      // Call recursive directory printer to display all files and subdirectories
       printDirectory(root, 0);
     }
 
-
-    //----- WRITE COMMAND TO SD CARD ---------------------------------------------------
-    //-----------------------------------------------------------------------
+    // WRITE COMMAND TO SD CARD - Store motion/G-code command as text file
     else if (function == "WC") {
+      // Initialize SD card interface
       SD.begin(BUILTIN_SDCARD);
+      // Find position of Fn parameter (filename) in command
       int fileStart = inData.indexOf("Fn");
+      // Extract filename string from command
       String filename = inData.substring(fileStart + 2);
+      // Convert String to C-string for SD library
       const char *fn = filename.c_str();
+      // Extract command data before filename (everything before Fn parameter)
       String info = inData.substring(0, fileStart);
+      // Write command data to SD card file
       writeSD(fn, info);
-      //moveJ(info, false, true, false);
+      // Send current robot position back to user after write
       sendRobotPos();
     }
 
-    //----- PLAY FILE ON SD CARD ---------------------------------------------------
-    //-----------------------------------------------------------------------
+    // PLAY FILE ON SD CARD - Execute pre-stored motion commands from file
     else if (function == "PG") {
+      // Declare file object for reading commands
       File gcFile;
+      // Declare string to hold each command line from file
       String Cmd;
+      // Initialize SD card interface
       SD.begin(BUILTIN_SDCARD);
+      // Find position of filename parameter in command
       int fileStart = inData.indexOf("Fn");
+      // Extract filename string
       String filename = inData.substring(fileStart + 2);
+      // Convert String to C-string for SD library
       const char *fn = filename.c_str();
+      // Attempt to open file from SD card
       gcFile = SD.open(fn);
+      // Check if file open was unsuccessful (null file pointer)
       if (!gcFile) {
+        // Send error response (EG = G-code Error)
         Serial.println("EG");
+        // Infinite loop to halt execution on file error
         while (1)
           ;
       }
+      // Loop while file has data AND emergency stop not triggered
       while (gcFile.available() && estopActive == false) {
+        // Read one line of command from file (up to newline character)
         Cmd = gcFile.readStringUntil('\n');
-        //CARTESIAN CMD
+        // Check if command starts with "X" (Cartesian move command)
         if (Cmd.substring(0, 1) == "X") {
+          // Update current position before executing move
           updatePos();
+          // Execute Cartesian move command from file (false=file mode, true=G-code)
           moveJ(Cmd, false, false, true);
         }
-        //PRECALC'D CMD - not currently used, needs position handling
+        // PRECALC'D CMD - not currently used, needs position handling
+        // This section parses pre-calculated step format from SD card
         else {
+          // Parse comma-delimited position indices from command string
           int i1 = Cmd.indexOf(',');
           int i2 = Cmd.indexOf(',', i1 + 1);
           int i3 = Cmd.indexOf(',', i2 + 1);
@@ -6003,6 +6411,7 @@ void loop() {
           int i21 = Cmd.indexOf(',', i20 + 1);
           int i22 = Cmd.indexOf(',', i21 + 1);
           int i23 = Cmd.indexOf(',', i22 + 1);
+          // Extract step counts for J1-J9 (absolute steps needed for motion)
           int J1step = Cmd.substring(0, i1).toInt();
           int J2step = Cmd.substring(i1 + 1, i2).toInt();
           int J3step = Cmd.substring(i2 + 1, i3).toInt();
@@ -6012,6 +6421,7 @@ void loop() {
           int J7step = Cmd.substring(i6 + 1, i7).toInt();
           int J8step = Cmd.substring(i7 + 1, i8).toInt();
           int J9step = Cmd.substring(i8 + 1, i9).toInt();
+          // Extract motor direction bits for J1-J9 (1=backward, 0=forward)
           int J1dir = Cmd.substring(i9 + 1, i10).toInt();
           int J2dir = Cmd.substring(i10 + 1, i11).toInt();
           int J3dir = Cmd.substring(i11 + 1, i12).toInt();
@@ -6021,23 +6431,29 @@ void loop() {
           int J7dir = Cmd.substring(i15 + 1, i16).toInt();
           int J8dir = Cmd.substring(i16 + 1, i17).toInt();
           int J9dir = Cmd.substring(i17 + 1, i18).toInt();
+          // Extract speed type character (s=seconds, m=mm/sec, p=percentage)
           String SpeedType = Cmd.substring(i18 + 1, i19);
+          // Extract speed value (magnitude for speed calculation)
           float SpeedVal = Cmd.substring(i19 + 1, i20).toFloat();
+          // Extract acceleration percentage (percentage of steps to accelerate)
           float ACCspd = Cmd.substring(i20 + 1, i21).toFloat();
+          // Extract deceleration percentage (percentage of steps to decelerate)
           float DCCspd = Cmd.substring(i21 + 1, i22).toFloat();
+          // Extract acceleration ramp rate (percentage per step increment)
           float ACCramp = Cmd.substring(i22 + 1).toFloat();
+          // Call G-code motion function with all parsed parameters
           driveMotorsG(J1step, J2step, J3step, J4step, J5step, J6step, J7step, J8step, J9step, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
         }
       }
+      // Close file after reading all commands
       gcFile.close();
+      // Send robot position back to user after playback complete
       sendRobotPos();
     }
 
-
-
-    //----- WRITE PRE-CALC'D MOVE TO SD CARD ---------------------------------------------------
-    //-----------------------------------------------------------------------
+    // WRITE PRE-CALC'D MOVE TO SD CARD - Pre-calculate motion and store to file
     else if (function == "WG") {
+      // Declare direction variables for each motor (1=backward, 0=forward)
       int J1dir;
       int J2dir;
       int J3dir;
@@ -6048,6 +6464,7 @@ void loop() {
       int J8dir;
       int J9dir;
 
+      // Initialize axis fault flags for limit checking
       int J1axisFault = 0;
       int J2axisFault = 0;
       int J3axisFault = 0;
@@ -6057,10 +6474,13 @@ void loop() {
       int J7axisFault = 0;
       int J8axisFault = 0;
       int J9axisFault = 0;
+      // Sum of all axis faults (0 = no errors, >0 = limit violation)
       int TotalAxisFault = 0;
 
+      // String to store formatted motion command for writing to file
       String info;
 
+      // Parse command parameter positions (location of each parameter in string)
       int xStart = inData.indexOf("X");
       int yStart = inData.indexOf("Y");
       int zStart = inData.indexOf("Z");
@@ -6079,26 +6499,39 @@ void loop() {
       int LoopModeStart = inData.indexOf("Lm");
       int fileStart = inData.indexOf("Fn");
 
+      // Extract target X, Y, Z Cartesian position from command
       xyzuvw_In[0] = inData.substring(xStart + 1, yStart).toFloat();
       xyzuvw_In[1] = inData.substring(yStart + 1, zStart).toFloat();
       xyzuvw_In[2] = inData.substring(zStart + 1, rzStart).toFloat();
+      // Extract target orientation (Rz, Ry, Rx rotation angles in degrees)
       xyzuvw_In[3] = inData.substring(rzStart + 2, ryStart).toFloat();
       xyzuvw_In[4] = inData.substring(ryStart + 2, rxStart).toFloat();
       xyzuvw_In[5] = inData.substring(rxStart + 2, J7Start).toFloat();
+      // Extract external axis target positions (J7, J8, J9)
       J7_In = inData.substring(J7Start + 2, J8Start).toFloat();
       J8_In = inData.substring(J8Start + 2, J9Start).toFloat();
       J9_In = inData.substring(J9Start + 2, SPstart).toFloat();
 
+      // Extract speed type (s=seconds, m=mm/sec, p=percentage speed)
       String SpeedType = inData.substring(SPstart + 1, SPstart + 2);
+      // Extract speed value (seconds, mm per second, or percentage)
       float SpeedVal = inData.substring(SPstart + 2, AcStart).toFloat();
+      // Extract acceleration profile percentage (% of steps for acceleration phase)
       float ACCspd = inData.substring(AcStart + 2, DcStart).toFloat();
+      // Extract deceleration profile percentage (% of steps for deceleration phase)
       float DCCspd = inData.substring(DcStart + 2, RmStart).toFloat();
+      // Extract acceleration ramp rate (rate of change of velocity)
       float ACCramp = inData.substring(RmStart + 2, RndStart).toFloat();
+      // Extract corner rounding radius (smooth corners in spline motion)
       float Rounding = inData.substring(RndStart + 3, WristConStart).toFloat();
+      // Extract wrist configuration (determines IK solution orientation)
       WristCon = inData.substring(WristConStart + 1, LoopModeStart);
+      // Extract loop mode string for J1-J6 motion behavior
       String LoopMode = inData.substring(LoopModeStart + 2, fileStart);
+      // Extract output filename for pre-calculated command storage
       String filename = inData.substring(fileStart + 2);
 
+      // Parse loop mode for each joint (0=linear, 1=modulo for continuous rotation)
       J1LoopMode = LoopMode.substring(0, 1).toInt();
       J2LoopMode = LoopMode.substring(1, 2).toInt();
       J3LoopMode = LoopMode.substring(2, 3).toInt();
@@ -6106,21 +6539,22 @@ void loop() {
       J5LoopMode = LoopMode.substring(4, 5).toInt();
       J6LoopMode = LoopMode.substring(5).toInt();
 
+      // Solve inverse kinematics to find joint angles for target position
       SolveInverseKinematics();
 
-      //calc destination motor steps
+      // Calculate destination motor steps for each joint from IK solution
       int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
       int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
       int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
       int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
       int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
       int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+      // Calculate steps for external axes (J7, J8, J9)
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
 
-
-      //calc delta from current to destination
+      // Calculate step deltas (current position to target position) for each axis
       int J1stepDif = J1StepM - J1futStepM;
       int J2stepDif = J2StepM - J2futStepM;
       int J3stepDif = J3StepM - J3futStepM;
@@ -6131,7 +6565,7 @@ void loop() {
       int J8stepDif = J8StepM - J8futStepM;
       int J9stepDif = J9StepM - J9futStepM;
 
-      //set step
+      // Update current step position to target (commit motion to memory)
       J1StepM = J1futStepM;
       J2StepM = J2futStepM;
       J3StepM = J3futStepM;
@@ -6142,7 +6576,7 @@ void loop() {
       J8StepM = J8futStepM;
       J9StepM = J9futStepM;
 
-      //determine motor directions
+      // Determine motor directions based on step differences (1=backward, 0=forward)
       J1dir = (J1stepDif <= 0) ? 1 : 0;
       J2dir = (J2stepDif <= 0) ? 1 : 0;
       J3dir = (J3stepDif <= 0) ? 1 : 0;
@@ -6153,55 +6587,70 @@ void loop() {
       J8dir = (J8stepDif <= 0) ? 1 : 0;
       J9dir = (J9stepDif <= 0) ? 1 : 0;
 
-
-      //determine if requested position is within axis limits
+      // Check if requested position is within J1 axis limits
       if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
         J1axisFault = 1;
       }
+      // Check if requested position is within J2 axis limits
       if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
         J2axisFault = 1;
       }
+      // Check if requested position is within J3 axis limits
       if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
         J3axisFault = 1;
       }
+      // Check if requested position is within J4 axis limits
       if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
         J4axisFault = 1;
       }
+      // Check if requested position is within J5 axis limits
       if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
         J5axisFault = 1;
       }
+      // Check if requested position is within J6 axis limits
       if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
         J6axisFault = 1;
       }
+      // Check if requested position is within J7 (external axis) limits
       if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
         J7axisFault = 1;
       }
+      // Check if requested position is within J8 (external axis) limits
       if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
         J8axisFault = 1;
       }
+      // Check if requested position is within J9 (external axis) limits
       if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
         J9axisFault = 1;
       }
+      // Sum all axis fault flags (0=no errors, >0 = some axes have limit violations)
       TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
 
-
-      //send move command if no axis limit error
+      // If no axis limit errors and kinematics valid, write pre-calculated command to file
       if (TotalAxisFault == 0 && KinematicError == 0) {
+        // Format motion command as comma-delimited string: steps, directions, speeds, accel, ramp
         info = String(abs(J1stepDif)) + "," + String(abs(J2stepDif)) + "," + String(abs(J3stepDif)) + "," + String(abs(J4stepDif)) + "," + String(abs(J5stepDif)) + "," + String(abs(J6stepDif)) + "," + String(abs(J7stepDif)) + "," + String(abs(J8stepDif)) + "," + String(abs(J9stepDif)) + "," + String(J1dir) + "," + String(J2dir) + "," + String(J3dir) + "," + String(J4dir) + "," + String(J5dir) + "," + String(J6dir) + "," + String(J7dir) + "," + String(J8dir) + "," + String(J9dir) + "," + String(SpeedType) + "," + String(SpeedVal) + "," + String(ACCspd) + "," + String(DCCspd) + "," + String(ACCramp);
+        // Write formatted command string to SD card file
         writeSD(filename, info);
+        // Send current robot position back to user
         sendRobotPos();
       } else if (KinematicError == 1) {
+        // Kinematics error - target position unreachable
         Alarm = "ER";
         delay(5);
         Serial.println(Alarm);
+        // Reset alarm code
         Alarm = "0";
       } else {
+        // Axis limit error - report which axes exceeded limits (9-bit binary code)
         Alarm = "EL" + String(J1axisFault) + String(J2axisFault) + String(J3axisFault) + String(J4axisFault) + String(J5axisFault) + String(J6axisFault) + String(J7axisFault) + String(J8axisFault) + String(J9axisFault);
         delay(5);
         Serial.println(Alarm);
+        // Reset alarm code
         Alarm = "0";
       }
 
+      // Clear input buffer after command complete
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }
@@ -6214,6 +6663,7 @@ void loop() {
       // MOVE CIRCLE - Circular interpolated motion in Cartesian space
       // Interpolates along circular arc through intermediate point to final point
 
+      // Motor direction control bits for each axis (1=backward, 0=forward)
       int J1dir;
       int J2dir;
       int J3dir;
@@ -6224,32 +6674,49 @@ void loop() {
       int J8dir;
       int J9dir;
 
+      // Axis fault flags: set to 1 if target position exceeds joint limits
       int J1axisFault = 0;
       int J2axisFault = 0;
       int J3axisFault = 0;
       int J4axisFault = 0;
       int J5axisFault = 0;
       int J6axisFault = 0;
+      // Note: J7, J8, J9 faults not tracked for circle motion (6-axis only)
+      // Status flag for alarm reporting (0 = no error)
       int TotalAxisFault = 0;
 
+      // Alarm code string for status reporting to user
       String Alarm = "0";
+      // Current distance to waypoint for motion planning
       float curWayDis;
+      // Speed in microseconds for timing calculations (converted from user units)
       float speedSP;
+      // Vector components for calculating distances and directions in Cartesian space
       float Xvect;
       float Yvect;
       float Zvect;
+      // Calculated step gap (delay in microseconds between stepper pulses)
       float calcStepGap;
+      // Rotation angle in radians for arc waypoint calculation
       float theta;
+      // Circle direction: 1=clockwise, -1=counterclockwise based on arc angle
       int Cdir;
+      // Rotation axis (unit vector) used for 3D arc rotation calculations
       float axis[3];
+      // Temporary storage for axis calculations during normalization
       float axisTemp[3];
+      // Starting vector for arc rotation (from center to start point)
       float startVect[3];
+      // 3x3 rotation matrix for applying rotations to arc coordinates
       float Rotation[3][3];
+      // Destination point after rotation applied
       float DestPt[3];
+      // Quaternion components (a,b,c,d) used in Euler-Rodrigues formula for 3D rotation
       float a;
       float b;
       float c;
       float d;
+      // Cached products of quaternion components for rotation matrix calculation (optimization)
       float aa;
       float bb;
       float cc;
@@ -6261,43 +6728,60 @@ void loop() {
       float bd;
       float cd;
 
+      // Parse command parameter positions (locations of parameters in input string)
+      // Circle center position parameters (Cx, Cy, Cz)
       int xStart = inData.indexOf("Cx");
       int yStart = inData.indexOf("Cy");
       int zStart = inData.indexOf("Cz");
+      // Orientation parameters (Rz, Ry, Rx angles in degrees)
       int rzStart = inData.indexOf("Rz");
       int ryStart = inData.indexOf("Ry");
       int rxStart = inData.indexOf("Rx");
+      // Arc start point on circle (Bx, By, Bz = "B" for beginning)
       int xMidIndex = inData.indexOf("Bx");
       int yMidIndex = inData.indexOf("By");
       int zMidIndex = inData.indexOf("Bz");
+      // Arc end point on circle (Px, Py, Pz = "P" for point)
       int xEndIndex = inData.indexOf("Px");
       int yEndIndex = inData.indexOf("Py");
       int zEndIndex = inData.indexOf("Pz");
+      // Tool offset (Tr = tool rotation/transformation)
       int tStart = inData.indexOf("Tr");
+      // Speed parameters (S = speed value, Ac = acceleration, Dc = deceleration)
       int SPstart = inData.indexOf("S");
       int AcStart = inData.indexOf("Ac");
       int DcStart = inData.indexOf("Dc");
+      // Ramp rate (Rm = ramp mode/rate)
       int RmStart = inData.indexOf("Rm");
+      // Wrist configuration and loop mode
       int WristConStart = inData.indexOf("W");
       int LoopModeStart = inData.indexOf("Lm");
 
-
+      // Extract circle center point coordinates (beginning point of circle definition)
       float xBeg = inData.substring(xStart + 2, yStart).toFloat();
       float yBeg = inData.substring(yStart + 2, zStart).toFloat();
       float zBeg = inData.substring(zStart + 2, rzStart).toFloat();
+      // Extract starting orientation (circle center orientation)
       float rzBeg = inData.substring(rzStart + 2, ryStart).toFloat();
       float ryBeg = inData.substring(ryStart + 2, rxStart).toFloat();
       float rxBeg = inData.substring(rxStart + 2, xMidIndex).toFloat();
+      // Extract arc start point (first point on the circle's arc)
       float xMid = inData.substring(xMidIndex + 2, yMidIndex).toFloat();
       float yMid = inData.substring(yMidIndex + 2, zMidIndex).toFloat();
       float zMid = inData.substring(zMidIndex + 2, xEndIndex).toFloat();
+      // Extract arc end point (final point on the circle's arc)
       float xEnd = inData.substring(xEndIndex + 2, yEndIndex).toFloat();
       float yEnd = inData.substring(yEndIndex + 2, zEndIndex).toFloat();
       float zEnd = inData.substring(zEndIndex + 2, tStart).toFloat();
+      // Extract tool transformation (typically tool offset or rotation angle)
       xyzuvw_In[6] = inData.substring(tStart + 2, SPstart).toFloat();
+      // Extract speed type character (s=seconds, m=mm/sec, p=percentage)
       String SpeedType = inData.substring(SPstart + 1, SPstart + 2);
+      // Extract speed value (magnitude in selected units)
       float SpeedVal = inData.substring(SPstart + 2, AcStart).toFloat();
+      // Extract acceleration percentage (% of motion to accelerate)
       float ACCspd = inData.substring(AcStart + 2, DcStart).toFloat();
+      // Extract deceleration percentage (% of motion to decelerate)
       float DCCspd = inData.substring(DcStart + 2, RmStart).toFloat();
       float ACCramp = inData.substring(RmStart + 2, WristConStart).toFloat();
       WristCon = inData.substring(WristConStart + 1, LoopModeStart);
@@ -6415,23 +6899,26 @@ void loop() {
       //set starting delsy
       float curDelay = calcACCstartDel;
 
-      //set starting angle first way pt
+      // Initialize rotation angle for first waypoint (start at first incremental step)
       float cur_deg = theta_Deg;
 
-      /////////////////////////////////////
-      //loop through waypoints
-      ////////////////////////////////////
-
+      // Reset encoder fault tracking before motion execution
       resetEncoders();
 
+      // Iterate through each waypoint along the circular arc
+      // i: waypoint counter from 1 to wayPts
       for (int i = 1; i <= wayPts; i++) {
 
+        // Convert current angle to radians for 3D rotation mathematics
         theta = radians(cur_deg);
-        //use euler rodrigues formula to find rotation vector
+        // Calculate quaternion (a,b,c,d) components from rotation axis and theta
+        // Using Euler-Rodrigues formula: q = [cos(θ/2), -sin(θ/2)*axis_x, -sin(θ/2)*axis_y, -sin(θ/2)*axis_z]
+        // Quaternions avoid gimbal lock and enable smooth arbitrary axis rotation
         a = cos(theta / 2.0);
         b = -axis[0] * sin(theta / 2.0);
         c = -axis[1] * sin(theta / 2.0);
         d = -axis[2] * sin(theta / 2.0);
+        // Pre-compute products of quaternion components for rotation matrix calculation (optimization)
         aa = a * a;
         bb = b * b;
         cc = c * c;
@@ -6442,6 +6929,10 @@ void loop() {
         ab = a * b;
         bd = b * d;
         cd = c * d;
+        // Build 3x3 rotation matrix from quaternion using standard formula
+        // R = [[aa+bb-cc-dd,  2(bc+ad),    2(bd-ac)  ],
+        //      [2(bc-ad),     aa+cc-bb-dd, 2(cd+ab)  ],
+        //      [2(bd+ac),     2(cd-ab),    aa+dd-bb-cc]]
         Rotation[0][0] = aa + bb - cc - dd;
         Rotation[0][1] = 2 * (bc + ad);
         Rotation[0][2] = 2 * (bd - ac);
@@ -6452,31 +6943,37 @@ void loop() {
         Rotation[2][1] = 2 * (cd - ab);
         Rotation[2][2] = aa + dd - bb - cc;
 
-        //get product of current rotation and start vector
+        // Apply rotation matrix to start vector to get waypoint position on arc
+        // Matrix-vector product: DestPt = Rotation * startVect
         DestPt[0] = (Rotation[0][0] * startVect[0]) + (Rotation[0][1] * startVect[1]) + (Rotation[0][2] * startVect[2]);
         DestPt[1] = (Rotation[1][0] * startVect[0]) + (Rotation[1][1] * startVect[1]) + (Rotation[1][2] * startVect[2]);
         DestPt[2] = (Rotation[2][0] * startVect[0]) + (Rotation[2][1] * startVect[1]) + (Rotation[2][2] * startVect[2]);
 
-        ////DELAY CALC/////
+        // Calculate step delay for this waypoint with acceleration/deceleration ramping
+        // During acceleration phase: decrease delay to increase speed
         if (i <= ACCwayPts) {
           curDelay = curDelay - (ACCwayInc);
         } else if (i >= (wayPts - DCCwayPts)) {
+          // During deceleration phase: increase delay to decrease speed
           curDelay = curDelay + (DCCwayInc);
         } else {
+          // During normal speed phase: maintain constant delay
           curDelay = calcStepGap;
         }
 
-        //shift way pts back to orignal origin and calc kinematics for way pt movement
+        // Shift waypoint back to original circle center coordinates (add center offset)
         xyzuvw_In[0] = (DestPt[0]) + Px;
         xyzuvw_In[1] = (DestPt[1]) + Py;
         xyzuvw_In[2] = (DestPt[2]) + Pz;
+        // Maintain constant orientation throughout arc motion (wrist stays fixed)
         xyzuvw_In[3] = rzBeg;
         xyzuvw_In[4] = ryBeg;
         xyzuvw_In[5] = rxBeg;
 
+        // Solve inverse kinematics for this waypoint position
         SolveInverseKinematics();
 
-        //calc destination motor steps
+        // Calculate target motor steps for each joint at this waypoint
         int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
         int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
         int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
@@ -6484,72 +6981,85 @@ void loop() {
         int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
         int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
 
-        //calc delta from current to destination
+        // Calculate step difference (delta) from current position to waypoint target for each joint
         int J1stepDif = J1StepM - J1futStepM;
         int J2stepDif = J2StepM - J2futStepM;
         int J3stepDif = J3StepM - J3futStepM;
         int J4stepDif = J4StepM - J4futStepM;
         int J5stepDif = J5StepM - J5futStepM;
         int J6stepDif = J6StepM - J6futStepM;
+        // External axes J7-J9 not used in circle motion (6-axis only)
         int J7stepDif = 0;
         int J8stepDif = 0;
         int J9stepDif = 0;
 
-        //determine motor directions
+        // Determine motor rotation direction based on step difference sign
+        // ternary operator: if stepDif <= 0 then direction=1 (backward), else 0 (forward)
         J1dir = (J1stepDif <= 0) ? 1 : 0;
         J2dir = (J2stepDif <= 0) ? 1 : 0;
         J3dir = (J3stepDif <= 0) ? 1 : 0;
         J4dir = (J4stepDif <= 0) ? 1 : 0;
         J5dir = (J5stepDif <= 0) ? 1 : 0;
         J6dir = (J6stepDif <= 0) ? 1 : 0;
+        // J7-J9 not moving during circle motion (direction = 0 = stopped)
         J7dir = 0;
         J8dir = 0;
         J9dir = 0;
 
-        //determine if requested position is within axis limits
+        // Check if J1 axis position would exceed limits
         if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
           J1axisFault = 1;
         }
+        // Check if J2 axis position would exceed limits
         if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
           J2axisFault = 1;
         }
+        // Check if J3 axis position would exceed limits
         if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
           J3axisFault = 1;
         }
+        // Check if J4 axis position would exceed limits
         if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
           J4axisFault = 1;
         }
+        // Check if J5 axis position would exceed limits
         if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
           J5axisFault = 1;
         }
+        // Check if J6 axis position would exceed limits
         if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
           J6axisFault = 1;
         }
+        // Sum all joint fault flags (0=valid move, >0=at least one joint limit violation)
         TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault;
 
-
-
+        // Execute motion step only if no axis limits exceeded AND kinematics solution found
         if (TotalAxisFault == 0 && KinematicError == 0) {
+          // Call low-level motion driver with absolute step counts and directions
+          // driveMotorsL handles stepper pulse generation with defined delay between steps
           driveMotorsL(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
         } else if (KinematicError == 1) {
+          // Kinematics solver failed - target position unreachable
           Alarm = "ER";
           delay(5);
           Serial.println(Alarm);
         } else {
+          // Axis limit violation - report which axes failed (9-bit binary code J1-J9)
           Alarm = "EL" + String(J1axisFault) + String(J2axisFault) + String(J3axisFault) + String(J4axisFault) + String(J5axisFault) + String(J6axisFault);
           delay(5);
           Serial.println(Alarm);
         }
 
-
-        //increment angle
+        // Increment angle for next waypoint (rotate further around arc)
         cur_deg += theta_Deg;
       }
 
+      // Check encoders for collision/slip detection after motion completes
       checkEncoders();
+      // Send current robot position back to user
       sendRobotPos();
 
-
+      // Clear input buffer after command processed
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }

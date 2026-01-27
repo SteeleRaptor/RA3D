@@ -287,7 +287,7 @@ class ArmController:
     #This function may not be much different but InverseKinematics is needed for printing
     def moveLinearCustom(self, X, Y, Z, Rx, Ry, Rz):
         
-        outgoingJointAngles = kinematics.solveInverseKinematics([X, Y, Z, Rx, Ry, Rz])
+        outgoingJointAngles = self.kinematics.solveInverseKinematics([X, Y, Z, Rx, Ry, Rz])
         self.sendRJ(outgoingJointAngles[0], outgoingJointAngles[1], outgoingJointAngles[2], outgoingJointAngles[3], outgoingJointAngles[4], outgoingJointAngles[5])
     def prepRJCommand(self):
         # Read the values from each entry box
@@ -512,7 +512,8 @@ class ArmController:
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed")
             return
-        self.sendRJ(0, -40, 40, 0, 90, 0)
+        self.sendRJ(0,0,0,0,90,0)
+        self.sendRJ(0, -40, 50, 0, 90, 0)
 
     #--------Origin-------
     def setOrigin(self):

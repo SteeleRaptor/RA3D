@@ -3,65 +3,7 @@
 /*  AR4 Robot Control Software
     Copyright (c) 2024, Chris Annin
     All rights reserved.
-
-    You are free to share, copy and redistribute in any medium
-    or format.  You are free to remix, transform and build upon
-    this material.
-
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions are met:
-
-          Redistributions of source code must retain the above copyright
-          notice, this list of conditions and the following disclaimer.
-          Redistribution of this software in source or binary forms shall be free
-          of all charges or fees to the recipient of this software.
-          Redistributions in binary form must reproduce the above copyright
-          notice, this list of conditions and the following disclaimer in the
-          documentation and/or other materials provided with the distribution.
-          you must give appropriate credit and indicate if changes were made. You may do
-          so in any reasonable manner, but not in any way that suggests the
-          licensor endorses you or your use.
-          Selling Annin Robotics software, robots, robot parts, or any versions of robots or software based on this
-          work is strictly prohibited.
-
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-    DISCLAIMED. IN NO EVENT SHALL CHRIS ANNIN BE LIABLE FOR ANY
-    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-    chris.annin@gmail.com
-
 */
-
-
-// VERSION LOG
-// 1.0 - 2/6/21 - initial release
-// 1.1 - 2/20/21 - bug fix, calibration offset on negative axis calibration direction axis 2,4,5
-// 2.0 - 10/1/22 - added lookahead and spline functionality
-// 2.2 - 11/6/22 - added Move V for open cv integrated vision
-// 3.0 - 2/3/23 - open loop bypass moved to teensy board / add external axis 8 & 9 / bug fix live jog drift
-// 3.1 - 5/10/23 - gcode initial
-// 3.2 - 5/12/23 - remove RoboDK kinematics
-// 3.3 - 6/4/23 - update geometric kinematics
-// 4.0 - 11/5/23 - .txt .ar4 extension, gcode tab, kinematics tab. Initial MK2 release.
-// 4.1 - 11/23/23 - bug fix added - R06_neg_matrix[2][3] = -DHparams[5][2]; added to UPdate CMD & GCC diagnostic
-// 4.2 - 1/12/24 - bug fix - step direction delay
-// 4.3 - 1/21/24 - Gcode to SD card.  Estop button interrupt.
-// 4.3.1 - 2/1/24 bug fix - vision snap and find drop down
-// 4.4 - 3/2/24 added kinematic error handling
-// 4.5 - 6/29/24 simplified drive motors functions with arrays
-// 5.0 - 7/14/24 updated kinematics
-// 5.1 - 2/15/25 Modbus option
-// 5.2 - 6/7/25 Modbus option
-// 6.0 - 6/7/25 Virtual Robot
-// 6.1 - 8/29/25 updated accel and decel, auto calibrate & microsteps
-// 6.2 - 8/29/25 9/12/25 changed bootstrap theme, xbox upgrade
 
 #include <math.h>
 #include <limits>

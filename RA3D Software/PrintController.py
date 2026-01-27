@@ -80,7 +80,9 @@ class PrintController:
         self.root.cancelPrintButton.config(state="normal")
 
     def startPrint(self):
-
+        self.OriginX = self.root.armController.OriginX
+        self.OriginY = self.root.armController.OriginY
+        self.OriginZ = self.root.armController.OriginZ
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
             return
@@ -118,9 +120,7 @@ class PrintController:
 
     def cancelPrint(self):
         pass
-        
-        
-
+    
     # Converts a GCode instruction to the instruction to send over serial
     def gcodeToTeensy(self, lineToConvert):
         if lineToConvert[0] == ';': # Line is comment
@@ -129,6 +129,7 @@ class PrintController:
             return "" # Don't convert
         # Actual instructions to convert
         elif lineToConvert[0:3] == "G28": # Home the printer
+            self.armController.moveSafe() #Should probably implement home seperate from safe position
             return ""
         elif lineToConvert[0:3] == "G90": # Absolute positioning
             # TODO: This needs handling or removal
@@ -175,7 +176,9 @@ class PrintController:
                 e = self.lastE
             else:
                 self.lastE = e
-
+            x = x + self.OriginX
+            y = y + self.OriginY
+            z = z + self.OriginZ
             # TODO: Additional processing to ensure X, Y, and Z are within build volume
             # TODO: Additional processing for F to control speed or something
             # Note that F is in units per minute (per LinuxCNC specifications)
@@ -190,3 +193,42 @@ class PrintController:
     def printLoop(self):
 
         pass
+
+class Position:
+    def __init__(self, X, Y, Z, Rx, Ry, Rz, origin):
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+        self.Rx = Rx
+        self.Ry = Ry
+        self.Rz = Rz
+        self.origin = origin()
+
+    def GetAbsolute(self):
+        return [self.X, self.Y, self.Z, self.Rx, self.Ry, self.Rz]
+    
+    def GetRelative(self):
+        relX = self.X - self.originX
+        relY = self.Y - self.originY
+        relZ = self.Z - self.originZ
+        return [relX, relY, relZ, self.Rx, self.Ry, self.Rz]
+    def SetPosition(self, X, Y, Z, Rx, Ry, Rz):
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+        self.Rx = Rx
+        self.Ry = Ry
+        self.Rz = Rz
+
+class Origin:
+    def __init__(self, X, Y, Z):
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+    def getOrigin(self):
+        return [self.X, self.Y, self.Z]
+    def setOrigin(self, X, Y, Z):
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+

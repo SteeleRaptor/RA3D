@@ -290,7 +290,7 @@ float J9StepDeg = 14.2857;   // Steps per mm for J9 (linear axis)
 // TOTAL STEP LIMITS FOR EACH AXIS
 // =============================================================================================
 // Maximum step count for full range of motion
-int J1StepLim = J1axisLim * J1StepDeg;  // Total steps for J1 full range
+int J1StepRange = J1axisLim * J1StepDeg;  // Total steps for J1 full range
 int J2StepLim = J2axisLim * J2StepDeg;  // Total steps for J2 full range
 int J3StepLim = J3axisLim * J3StepDeg;  // Total steps for J3 full range
 int J4StepLim = J4axisLim * J4StepDeg;  // Total steps for J4 full range
@@ -318,15 +318,16 @@ int J9zeroStep = J9axisLimNeg * J9StepDeg;  // Steps to reach zero for J9
 // MASTER STEP COUNTERS
 // =============================================================================================
 // Current step position counters for each joint (initialized at zero position)
-int J1StepM = J1zeroStep;  // Master step counter for J1
-int J2StepM = J2zeroStep;  // Master step counter for J2
-int J3StepM = J3zeroStep;  // Master step counter for J3
-int J4StepM = J4zeroStep;  // Master step counter for J4
-int J5StepM = J5zeroStep;  // Master step counter for J5
-int J6StepM = J6zeroStep;  // Master step counter for J6
-int J7StepM = J7zeroStep;  // Master step counter for J7
-int J8StepM = J8zeroStep;  // Master step counter for J8
-int J9StepM = J9zeroStep;  // Master step counter for J9
+// Also, last known position (with or without encoder feedback)
+int J1MasterStep = J1zeroStep;  // Master step counter for J1
+int J2MasterStep = J2zeroStep;  // Master step counter for J2
+int J3MasterStep = J3zeroStep;  // Master step counter for J3
+int J4MasterStep = J4zeroStep;  // Master step counter for J4
+int J5MasterStep = J5zeroStep;  // Master step counter for J5
+int J6MasterStep = J6zeroStep;  // Master step counter for J6
+int J7MasterStep = J7zeroStep;  // Master step counter for J7
+int J8MasterStep = J8zeroStep;  // Master step counter for J8
+int J9MasterStep = J9zeroStep;  // Master step counter for J9
 
 
 
@@ -453,9 +454,9 @@ float xyzuvw_Temp[ROBOT_nDOFs]; // Temporary storage for cartesian coordinates
 // JOINT ANGLE VARIABLES
 // =============================================================================================
 // Output joint angles from inverse kinematics (in degrees)
-float JangleOut[ROBOT_nDOFs];   // Inverse kinematics solution (degrees)
+float JointAnglesInverseKinematic[ROBOT_nDOFs];   // Inverse kinematics solution (degrees)
 // Input joint angles for forward kinematics (in degrees)
-float JangleIn[ROBOT_nDOFs];    // Current joint angles (degrees)
+float CurrentJointAngle[ROBOT_nDOFs];    // Current joint angles (degrees)
 // Estimated joint angles for IK solver guidance
 float joints_estimate[ROBOT_nDOFs];  // Joint estimate for IK convergence
 // Multiple IK solutions for wrist configuration selection
@@ -1288,7 +1289,7 @@ void SolveFowardKinematics() {
   // Copy current joint angles from global array to local array
   for (int i = 0; i < ROBOT_nDOFs; i++) {
     // Copy each joint angle for processing
-    joints[i] = JangleIn[i];
+    joints[i] = CurrentJointAngle[i];
   }
 
   // Call forward kinematics solver with joint angles to get Cartesian position
@@ -1348,17 +1349,18 @@ void forward_kinematics_robot(const T joints[ROBOT_nDOFs], Matrix4x4 target) {
 //REVERSE KINEMATICS
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//vestigal function
 void updatejoints() {
 
   for (int i = 0; i > ROBOT_nDOFs; i++) {
-    JangleIn[i] = JangleOut[i];
+    CurrentJointAngle[i] = JointAnglesInverseKinematic[i];
   }
 }
 
 void JointEstimate() {
 
   for (int i = 0; i < ROBOT_nDOFs; i++) {
-    joints_estimate[i] = JangleIn[i];
+    joints_estimate[i] = CurrentJointAngle[i];
   }
 }
 
@@ -1430,7 +1432,7 @@ void SolveInverseKinematics() {
   }
 
   // Restore original J5 estimate for solution selection
-  joints_estimate[4] = JangleIn[4];
+  joints_estimate[4] = CurrentJointAngle[4];
 
   // Default to first solution
   solVal = 0;
@@ -1459,7 +1461,7 @@ void SolveInverseKinematics() {
   // Copy selected solution to output array
   for (int i = 0; i < ROBOT_nDOFs; i++) {
     // Copy joint angle from selected solution to output
-    JangleOut[i] = SolutionMatrix[i][solVal];
+    JointAnglesInverseKinematic[i] = SolutionMatrix[i][solVal];
   }
 }
 
@@ -1754,7 +1756,7 @@ void sendRobotPos() {
 
   // Build position response string with all joint and cartesian data
   // Format: A<J1>B<J2>...L<Rz>M<speedViolation>N<debug>O<flag>P<J7>Q<J8>R<J9>
-  String sendPos = "A" + String(JangleIn[0], 3) + "B" + String(JangleIn[1], 3) + "C" + String(JangleIn[2], 3) + "D" + String(JangleIn[3], 3) + "E" + String(JangleIn[4], 3) + "F" + String(JangleIn[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  String sendPos = "A" + String(CurrentJointAngle[0], 3) + "B" + String(CurrentJointAngle[1], 3) + "C" + String(CurrentJointAngle[2], 3) + "D" + String(CurrentJointAngle[3], 3) + "E" + String(CurrentJointAngle[4], 3) + "F" + String(CurrentJointAngle[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
   // Small delay before transmission for serial stability
   delay(5);
   // Send position response to host
@@ -1774,7 +1776,7 @@ void sendRobotPosSpline() {
 
   updatePos();
 
-  String sendPos = "A" + String(JangleIn[0], 3) + "B" + String(JangleIn[1], 3) + "C" + String(JangleIn[2], 3) + "D" + String(JangleIn[3], 3) + "E" + String(JangleIn[4], 3) + "F" + String(JangleIn[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  String sendPos = "A" + String(CurrentJointAngle[0], 3) + "B" + String(CurrentJointAngle[1], 3) + "C" + String(CurrentJointAngle[2], 3) + "D" + String(CurrentJointAngle[3], 3) + "E" + String(CurrentJointAngle[4], 3) + "F" + String(CurrentJointAngle[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
   delay(5);
   Serial.println(sendPos);
   speedViolation = "0";
@@ -1786,24 +1788,24 @@ void updatePos() {
     readEncoders();
   }
   // Convert J1 step count to angle in degrees (relative to zero position)
-  JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
+  CurrentJointAngle[0] = (J1MasterStep - J1zeroStep) / J1StepDeg;
   // Convert J2 step count to angle in degrees
-  JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
+  CurrentJointAngle[1] = (J2MasterStep - J2zeroStep) / J2StepDeg;
   // Convert J3 step count to angle in degrees
-  JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
+  CurrentJointAngle[2] = (J3MasterStep - J3zeroStep) / J3StepDeg;
   // Convert J4 step count to angle in degrees
-  JangleIn[3] = (J4StepM - J4zeroStep) / J4StepDeg;
+  CurrentJointAngle[3] = (J4MasterStep - J4zeroStep) / J4StepDeg;
   // Convert J5 step count to angle in degrees
-  JangleIn[4] = (J5StepM - J5zeroStep) / J5StepDeg;
+  CurrentJointAngle[4] = (J5MasterStep - J5zeroStep) / J5StepDeg;
   // Convert J6 step count to angle in degrees
-  JangleIn[5] = (J6StepM - J6zeroStep) / J6StepDeg;
+  CurrentJointAngle[5] = (J6MasterStep - J6zeroStep) / J6StepDeg;
 
   // Convert J7 step count to position (linear or rotary)
-  J7_pos = (J7StepM - J7zeroStep) / J7StepDeg;
+  J7_pos = (J7MasterStep - J7zeroStep) / J7StepDeg;
   // Convert J8 step count to position
-  J8_pos = (J8StepM - J8zeroStep) / J8StepDeg;
+  J8_pos = (J8MasterStep - J8zeroStep) / J8StepDeg;
   // Convert J9 step count to position
-  J9_pos = (J9StepM - J9zeroStep) / J9StepDeg;
+  J9_pos = (J9MasterStep - J9zeroStep) / J9StepDeg;
 
   // Solve forward kinematics to get Cartesian position from joint angles
   SolveFowardKinematics();
@@ -1816,37 +1818,37 @@ void correctRobotPos() {
   // Read encoder position and update internal step counters from encoder feedback
   // This synchronizes the system with actual motor positions
   // Read J1 encoder and scale by encoder multiplier
-  J1StepM = J1encPos.read() / J1encMult;
+  J1MasterStep = J1encPos.read() / J1encMult;
   // Read J2 encoder and scale by multiplier
-  J2StepM = J2encPos.read() / J2encMult;
+  J2MasterStep = J2encPos.read() / J2encMult;
   // Read J3 encoder and scale by multiplier
-  J3StepM = J3encPos.read() / J3encMult;
+  J3MasterStep = J3encPos.read() / J3encMult;
   // Read J4 encoder and scale by multiplier
-  J4StepM = J4encPos.read() / J4encMult;
+  J4MasterStep = J4encPos.read() / J4encMult;
   // Read J5 encoder and scale by multiplier
-  J5StepM = J5encPos.read() / J5encMult;
+  J5MasterStep = J5encPos.read() / J5encMult;
   // Read J6 encoder and scale by multiplier
-  J6StepM = J6encPos.read() / J6encMult;
+  J6MasterStep = J6encPos.read() / J6encMult;
 
   // Convert updated step counts to joint angles (degrees)
   // Calculate J1 angle from encoder-based step count
-  JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
+  CurrentJointAngle[0] = (J1MasterStep - J1zeroStep) / J1StepDeg;
   // Calculate J2 angle from encoder-based step count
-  JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
+  CurrentJointAngle[1] = (J2MasterStep - J2zeroStep) / J2StepDeg;
   // Calculate J3 angle from encoder-based step count
-  JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
+  CurrentJointAngle[2] = (J3MasterStep - J3zeroStep) / J3StepDeg;
   // Calculate J4 angle from encoder-based step count
-  JangleIn[3] = (J4StepM - J4zeroStep) / J4StepDeg;
+  CurrentJointAngle[3] = (J4MasterStep - J4zeroStep) / J4StepDeg;
   // Calculate J5 angle from encoder-based step count
-  JangleIn[4] = (J5StepM - J5zeroStep) / J5StepDeg;
+  CurrentJointAngle[4] = (J5MasterStep - J5zeroStep) / J5StepDeg;
   // Calculate J6 angle from encoder-based step count
-  JangleIn[5] = (J6StepM - J6zeroStep) / J6StepDeg;
+  CurrentJointAngle[5] = (J6MasterStep - J6zeroStep) / J6StepDeg;
 
   // Solve forward kinematics to get Cartesian position from corrected joint angles
   SolveFowardKinematics();
 
   // Build corrected position response string
-  String sendPos = "A" + String(JangleIn[0], 3) + "B" + String(JangleIn[1], 3) + "C" + String(JangleIn[2], 3) + "D" + String(JangleIn[3], 3) + "E" + String(JangleIn[4], 3) + "F" + String(JangleIn[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  String sendPos = "A" + String(CurrentJointAngle[0], 3) + "B" + String(CurrentJointAngle[1], 3) + "C" + String(CurrentJointAngle[2], 3) + "D" + String(CurrentJointAngle[3], 3) + "E" + String(CurrentJointAngle[4], 3) + "F" + String(CurrentJointAngle[5], 3) + "G" + String(xyzuvw_Out[0], 3) + "H" + String(xyzuvw_Out[1], 3) + "I" + String(xyzuvw_Out[2], 3) + "J" + String(xyzuvw_Out[3], 3) + "K" + String(xyzuvw_Out[4], 3) + "L" + String(xyzuvw_Out[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
   // Brief delay for serial stability
   delay(5);
   // Send corrected position to host
@@ -2101,12 +2103,12 @@ void resetEncoders() {
 //Made by Justin Fauson
 //Sets Master step to encoder position
 void readEncoders() {
-      J1StepM = J1encPos.read() / J1encMult;
-      J2StepM = J2encPos.read() / J2encMult;
-      J3StepM = J3encPos.read() / J3encMult;
-      J4StepM = J4encPos.read() / J4encMult;
-      J5StepM = J5encPos.read() / J5encMult;
-      J6StepM = J6encPos.read() / J6encMult;
+      J1MasterStep = J1encPos.read() / J1encMult;
+      J2MasterStep = J2encPos.read() / J2encMult;
+      J3MasterStep = J3encPos.read() / J3encMult;
+      J4MasterStep = J4encPos.read() / J4encMult;
+      J5MasterStep = J5encPos.read() / J5encMult;
+      J6MasterStep = J6encPos.read() / J6encMult;
 }
 // ==================================================================================
 // ENCODER FEEDBACK & COLLISION DETECTION
@@ -2137,63 +2139,63 @@ void checkEncoders() {
   J6EncSteps = J6encPos.read() / J6encMult;
   //Check for collision and update position based on encoder
   // Check if J1 encoder position differs significantly from commanded position
-  if (abs((J1EncSteps - J1StepM)) >= encOffset) {
+  if (abs((J1EncSteps - J1MasterStep)) >= encOffset) {
     // If in closed-loop mode, this indicates a collision/stall
     if (J1LoopMode == 0) {
       // Set collision flag for J1
       J1collisionTrue = 1;
       // Update step counter to match actual encoder position
-      J1StepM = J1encPos.read() / J1encMult;
+      J1MasterStep = J1encPos.read() / J1encMult;
     }
   }
   // Check if J2 encoder position differs significantly from commanded position
-  if (abs((J2EncSteps - J2StepM)) >= encOffset) {
+  if (abs((J2EncSteps - J2MasterStep)) >= encOffset) {
     // If in closed-loop mode, this indicates a collision
     if (J2LoopMode == 0) {
       // Set collision flag for J2
       J2collisionTrue = 1;
       // Update step counter to match actual encoder position
-      J2StepM = J2encPos.read() / J2encMult;
+      J2MasterStep = J2encPos.read() / J2encMult;
     }
   }
   // Check if J3 encoder position differs significantly from commanded position
-  if (abs((J3EncSteps - J3StepM)) >= encOffset) {
+  if (abs((J3EncSteps - J3MasterStep)) >= encOffset) {
     // If in closed-loop mode, this indicates a collision
     if (J3LoopMode == 0) {
       // Set collision flag for J3
       J3collisionTrue = 1;
       // Update step counter to match actual encoder position
-      J3StepM = J3encPos.read() / J3encMult;
+      J3MasterStep = J3encPos.read() / J3encMult;
     }
   }
   // Check if J4 encoder position differs significantly from commanded position
-  if (abs((J4EncSteps - J4StepM)) >= encOffset) {
+  if (abs((J4EncSteps - J4MasterStep)) >= encOffset) {
     // If in closed-loop mode, this indicates a collision
     if (J4LoopMode == 0) {
       // Set collision flag for J4
       J4collisionTrue = 1;
       // Update step counter to match actual encoder position
-      J4StepM = J4encPos.read() / J4encMult;
+      J4MasterStep = J4encPos.read() / J4encMult;
     }
   }
   // Check if J5 encoder position differs significantly from commanded position
-  if (abs((J5EncSteps - J5StepM)) >= encOffset) {
+  if (abs((J5EncSteps - J5MasterStep)) >= encOffset) {
     // If in closed-loop mode, this indicates a collision
     if (J5LoopMode == 0) {
       // Set collision flag for J5
       J5collisionTrue = 1;
       // Update step counter to match actual encoder position
-      J5StepM = J5encPos.read() / J5encMult;
+      J5MasterStep = J5encPos.read() / J5encMult;
     }
   }
   // Check if J6 encoder position differs significantly from commanded position
-  if (abs((J6EncSteps - J6StepM)) >= encOffset) {
+  if (abs((J6EncSteps - J6MasterStep)) >= encOffset) {
     // If in closed-loop mode, this indicates a collision
     if (J6LoopMode == 0) {
       // Set collision flag for J6
       J6collisionTrue = 1;
       // Update step counter to match actual encoder position
-      J6StepM = J6encPos.read() / J6encMult;
+      J6MasterStep = J6encPos.read() / J6encMult;
     }
   }
 
@@ -2241,7 +2243,7 @@ void driveMotorsJ(int J1step, int J2step, int J3step, int J4step, int J5step, in
   int motDirs[9] = { J1MotDir, J2MotDir, J3MotDir, J4MotDir, J5MotDir, J6MotDir, J7MotDir, J8MotDir, J9MotDir };
 
   // Initialize step monitors
-  int stepMonitors[9] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
+  int stepMonitors[9] = { J1MasterStep, J2MasterStep, J3MasterStep, J4MasterStep, J5MasterStep, J6MasterStep, J7MasterStep, J8MasterStep, J9MasterStep };
 
   int HighStep = steps[0];
   int Jactive = 0;
@@ -2417,15 +2419,15 @@ void driveMotorsJ(int J1step, int J2step, int J3step, int J4step, int J5step, in
   rndSpeed = curDelay;
 
   // Update the original step monitor variables
-  J1StepM = stepMonitors[0];
-  J2StepM = stepMonitors[1];
-  J3StepM = stepMonitors[2];
-  J4StepM = stepMonitors[3];
-  J5StepM = stepMonitors[4];
-  J6StepM = stepMonitors[5];
-  J7StepM = stepMonitors[6];
-  J8StepM = stepMonitors[7];
-  J9StepM = stepMonitors[8];
+  J1MasterStep = stepMonitors[0];
+  J2MasterStep = stepMonitors[1];
+  J3MasterStep = stepMonitors[2];
+  J4MasterStep = stepMonitors[3];
+  J5MasterStep = stepMonitors[4];
+  J6MasterStep = stepMonitors[5];
+  J7MasterStep = stepMonitors[6];
+  J8MasterStep = stepMonitors[7];
+  J9MasterStep = stepMonitors[8];
 }
 
 
@@ -2445,7 +2447,7 @@ void driveMotorsG(int J1step, int J2step, int J3step, int J4step, int J5step, in
   int motDirs[] = { J1MotDir, J2MotDir, J3MotDir, J4MotDir, J5MotDir, J6MotDir, J7MotDir, J8MotDir, J9MotDir };
   int stepPins[] = { J1stepPin, J2stepPin, J3stepPin, J4stepPin, J5stepPin, J6stepPin, J7stepPin, J8stepPin, J9stepPin };
   int dirPins[] = { J1dirPin, J2dirPin, J3dirPin, J4dirPin, J5dirPin, J6dirPin, J7dirPin, J8dirPin, J9dirPin };
-  int stepMonitors[] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
+  int stepMonitors[] = { J1MasterStep, J2MasterStep, J3MasterStep, J4MasterStep, J5MasterStep, J6MasterStep, J7MasterStep, J8MasterStep, J9MasterStep };
 
   // FIND HIGHEST STEP
   int HighStep = 0;
@@ -2560,15 +2562,15 @@ void driveMotorsG(int J1step, int J2step, int J3step, int J4step, int J5step, in
   rndSpeed = curDelay;
 
   // assign the updated values back to the original step monitors
-  J1StepM = stepMonitors[0];
-  J2StepM = stepMonitors[1];
-  J3StepM = stepMonitors[2];
-  J4StepM = stepMonitors[3];
-  J5StepM = stepMonitors[4];
-  J6StepM = stepMonitors[5];
-  J7StepM = stepMonitors[6];
-  J8StepM = stepMonitors[7];
-  J9StepM = stepMonitors[8];
+  J1MasterStep = stepMonitors[0];
+  J2MasterStep = stepMonitors[1];
+  J3MasterStep = stepMonitors[2];
+  J4MasterStep = stepMonitors[3];
+  J5MasterStep = stepMonitors[4];
+  J6MasterStep = stepMonitors[5];
+  J7MasterStep = stepMonitors[6];
+  J8MasterStep = stepMonitors[7];
+  J9MasterStep = stepMonitors[8];
 }
 
 
@@ -2589,7 +2591,7 @@ void driveMotorsL(int J1step, int J2step, int J3step, int J4step, int J5step, in
   int dirPins[9] = { J1dirPin, J2dirPin, J3dirPin, J4dirPin, J5dirPin, J6dirPin, J7dirPin, J8dirPin, J9dirPin };
   int stepPins[9] = { J1stepPin, J2stepPin, J3stepPin, J4stepPin, J5stepPin, J6stepPin, J7stepPin, J8stepPin, J9stepPin };
   int motDirs[9] = { J1MotDir, J2MotDir, J3MotDir, J4MotDir, J5MotDir, J6MotDir, J7MotDir, J8MotDir, J9MotDir };
-  int stepMonitors[9] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
+  int stepMonitors[9] = { J1MasterStep, J2MasterStep, J3MasterStep, J4MasterStep, J5MasterStep, J6MasterStep, J7MasterStep, J8MasterStep, J9MasterStep };
 
   // Array of active joints, current steps, PE, SE, LO, and their current states
   int active[9] = { 0 };
@@ -2686,15 +2688,15 @@ void driveMotorsL(int J1step, int J2step, int J3step, int J4step, int J5step, in
   }
 
   // Assign the updated values back to the original step monitors
-  J1StepM = stepMonitors[0];
-  J2StepM = stepMonitors[1];
-  J3StepM = stepMonitors[2];
-  J4StepM = stepMonitors[3];
-  J5StepM = stepMonitors[4];
-  J6StepM = stepMonitors[5];
-  J7StepM = stepMonitors[6];
-  J8StepM = stepMonitors[7];
-  J9StepM = stepMonitors[8];
+  J1MasterStep = stepMonitors[0];
+  J2MasterStep = stepMonitors[1];
+  J3MasterStep = stepMonitors[2];
+  J4MasterStep = stepMonitors[3];
+  J5MasterStep = stepMonitors[4];
+  J6MasterStep = stepMonitors[5];
+  J7MasterStep = stepMonitors[6];
+  J8MasterStep = stepMonitors[7];
+  J9MasterStep = stepMonitors[8];
 }
 
 
@@ -2784,56 +2786,56 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
   SolveInverseKinematics();
 
   //calc destination motor steps
-  int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-  int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-  int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-  int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-  int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-  int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+  int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+  int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+  int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+  int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+  int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+  int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
   int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
   int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
   int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
 
   if (precalc) {
-    J1StepM = J1futStepM;
-    J2StepM = J2futStepM;
-    J3StepM = J3futStepM;
-    J4StepM = J4futStepM;
-    J5StepM = J5futStepM;
-    J6StepM = J6futStepM;
-    J7StepM = J7futStepM;
-    J8StepM = J8futStepM;
-    J9StepM = J9futStepM;
+    J1MasterStep = J1FutureMasterStep;
+    J2MasterStep = J2FutureMasterStep;
+    J3MasterStep = J3FutureMasterStep;
+    J4MasterStep = J4FutureMasterStep;
+    J5MasterStep = J5FutureMasterStep;
+    J6MasterStep = J6FutureMasterStep;
+    J7MasterStep = J7futStepM;
+    J8MasterStep = J8futStepM;
+    J9MasterStep = J9futStepM;
   }
 
   else {
     //calc delta from current to destination
-    int J1stepDif = J1StepM - J1futStepM;
-    int J2stepDif = J2StepM - J2futStepM;
-    int J3stepDif = J3StepM - J3futStepM;
-    int J4stepDif = J4StepM - J4futStepM;
-    int J5stepDif = J5StepM - J5futStepM;
-    int J6stepDif = J6StepM - J6futStepM;
-    int J7stepDif = J7StepM - J7futStepM;
-    int J8stepDif = J8StepM - J8futStepM;
-    int J9stepDif = J9StepM - J9futStepM;
+    int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+    int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+    int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+    int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+    int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+    int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+    int J7StepDelta = J7MasterStep - J7futStepM;
+    int J8StepDelta = J8MasterStep - J8futStepM;
+    int J9StepDelta = J9MasterStep - J9futStepM;
 
     //determine motor directions
-    J1dir = (J1stepDif <= 0) ? 1 : 0;
-    J2dir = (J2stepDif <= 0) ? 1 : 0;
-    J3dir = (J3stepDif <= 0) ? 1 : 0;
-    J4dir = (J4stepDif <= 0) ? 1 : 0;
-    J5dir = (J5stepDif <= 0) ? 1 : 0;
-    J6dir = (J6stepDif <= 0) ? 1 : 0;
-    J7dir = (J7stepDif <= 0) ? 1 : 0;
-    J8dir = (J8stepDif <= 0) ? 1 : 0;
-    J9dir = (J9stepDif <= 0) ? 1 : 0;
+    J1dir = (J1StepDelta <= 0) ? 1 : 0;
+    J2dir = (J2StepDelta <= 0) ? 1 : 0;
+    J3dir = (J3StepDelta <= 0) ? 1 : 0;
+    J4dir = (J4StepDelta <= 0) ? 1 : 0;
+    J5dir = (J5StepDelta <= 0) ? 1 : 0;
+    J6dir = (J6StepDelta <= 0) ? 1 : 0;
+    J7dir = (J7StepDelta <= 0) ? 1 : 0;
+    J8dir = (J8StepDelta <= 0) ? 1 : 0;
+    J9dir = (J9StepDelta <= 0) ? 1 : 0;
 
     // Arrays for joint properties
     int dir[numJoints] = { J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir };
-    int StepM[numJoints] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
-    int stepDif[numJoints] = { J1stepDif, J2stepDif, J3stepDif, J4stepDif, J5stepDif, J6stepDif, J7stepDif, J8stepDif, J9stepDif };
-    int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
+    int StepM[numJoints] = { J1MasterStep, J2MasterStep, J3MasterStep, J4MasterStep, J5MasterStep, J6MasterStep, J7MasterStep, J8MasterStep, J9MasterStep };
+    int stepDif[numJoints] = { J1StepDelta, J2StepDelta, J3StepDelta, J4StepDelta, J5StepDelta, J6StepDelta, J7StepDelta, J8StepDelta, J9StepDelta };
+    int StepLim[numJoints] = { J1StepRange, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
     int axisFault[numJoints] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     // Loop to check axis limits and set faults
@@ -2864,9 +2866,9 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     if (TotalAxisFault == 0 && KinematicError == 0) {
       resetEncoders();
       if (simspeed) {
-        driveMotorsG(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsG(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
       } else {
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
       }
       checkEncoders();
       if (response == true) {
@@ -3803,52 +3805,53 @@ void loop() {
       float DCCspd = 10.0;
       float ACCramp = 20.0;
 
-      JangleIn[0] = 0.00;
-      JangleIn[1] = 0.00;
-      JangleIn[2] = 0.00;
-      JangleIn[3] = 0.00;
-      JangleIn[4] = 0.00;
-      JangleIn[5] = 0.00;
+      CurrentJointAngle[0] = 0.00;
+      CurrentJointAngle[1] = 0.00;
+      CurrentJointAngle[2] = 0.00;
+      CurrentJointAngle[3] = 0.00;
+      CurrentJointAngle[4] = 0.00;
+      CurrentJointAngle[5] = 0.00;
 
 
       //calc destination motor steps
-      int J1futStepM = J1axisLimNeg * J1StepDeg;
-      int J2futStepM = J2axisLimNeg * J2StepDeg;
-      int J3futStepM = J3axisLimNeg * J3StepDeg;
-      int J4futStepM = J4axisLimNeg * J4StepDeg;
-      int J5futStepM = J5axisLimNeg * J5StepDeg;
-      int J6futStepM = J6axisLimNeg * J6StepDeg;
+      int J1FutureMasterStep = J1axisLimNeg * J1StepDeg;
+      int J2FutureMasterStep = J2axisLimNeg * J2StepDeg;
+      int J3FutureMasterStep = J3axisLimNeg * J3StepDeg;
+      int J4FutureMasterStep = J4axisLimNeg * J4StepDeg;
+      int J5FutureMasterStep = J5axisLimNeg * J5StepDeg;
+      int J6FutureMasterStep = J6axisLimNeg * J6StepDeg;
 
       //calc delta from current to destination
-      int J1stepDif = J1StepM - J1futStepM;
-      int J2stepDif = J2StepM - J2futStepM;
-      int J3stepDif = J3StepM - J3futStepM;
-      int J4stepDif = J4StepM - J4futStepM;
-      int J5stepDif = J5StepM - J5futStepM;
-      int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = 0;
-      int J8stepDif = 0;
-      int J9stepDif = 0;
+      int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+      int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+      int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+      int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+      int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+      int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+      int J7StepDelta = 0;
+      int J8StepDelta = 0;
+      int J9StepDelta = 0;
 
       //determine motor directions
-      J1dir = (J1stepDif <= 0) ? 1 : 0;
-      J2dir = (J2stepDif <= 0) ? 1 : 0;
-      J3dir = (J3stepDif <= 0) ? 1 : 0;
-      J4dir = (J4stepDif <= 0) ? 1 : 0;
-      J5dir = (J5stepDif <= 0) ? 1 : 0;
-      J6dir = (J6stepDif <= 0) ? 1 : 0;
+      J1dir = (J1StepDelta <= 0) ? 1 : 0;
+      J2dir = (J2StepDelta <= 0) ? 1 : 0;
+      J3dir = (J3StepDelta <= 0) ? 1 : 0;
+      J4dir = (J4StepDelta <= 0) ? 1 : 0;
+      J5dir = (J5StepDelta <= 0) ? 1 : 0;
+      J6dir = (J6StepDelta <= 0) ? 1 : 0;
       J7dir = 0;
       J8dir = 0;
       J9dir = 0;
 
 
 
-      resetEncoders();
-      driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
-      checkEncoders();
-      sendRobotPos();
-      delay(5);
+      resetEncoders();//reset encoder faults
+      driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      checkEncoders();//update encoder
+      sendRobotPos();//send position to host
+      delay(5);//might be to give time for serial to process idk
       Serial.println("Done");
+
     }
 
 
@@ -4033,7 +4036,7 @@ void loop() {
       J6axisLim = J6axisLimPos + J6axisLimNeg;
 
       //steps full movement of each axis
-      J1StepLim = J1axisLim * J1StepDeg;
+      J1StepRange = J1axisLim * J1StepDeg;
       J2StepLim = J2axisLim * J2StepDeg;
       J3StepLim = J3axisLim * J3StepDeg;
       J4StepLim = J4axisLim * J4StepDeg;
@@ -4104,21 +4107,21 @@ void loop() {
     //-----COMMAND ZERO J7---------------------------------------------------
     //-----------------------------------------------------------------------
     else if (function == "Z7") {
-      J7StepM = 0;
+      J7MasterStep = 0;
       sendRobotPos();
     }
 
     //-----COMMAND ZERO J8---------------------------------------------------
     //-----------------------------------------------------------------------
     else if (function == "Z8") {
-      J8StepM = 0;
+      J8MasterStep = 0;
       sendRobotPos();
     }
 
     //-----COMMAND ZERO J9---------------------------------------------------
     //-----------------------------------------------------------------------
     else if (function == "Z9") {
-      J9StepM = 0;
+      J9MasterStep = 0;
       sendRobotPos();
     }
 
@@ -4248,15 +4251,15 @@ void loop() {
       int J7angStart = inData.indexOf('G');
       int J8angStart = inData.indexOf('H');
       int J9angStart = inData.indexOf('I');
-      J1StepM = ((inData.substring(J1angStart + 1, J2angStart).toFloat()) + J1axisLimNeg) * J1StepDeg;
-      J2StepM = ((inData.substring(J2angStart + 1, J3angStart).toFloat()) + J2axisLimNeg) * J2StepDeg;
-      J3StepM = ((inData.substring(J3angStart + 1, J4angStart).toFloat()) + J3axisLimNeg) * J3StepDeg;
-      J4StepM = ((inData.substring(J4angStart + 1, J5angStart).toFloat()) + J4axisLimNeg) * J4StepDeg;
-      J5StepM = ((inData.substring(J5angStart + 1, J6angStart).toFloat()) + J5axisLimNeg) * J5StepDeg;
-      J6StepM = ((inData.substring(J6angStart + 1, J7angStart).toFloat()) + J6axisLimNeg) * J6StepDeg;
-      J7StepM = ((inData.substring(J7angStart + 1, J8angStart).toFloat()) + J7axisLimNeg) * J7StepDeg;
-      J8StepM = ((inData.substring(J8angStart + 1, J9angStart).toFloat()) + J8axisLimNeg) * J8StepDeg;
-      J9StepM = ((inData.substring(J9angStart + 1).toFloat()) + J9axisLimNeg) * J9StepDeg;
+      J1MasterStep = ((inData.substring(J1angStart + 1, J2angStart).toFloat()) + J1axisLimNeg) * J1StepDeg;
+      J2MasterStep = ((inData.substring(J2angStart + 1, J3angStart).toFloat()) + J2axisLimNeg) * J2StepDeg;
+      J3MasterStep = ((inData.substring(J3angStart + 1, J4angStart).toFloat()) + J3axisLimNeg) * J3StepDeg;
+      J4MasterStep = ((inData.substring(J4angStart + 1, J5angStart).toFloat()) + J4axisLimNeg) * J4StepDeg;
+      J5MasterStep = ((inData.substring(J5angStart + 1, J6angStart).toFloat()) + J5axisLimNeg) * J5StepDeg;
+      J6MasterStep = ((inData.substring(J6angStart + 1, J7angStart).toFloat()) + J6axisLimNeg) * J6StepDeg;
+      J7MasterStep = ((inData.substring(J7angStart + 1, J8angStart).toFloat()) + J7axisLimNeg) * J7StepDeg;
+      J8MasterStep = ((inData.substring(J8angStart + 1, J9angStart).toFloat()) + J8axisLimNeg) * J8StepDeg;
+      J9MasterStep = ((inData.substring(J9angStart + 1).toFloat()) + J9axisLimNeg) * J9StepDeg;
       delay(5);
       Serial.println("Done");
     }
@@ -4272,12 +4275,12 @@ void loop() {
       int J5start = inData.indexOf('E');
       int J6start = inData.indexOf('F');
       int WristConStart = inData.indexOf('W');
-      JangleIn[0] = inData.substring(J1start + 1, J2start).toFloat();
-      JangleIn[1] = inData.substring(J2start + 1, J3start).toFloat();
-      JangleIn[2] = inData.substring(J3start + 1, J4start).toFloat();
-      JangleIn[3] = inData.substring(J4start + 1, J5start).toFloat();
-      JangleIn[4] = inData.substring(J5start + 1, J6start).toFloat();
-      JangleIn[5] = inData.substring(J6start + 1, WristConStart).toFloat();
+      CurrentJointAngle[0] = inData.substring(J1start + 1, J2start).toFloat();
+      CurrentJointAngle[1] = inData.substring(J2start + 1, J3start).toFloat();
+      CurrentJointAngle[2] = inData.substring(J3start + 1, J4start).toFloat();
+      CurrentJointAngle[3] = inData.substring(J4start + 1, J5start).toFloat();
+      CurrentJointAngle[4] = inData.substring(J5start + 1, J6start).toFloat();
+      CurrentJointAngle[5] = inData.substring(J6start + 1, WristConStart).toFloat();
       WristCon = inData.substring(WristConStart + 1);
       WristCon.trim();
 
@@ -4369,7 +4372,7 @@ void loop() {
       int J9dir;
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
+      int JStepLim[9] = { J1StepRange, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -4397,84 +4400,84 @@ void loop() {
 
       if (J1req == 1) {
         if (J1CalDir == 1) {
-          J1StepM = ((J1axisLim) + J1calBaseOff + J1calOff) * J1StepDeg;
+          J1MasterStep = ((J1axisLim) + J1calBaseOff + J1calOff) * J1StepDeg;
           J1stepCen = ((J1axisLimPos) + J1calBaseOff + J1calOff) * J1StepDeg;
         } else {
-          J1StepM = (0 + J1calBaseOff + J1calOff) * J1StepDeg;
+          J1MasterStep = (0 + J1calBaseOff + J1calOff) * J1StepDeg;
           J1stepCen = ((J1axisLimNeg)-J1calBaseOff - J1calOff) * J1StepDeg;
         }
       }
       if (J2req == 1) {
         if (J2CalDir == 1) {
-          J2StepM = ((J2axisLim) + J2calBaseOff + J2calOff) * J2StepDeg;
+          J2MasterStep = ((J2axisLim) + J2calBaseOff + J2calOff) * J2StepDeg;
           J2stepCen = ((J2axisLimPos) + J2calBaseOff + J2calOff) * J2StepDeg;
         } else {
-          J2StepM = (0 + J2calBaseOff + J2calOff) * J2StepDeg;
+          J2MasterStep = (0 + J2calBaseOff + J2calOff) * J2StepDeg;
           J2stepCen = ((J2axisLimNeg)-J2calBaseOff - J2calOff) * J2StepDeg;
         }
       }
       if (J3req == 1) {
         if (J3CalDir == 1) {
-          J3StepM = ((J3axisLim) + J3calBaseOff + J3calOff) * J3StepDeg;
+          J3MasterStep = ((J3axisLim) + J3calBaseOff + J3calOff) * J3StepDeg;
           J3stepCen = ((J3axisLimPos) + J3calBaseOff + J3calOff) * J3StepDeg;
         } else {
-          J3StepM = (0 + J3calBaseOff + J3calOff) * J3StepDeg;
+          J3MasterStep = (0 + J3calBaseOff + J3calOff) * J3StepDeg;
           J3stepCen = ((J3axisLimNeg)-J3calBaseOff - J3calOff) * J3StepDeg;
         }
       }
       if (J4req == 1) {
         if (J4CalDir == 1) {
-          J4StepM = ((J4axisLim) + J4calBaseOff + J4calOff) * J4StepDeg;
+          J4MasterStep = ((J4axisLim) + J4calBaseOff + J4calOff) * J4StepDeg;
           J4stepCen = ((J4axisLimPos) + J4calBaseOff + J4calOff) * J4StepDeg;
         } else {
-          J4StepM = (0 + J4calBaseOff + J4calOff) * J4StepDeg;
+          J4MasterStep = (0 + J4calBaseOff + J4calOff) * J4StepDeg;
           J4stepCen = ((J4axisLimNeg)-J4calBaseOff - J4calOff) * J4StepDeg;
         }
       }
       if (J5req == 1) {
         if (J5CalDir == 1) {
-          J5StepM = ((J5axisLim) + J5calBaseOff + J5calOff) * J5StepDeg;
+          J5MasterStep = ((J5axisLim) + J5calBaseOff + J5calOff) * J5StepDeg;
           J5stepCen = ((J5axisLimPos) + J5calBaseOff + J5calOff) * J5StepDeg;
           J5step45 = (((J5axisLimNeg) + J5calBaseOff + J5calOff) - 45) * J5StepDeg;
         } else {
-          J5StepM = (0 + J5calBaseOff + J5calOff) * J5StepDeg;
+          J5MasterStep = (0 + J5calBaseOff + J5calOff) * J5StepDeg;
           J5stepCen = ((J5axisLimNeg)-J5calBaseOff - J5calOff) * J5StepDeg;
           J5step45 = (((J5axisLimNeg)-J5calBaseOff - J5calOff) + 45) * J5StepDeg;
         }
       }
       if (J6req == 1) {
         if (J6CalDir == 1) {
-          J6StepM = ((J6axisLim) + J6calBaseOff + J6calOff) * J6StepDeg;
+          J6MasterStep = ((J6axisLim) + J6calBaseOff + J6calOff) * J6StepDeg;
           J6stepCen = ((J6axisLimPos) + J6calBaseOff + J6calOff) * J6StepDeg;
         } else {
-          J6StepM = (0 + J6calBaseOff + J6calOff) * J6StepDeg;
+          J6MasterStep = (0 + J6calBaseOff + J6calOff) * J6StepDeg;
           J6stepCen = ((J6axisLimNeg)-J6calBaseOff - J6calOff) * J6StepDeg;
         }
       }
       if (J7req == 1) {
         if (J7CalDir == 1) {
-          J7StepM = ((J7axisLim) + J7calBaseOff + J7calOff) * J7StepDeg;
+          J7MasterStep = ((J7axisLim) + J7calBaseOff + J7calOff) * J7StepDeg;
           J7stepCen = ((J7axisLimPos) + J7calBaseOff + J7calOff) * J7StepDeg;
         } else {
-          J7StepM = (0 + J7calBaseOff + J7calOff) * J7StepDeg;
+          J7MasterStep = (0 + J7calBaseOff + J7calOff) * J7StepDeg;
           J7stepCen = ((J7axisLimNeg)-J7calBaseOff - J7calOff) * J7StepDeg;
         }
       }
       if (J8req == 1) {
         if (J8CalDir == 1) {
-          J8StepM = ((J8axisLim) + J8calBaseOff + J8calOff) * J8StepDeg;
+          J8MasterStep = ((J8axisLim) + J8calBaseOff + J8calOff) * J8StepDeg;
           J8stepCen = ((J8axisLimPos) + J8calBaseOff + J8calOff) * J8StepDeg;
         } else {
-          J8StepM = (0 + J8calBaseOff + J8calOff) * J8StepDeg;
+          J8MasterStep = (0 + J8calBaseOff + J8calOff) * J8StepDeg;
           J8stepCen = ((J8axisLimNeg)-J8calBaseOff - J8calOff) * J8StepDeg;
         }
       }
       if (J9req == 1) {
         if (J9CalDir == 1) {
-          J9StepM = ((J9axisLim) + J9calBaseOff + J9calOff) * J9StepDeg;
+          J9MasterStep = ((J9axisLim) + J9calBaseOff + J9calOff) * J9StepDeg;
           J9stepCen = ((J9axisLimPos) + J9calBaseOff + J9calOff) * J9StepDeg;
         } else {
-          J9StepM = (0 + J9calBaseOff + J9calOff) * J9StepDeg;
+          J9MasterStep = (0 + J9calBaseOff + J9calOff) * J9StepDeg;
           J9stepCen = ((J9axisLimNeg)-J9calBaseOff - J9calOff) * J9StepDeg;
         }
       }
@@ -4661,53 +4664,53 @@ void loop() {
         SolveInverseKinematics();
 
         //calc destination motor steps
-        int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-        int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-        int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-        int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-        int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-        int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+        int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+        int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+        int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+        int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+        int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+        int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
         //calc delta from current to destination
-        int J1stepDif = J1StepM - J1futStepM;
-        int J2stepDif = J2StepM - J2futStepM;
-        int J3stepDif = J3StepM - J3futStepM;
-        int J4stepDif = J4StepM - J4futStepM;
-        int J5stepDif = J5StepM - J5futStepM;
-        int J6stepDif = J6StepM - J6futStepM;
-        int J7stepDif = 0;
-        int J8stepDif = 0;
-        int J9stepDif = 0;
+        int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+        int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+        int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+        int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+        int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+        int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+        int J7StepDelta = 0;
+        int J8StepDelta = 0;
+        int J9StepDelta = 0;
 
         //determine motor directions
-        J1dir = (J1stepDif <= 0) ? 1 : 0;
-        J2dir = (J2stepDif <= 0) ? 1 : 0;
-        J3dir = (J3stepDif <= 0) ? 1 : 0;
-        J4dir = (J4stepDif <= 0) ? 1 : 0;
-        J5dir = (J5stepDif <= 0) ? 1 : 0;
-        J6dir = (J6stepDif <= 0) ? 1 : 0;
+        J1dir = (J1StepDelta <= 0) ? 1 : 0;
+        J2dir = (J2StepDelta <= 0) ? 1 : 0;
+        J3dir = (J3StepDelta <= 0) ? 1 : 0;
+        J4dir = (J4StepDelta <= 0) ? 1 : 0;
+        J5dir = (J5StepDelta <= 0) ? 1 : 0;
+        J6dir = (J6StepDelta <= 0) ? 1 : 0;
         J7dir = 0;
         J8dir = 0;
         J9dir = 0;
 
 
         //determine if requested position is within axis limits
-        if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+        if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
           J1axisFault = 1;
         }
-        if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+        if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
           J2axisFault = 1;
         }
-        if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+        if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
           J3axisFault = 1;
         }
-        if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+        if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
           J4axisFault = 1;
         }
-        if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+        if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
           J5axisFault = 1;
         }
-        if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+        if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
           J6axisFault = 1;
         }
         TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault;
@@ -4715,7 +4718,7 @@ void loop() {
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+          driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
           updatePos();
         }
 
@@ -4817,12 +4820,12 @@ void loop() {
       Serial.println();
       updatePos();
 
-      float J1Angle = JangleIn[0];
-      float J2Angle = JangleIn[1];
-      float J3Angle = JangleIn[2];
-      float J4Angle = JangleIn[3];
-      float J5Angle = JangleIn[4];
-      float J6Angle = JangleIn[5];
+      float J1Angle = CurrentJointAngle[0];
+      float J2Angle = CurrentJointAngle[1];
+      float J3Angle = CurrentJointAngle[2];
+      float J4Angle = CurrentJointAngle[3];
+      float J5Angle = CurrentJointAngle[4];
+      float J6Angle = CurrentJointAngle[5];
       float J7Angle = J7_pos;
       float J8Angle = J8_pos;
       float J9Angle = J9_pos;
@@ -4831,45 +4834,45 @@ void loop() {
       while (JogInPoc == true) {
 
         if (Vector == 10) {
-          J1Angle = JangleIn[0] - .25;
+          J1Angle = CurrentJointAngle[0] - .25;
         }
         if (Vector == 11) {
-          J1Angle = JangleIn[0] + .25;
+          J1Angle = CurrentJointAngle[0] + .25;
         }
 
         if (Vector == 20) {
-          J2Angle = JangleIn[1] - .25;
+          J2Angle = CurrentJointAngle[1] - .25;
         }
         if (Vector == 21) {
-          J2Angle = JangleIn[1] + .25;
+          J2Angle = CurrentJointAngle[1] + .25;
         }
 
         if (Vector == 30) {
-          J3Angle = JangleIn[2] - .25;
+          J3Angle = CurrentJointAngle[2] - .25;
         }
         if (Vector == 31) {
-          J3Angle = JangleIn[2] + .25;
+          J3Angle = CurrentJointAngle[2] + .25;
         }
 
         if (Vector == 40) {
-          J4Angle = JangleIn[3] - .25;
+          J4Angle = CurrentJointAngle[3] - .25;
         }
         if (Vector == 41) {
-          J4Angle = JangleIn[3] + .25;
+          J4Angle = CurrentJointAngle[3] + .25;
         }
 
         if (Vector == 50) {
-          J5Angle = JangleIn[4] - .25;
+          J5Angle = CurrentJointAngle[4] - .25;
         }
         if (Vector == 51) {
-          J5Angle = JangleIn[4] + .25;
+          J5Angle = CurrentJointAngle[4] + .25;
         }
 
         if (Vector == 60) {
-          J6Angle = JangleIn[5] - .25;
+          J6Angle = CurrentJointAngle[5] - .25;
         }
         if (Vector == 61) {
-          J6Angle = JangleIn[5] + .25;
+          J6Angle = CurrentJointAngle[5] + .25;
         }
         if (Vector == 70) {
           J7Angle = J7_pos - .25;
@@ -4891,71 +4894,71 @@ void loop() {
         }
 
         //calc destination motor steps
-        int J1futStepM = (J1Angle + J1axisLimNeg) * J1StepDeg;
-        int J2futStepM = (J2Angle + J2axisLimNeg) * J2StepDeg;
-        int J3futStepM = (J3Angle + J3axisLimNeg) * J3StepDeg;
-        int J4futStepM = (J4Angle + J4axisLimNeg) * J4StepDeg;
-        int J5futStepM = (J5Angle + J5axisLimNeg) * J5StepDeg;
-        int J6futStepM = (J6Angle + J6axisLimNeg) * J6StepDeg;
+        int J1FutureMasterStep = (J1Angle + J1axisLimNeg) * J1StepDeg;
+        int J2FutureMasterStep = (J2Angle + J2axisLimNeg) * J2StepDeg;
+        int J3FutureMasterStep = (J3Angle + J3axisLimNeg) * J3StepDeg;
+        int J4FutureMasterStep = (J4Angle + J4axisLimNeg) * J4StepDeg;
+        int J5FutureMasterStep = (J5Angle + J5axisLimNeg) * J5StepDeg;
+        int J6FutureMasterStep = (J6Angle + J6axisLimNeg) * J6StepDeg;
         int J7futStepM = (J7Angle + J7axisLimNeg) * J7StepDeg;
         int J8futStepM = (J8Angle + J8axisLimNeg) * J8StepDeg;
         int J9futStepM = (J9Angle + J9axisLimNeg) * J9StepDeg;
 
         //calc delta from current to destination
-        int J1stepDif = J1StepM - J1futStepM;
-        int J2stepDif = J2StepM - J2futStepM;
-        int J3stepDif = J3StepM - J3futStepM;
-        int J4stepDif = J4StepM - J4futStepM;
-        int J5stepDif = J5StepM - J5futStepM;
-        int J6stepDif = J6StepM - J6futStepM;
-        int J7stepDif = J7StepM - J7futStepM;
-        int J8stepDif = J8StepM - J8futStepM;
-        int J9stepDif = J9StepM - J9futStepM;
+        int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+        int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+        int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+        int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+        int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+        int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+        int J7StepDelta = J7MasterStep - J7futStepM;
+        int J8StepDelta = J8MasterStep - J8futStepM;
+        int J9StepDelta = J9MasterStep - J9futStepM;
 
         //determine motor directions
-        J1dir = (J1stepDif <= 0) ? 1 : 0;
-        J2dir = (J2stepDif <= 0) ? 1 : 0;
-        J3dir = (J3stepDif <= 0) ? 1 : 0;
-        J4dir = (J4stepDif <= 0) ? 1 : 0;
-        J5dir = (J5stepDif <= 0) ? 1 : 0;
-        J6dir = (J6stepDif <= 0) ? 1 : 0;
-        J7dir = (J7stepDif <= 0) ? 1 : 0;
-        J8dir = (J8stepDif <= 0) ? 1 : 0;
-        J9dir = (J9stepDif <= 0) ? 1 : 0;
+        J1dir = (J1StepDelta <= 0) ? 1 : 0;
+        J2dir = (J2StepDelta <= 0) ? 1 : 0;
+        J3dir = (J3StepDelta <= 0) ? 1 : 0;
+        J4dir = (J4StepDelta <= 0) ? 1 : 0;
+        J5dir = (J5StepDelta <= 0) ? 1 : 0;
+        J6dir = (J6StepDelta <= 0) ? 1 : 0;
+        J7dir = (J7StepDelta <= 0) ? 1 : 0;
+        J8dir = (J8StepDelta <= 0) ? 1 : 0;
+        J9dir = (J9StepDelta <= 0) ? 1 : 0;
 
         //determine if requested position is within axis limits
-        if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+        if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
           J1axisFault = 1;
         }
-        if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+        if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
           J2axisFault = 1;
         }
-        if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+        if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
           J3axisFault = 1;
         }
-        if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+        if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
           J4axisFault = 1;
         }
-        if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+        if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
           J5axisFault = 1;
         }
-        if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+        if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
           J6axisFault = 1;
         }
-        if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
+        if ((J7dir == 1 and (J7MasterStep + J7StepDelta > J7StepLim)) or (J7dir == 0 and (J7MasterStep - J7StepDelta < 0))) {
           J7axisFault = 1;
         }
-        if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
+        if ((J8dir == 1 and (J8MasterStep + J8StepDelta > J8StepLim)) or (J8dir == 0 and (J8MasterStep - J8StepDelta < 0))) {
           J8axisFault = 1;
         }
-        if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
+        if ((J9dir == 1 and (J9MasterStep + J9StepDelta > J9StepLim)) or (J9dir == 0 and (J9MasterStep - J9StepDelta < 0))) {
           J9axisFault = 1;
         }
         TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+          driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
           updatePos();
         }
 
@@ -5067,12 +5070,12 @@ void loop() {
       RYtool = Robot_Kin_Tool[4];
       RZtool = Robot_Kin_Tool[5];
 
-      JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
-      JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
-      JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
-      JangleIn[3] = (J4StepM - J4zeroStep) / J4StepDeg;
-      JangleIn[4] = (J5StepM - J5zeroStep) / J5StepDeg;
-      JangleIn[5] = (J6StepM - J6zeroStep) / J6StepDeg;
+      CurrentJointAngle[0] = (J1MasterStep - J1zeroStep) / J1StepDeg;
+      CurrentJointAngle[1] = (J2MasterStep - J2zeroStep) / J2StepDeg;
+      CurrentJointAngle[2] = (J3MasterStep - J3zeroStep) / J3StepDeg;
+      CurrentJointAngle[3] = (J4MasterStep - J4zeroStep) / J4StepDeg;
+      CurrentJointAngle[4] = (J5MasterStep - J5zeroStep) / J5StepDeg;
+      CurrentJointAngle[5] = (J6MasterStep - J6zeroStep) / J6StepDeg;
 
       while (JogInPoc == true) {
 
@@ -5144,53 +5147,53 @@ void loop() {
         Robot_Kin_Tool[5] = RZtool;
 
         //calc destination motor steps
-        int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-        int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-        int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-        int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-        int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-        int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+        int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+        int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+        int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+        int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+        int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+        int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
         //calc delta from current to destination
-        int J1stepDif = J1StepM - J1futStepM;
-        int J2stepDif = J2StepM - J2futStepM;
-        int J3stepDif = J3StepM - J3futStepM;
-        int J4stepDif = J4StepM - J4futStepM;
-        int J5stepDif = J5StepM - J5futStepM;
-        int J6stepDif = J6StepM - J6futStepM;
-        int J7stepDif = 0;
-        int J8stepDif = 0;
-        int J9stepDif = 0;
+        int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+        int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+        int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+        int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+        int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+        int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+        int J7StepDelta = 0;
+        int J8StepDelta = 0;
+        int J9StepDelta = 0;
 
         //determine motor directions
-        J1dir = (J1stepDif <= 0) ? 1 : 0;
-        J2dir = (J2stepDif <= 0) ? 1 : 0;
-        J3dir = (J3stepDif <= 0) ? 1 : 0;
-        J4dir = (J4stepDif <= 0) ? 1 : 0;
-        J5dir = (J5stepDif <= 0) ? 1 : 0;
-        J6dir = (J6stepDif <= 0) ? 1 : 0;
+        J1dir = (J1StepDelta <= 0) ? 1 : 0;
+        J2dir = (J2StepDelta <= 0) ? 1 : 0;
+        J3dir = (J3StepDelta <= 0) ? 1 : 0;
+        J4dir = (J4StepDelta <= 0) ? 1 : 0;
+        J5dir = (J5StepDelta <= 0) ? 1 : 0;
+        J6dir = (J6StepDelta <= 0) ? 1 : 0;
         J7dir = 0;
         J8dir = 0;
         J9dir = 0;
 
 
         //determine if requested position is within axis limits
-        if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+        if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
           J1axisFault = 1;
         }
-        if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+        if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
           J2axisFault = 1;
         }
-        if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+        if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
           J3axisFault = 1;
         }
-        if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+        if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
           J4axisFault = 1;
         }
-        if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+        if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
           J5axisFault = 1;
         }
-        if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+        if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
           J6axisFault = 1;
         }
         TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault;
@@ -5198,7 +5201,7 @@ void loop() {
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+          driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
           updatePos();
         }
 
@@ -5318,12 +5321,12 @@ void loop() {
       }
 
 
-      JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
-      JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
-      JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
-      JangleIn[3] = (J4StepM - J4zeroStep) / J4StepDeg;
-      JangleIn[4] = (J5StepM - J5zeroStep) / J5StepDeg;
-      JangleIn[5] = (J6StepM - J6zeroStep) / J6StepDeg;
+      CurrentJointAngle[0] = (J1MasterStep - J1zeroStep) / J1StepDeg;
+      CurrentJointAngle[1] = (J2MasterStep - J2zeroStep) / J2StepDeg;
+      CurrentJointAngle[2] = (J3MasterStep - J3zeroStep) / J3StepDeg;
+      CurrentJointAngle[3] = (J4MasterStep - J4zeroStep) / J4StepDeg;
+      CurrentJointAngle[4] = (J5MasterStep - J5zeroStep) / J5StepDeg;
+      CurrentJointAngle[5] = (J6MasterStep - J6zeroStep) / J6StepDeg;
 
 
       xyzuvw_In[0] = xyzuvw_Out[0];
@@ -5344,52 +5347,52 @@ void loop() {
 
 
       //calc destination motor steps
-      int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-      int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-      int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-      int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-      int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-      int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+      int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+      int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+      int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+      int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+      int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+      int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
       //calc delta from current to destination
-      int J1stepDif = J1StepM - J1futStepM;
-      int J2stepDif = J2StepM - J2futStepM;
-      int J3stepDif = J3StepM - J3futStepM;
-      int J4stepDif = J4StepM - J4futStepM;
-      int J5stepDif = J5StepM - J5futStepM;
-      int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = 0;
-      int J8stepDif = 0;
-      int J9stepDif = 0;
+      int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+      int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+      int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+      int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+      int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+      int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+      int J7StepDelta = 0;
+      int J8StepDelta = 0;
+      int J9StepDelta = 0;
 
       //determine motor directions
-      J1dir = (J1stepDif <= 0) ? 1 : 0;
-      J2dir = (J2stepDif <= 0) ? 1 : 0;
-      J3dir = (J3stepDif <= 0) ? 1 : 0;
-      J4dir = (J4stepDif <= 0) ? 1 : 0;
-      J5dir = (J5stepDif <= 0) ? 1 : 0;
-      J6dir = (J6stepDif <= 0) ? 1 : 0;
+      J1dir = (J1StepDelta <= 0) ? 1 : 0;
+      J2dir = (J2StepDelta <= 0) ? 1 : 0;
+      J3dir = (J3StepDelta <= 0) ? 1 : 0;
+      J4dir = (J4StepDelta <= 0) ? 1 : 0;
+      J5dir = (J5StepDelta <= 0) ? 1 : 0;
+      J6dir = (J6StepDelta <= 0) ? 1 : 0;
       J7dir = 0;
       J8dir = 0;
       J9dir = 0;
 
       //determine if requested position is within axis limits
-      if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+      if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
         J1axisFault = 1;
       }
-      if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+      if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
         J2axisFault = 1;
       }
-      if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+      if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
         J3axisFault = 1;
       }
-      if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+      if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
         J4axisFault = 1;
       }
-      if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+      if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
         J5axisFault = 1;
       }
-      if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+      if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
         J6axisFault = 1;
       }
       TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault;
@@ -5398,7 +5401,7 @@ void loop() {
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
         resetEncoders();
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
         checkEncoders();
         sendRobotPos();
       } else if (KinematicError == 1) {
@@ -5503,70 +5506,70 @@ void loop() {
       SolveInverseKinematics();
 
       //calc destination motor steps
-      int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-      int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-      int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-      int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-      int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-      int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+      int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+      int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+      int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+      int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+      int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+      int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
 
 
       //calc delta from current to destination
-      int J1stepDif = J1StepM - J1futStepM;
-      int J2stepDif = J2StepM - J2futStepM;
-      int J3stepDif = J3StepM - J3futStepM;
-      int J4stepDif = J4StepM - J4futStepM;
-      int J5stepDif = J5StepM - J5futStepM;
-      int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = J7StepM - J7futStepM;
-      int J8stepDif = J8StepM - J8futStepM;
-      int J9stepDif = J9StepM - J9futStepM;
+      int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+      int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+      int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+      int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+      int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+      int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+      int J7StepDelta = J7MasterStep - J7futStepM;
+      int J8StepDelta = J8MasterStep - J8futStepM;
+      int J9StepDelta = J9MasterStep - J9futStepM;
 
       // put tool roation back where it was
       Robot_Kin_Tool[5] = RXtool;
 
       //determine motor directions
-      J1dir = (J1stepDif <= 0) ? 1 : 0;
-      J2dir = (J2stepDif <= 0) ? 1 : 0;
-      J3dir = (J3stepDif <= 0) ? 1 : 0;
-      J4dir = (J4stepDif <= 0) ? 1 : 0;
-      J5dir = (J5stepDif <= 0) ? 1 : 0;
-      J6dir = (J6stepDif <= 0) ? 1 : 0;
-      J7dir = (J7stepDif <= 0) ? 1 : 0;
-      J8dir = (J8stepDif <= 0) ? 1 : 0;
-      J9dir = (J9stepDif <= 0) ? 1 : 0;
+      J1dir = (J1StepDelta <= 0) ? 1 : 0;
+      J2dir = (J2StepDelta <= 0) ? 1 : 0;
+      J3dir = (J3StepDelta <= 0) ? 1 : 0;
+      J4dir = (J4StepDelta <= 0) ? 1 : 0;
+      J5dir = (J5StepDelta <= 0) ? 1 : 0;
+      J6dir = (J6StepDelta <= 0) ? 1 : 0;
+      J7dir = (J7StepDelta <= 0) ? 1 : 0;
+      J8dir = (J8StepDelta <= 0) ? 1 : 0;
+      J9dir = (J9StepDelta <= 0) ? 1 : 0;
 
 
 
       //determine if requested position is within axis limits
-      if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+      if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
         J1axisFault = 1;
       }
-      if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+      if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
         J2axisFault = 1;
       }
-      if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+      if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
         J3axisFault = 1;
       }
-      if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+      if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
         J4axisFault = 1;
       }
-      if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+      if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
         J5axisFault = 1;
       }
-      if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+      if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
         J6axisFault = 1;
       }
-      if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
+      if ((J7dir == 1 and (J7MasterStep + J7StepDelta > J7StepLim)) or (J7dir == 0 and (J7MasterStep - J7StepDelta < 0))) {
         J7axisFault = 1;
       }
-      if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
+      if ((J8dir == 1 and (J8MasterStep + J8StepDelta > J8StepLim)) or (J8dir == 0 and (J8MasterStep - J8StepDelta < 0))) {
         J8axisFault = 1;
       }
-      if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
+      if ((J9dir == 1 and (J9MasterStep + J9StepDelta > J9StepLim)) or (J9dir == 0 and (J9MasterStep - J9StepDelta < 0))) {
         J9axisFault = 1;
       }
       TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
@@ -5575,7 +5578,7 @@ void loop() {
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
         resetEncoders();
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
         checkEncoders();
         sendRobotPos();
       } else if (KinematicError == 1) {
@@ -5676,12 +5679,12 @@ void loop() {
         closedLoopTrue = 1;
       }
       //Calculates steps from angle
-      int J1futStepM = (J1Angle + J1axisLimNeg) * J1StepDeg;
-      int J2futStepM = (J2Angle + J2axisLimNeg) * J2StepDeg;
-      int J3futStepM = (J3Angle + J3axisLimNeg) * J3StepDeg;
-      int J4futStepM = (J4Angle + J4axisLimNeg) * J4StepDeg;
-      int J5futStepM = (J5Angle + J5axisLimNeg) * J5StepDeg;
-      int J6futStepM = (J6Angle + J6axisLimNeg) * J6StepDeg;
+      int J1FutureMasterStep = (J1Angle + J1axisLimNeg) * J1StepDeg;
+      int J2FutureMasterStep = (J2Angle + J2axisLimNeg) * J2StepDeg;
+      int J3FutureMasterStep = (J3Angle + J3axisLimNeg) * J3StepDeg;
+      int J4FutureMasterStep = (J4Angle + J4axisLimNeg) * J4StepDeg;
+      int J5FutureMasterStep = (J5Angle + J5axisLimNeg) * J5StepDeg;
+      int J6FutureMasterStep = (J6Angle + J6axisLimNeg) * J6StepDeg;
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
@@ -5689,55 +5692,55 @@ void loop() {
         readEncoders();
       }
       //calc delta from current to destination
-      int J1stepDif = J1StepM - J1futStepM;
-      int J2stepDif = J2StepM - J2futStepM;
-      int J3stepDif = J3StepM - J3futStepM;
-      int J4stepDif = J4StepM - J4futStepM;
-      int J5stepDif = J5StepM - J5futStepM;
-      int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = J7StepM - J7futStepM;
-      int J8stepDif = J8StepM - J8futStepM;
-      int J9stepDif = J9StepM - J9futStepM;
+      int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+      int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+      int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+      int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+      int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+      int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+      int J7StepDelta = J7MasterStep - J7futStepM;
+      int J8StepDelta = J8MasterStep - J8futStepM;
+      int J9StepDelta = J9MasterStep - J9futStepM;
 
 
       //determine motor directions
-      J1dir = (J1stepDif <= 0) ? 1 : 0;
-      J2dir = (J2stepDif <= 0) ? 1 : 0;
-      J3dir = (J3stepDif <= 0) ? 1 : 0;
-      J4dir = (J4stepDif <= 0) ? 1 : 0;
-      J5dir = (J5stepDif <= 0) ? 1 : 0;
-      J6dir = (J6stepDif <= 0) ? 1 : 0;
-      J7dir = (J7stepDif <= 0) ? 1 : 0;
-      J8dir = (J8stepDif <= 0) ? 1 : 0;
-      J9dir = (J9stepDif <= 0) ? 1 : 0;
+      J1dir = (J1StepDelta <= 0) ? 1 : 0;
+      J2dir = (J2StepDelta <= 0) ? 1 : 0;
+      J3dir = (J3StepDelta <= 0) ? 1 : 0;
+      J4dir = (J4StepDelta <= 0) ? 1 : 0;
+      J5dir = (J5StepDelta <= 0) ? 1 : 0;
+      J6dir = (J6StepDelta <= 0) ? 1 : 0;
+      J7dir = (J7StepDelta <= 0) ? 1 : 0;
+      J8dir = (J8StepDelta <= 0) ? 1 : 0;
+      J9dir = (J9StepDelta <= 0) ? 1 : 0;
 
 
       //determine if requested position is within axis limits
-      if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+      if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
         J1axisFault = 1;
       }
-      if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+      if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
         J2axisFault = 1;
       }
-      if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+      if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
         J3axisFault = 1;
       }
-      if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+      if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
         J4axisFault = 1;
       }
-      if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+      if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
         J5axisFault = 1;
       }
-      if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+      if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
         J6axisFault = 1;
       }
-      if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
+      if ((J7dir == 1 and (J7MasterStep + J7StepDelta > J7StepLim)) or (J7dir == 0 and (J7MasterStep - J7StepDelta < 0))) {
         J7axisFault = 1;
       }
-      if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
+      if ((J8dir == 1 and (J8MasterStep + J8StepDelta > J8StepLim)) or (J8dir == 0 and (J8MasterStep - J8StepDelta < 0))) {
         J8axisFault = 1;
       }
-      if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
+      if ((J9dir == 1 and (J9MasterStep + J9StepDelta > J9StepLim)) or (J9dir == 0 and (J9MasterStep - J9StepDelta < 0))) {
         J9axisFault = 1;
       }
       TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
@@ -5746,7 +5749,7 @@ void loop() {
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
         resetEncoders();
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
         if (closedLoop){
           checkEncoders();
         }
@@ -6012,37 +6015,37 @@ void loop() {
         // Solve inverse kinematics to find joint angles for target position
         SolveInverseKinematics();
         // Calculate motor steps required to reach target from solved joint angles
-        int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-        int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-        int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-        int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-        int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-        int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+        int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+        int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+        int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+        int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+        int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+        int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
         // Calculate step deltas (difference between current steps and target steps) for each axis
-        int J1stepDif = J1StepM - J1futStepM;
-        int J2stepDif = J2StepM - J2futStepM;
-        int J3stepDif = J3StepM - J3futStepM;
-        int J4stepDif = J4StepM - J4futStepM;
-        int J5stepDif = J5StepM - J5futStepM;
-        int J6stepDif = J6StepM - J6futStepM;
+        int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+        int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+        int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+        int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+        int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+        int J6StepDelta = J6MasterStep - J6FutureMasterStep;
 
         // FIND HIGHEST STEP COUNT for acceleration profile calculation (bottleneck axis)
-        int HighStep = J1stepDif;
-        if (J2stepDif > HighStep) {
-          HighStep = J2stepDif;
+        int HighStep = J1StepDelta;
+        if (J2StepDelta > HighStep) {
+          HighStep = J2StepDelta;
         }
-        if (J3stepDif > HighStep) {
-          HighStep = J3stepDif;
+        if (J3StepDelta > HighStep) {
+          HighStep = J3StepDelta;
         }
-        if (J4stepDif > HighStep) {
-          HighStep = J4stepDif;
+        if (J4StepDelta > HighStep) {
+          HighStep = J4StepDelta;
         }
-        if (J5stepDif > HighStep) {
-          HighStep = J5stepDif;
+        if (J5StepDelta > HighStep) {
+          HighStep = J5StepDelta;
         }
-        if (J6stepDif > HighStep) {
-          HighStep = J6stepDif;
+        if (J6StepDelta > HighStep) {
+          HighStep = J6StepDelta;
         }
 
         // PRE-CALCULATE SPEED PROFILES AND ACCELERATION RAMPS
@@ -6123,30 +6126,30 @@ void loop() {
         // Calculate external axis (J7, J8, J9) step increments across waypoints
         int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
         // Distribute J7 steps evenly across waypoints for smooth motion
-        int J7stepDif = (J7StepM - J7futStepM) / (wayPts - 1);
+        int J7StepDelta = (J7MasterStep - J7futStepM) / (wayPts - 1);
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
         // Distribute J8 steps evenly across waypoints
-        int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);
+        int J8StepDelta = (J8MasterStep - J8futStepM) / (wayPts - 1);
         int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
         // Distribute J9 steps evenly across waypoints
-        int J9stepDif = (J9StepM - J9futStepM) / (wayPts - 1);
+        int J9StepDelta = (J9MasterStep - J9futStepM) / (wayPts - 1);
 
         // Determine J7 motion direction (1=backward, 0=forward)
-        if (J7stepDif <= 0) {
+        if (J7StepDelta <= 0) {
           J7dir = 1;
         } else {
           J7dir = 0;
         }
 
         // Determine J8 motion direction
-        if (J8stepDif <= 0) {
+        if (J8StepDelta <= 0) {
           J8dir = 1;
         } else {
           J8dir = 0;
         }
 
         // Determine J9 motion direction
-        if (J9stepDif <= 0) {
+        if (J9StepDelta <= 0) {
           J9dir = 1;
         } else {
           J9dir = 0;
@@ -6188,56 +6191,56 @@ void loop() {
           SolveInverseKinematics();
 
           // Calculate destination motor steps for this waypoint
-          int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-          int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-          int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-          int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-          int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-          int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+          int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+          int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+          int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+          int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+          int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+          int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
           // Calculate step delta from current to target for this waypoint
-          int J1stepDif = J1StepM - J1futStepM;
-          int J2stepDif = J2StepM - J2futStepM;
-          int J3stepDif = J3StepM - J3futStepM;
-          int J4stepDif = J4StepM - J4futStepM;
-          int J5stepDif = J5StepM - J5futStepM;
-          int J6stepDif = J6StepM - J6futStepM;
+          int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+          int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+          int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+          int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+          int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+          int J6StepDelta = J6MasterStep - J6FutureMasterStep;
 
           // Determine motor rotation directions (1=negative direction, 0=positive)
-          J1dir = (J1stepDif <= 0) ? 1 : 0;
-          J2dir = (J2stepDif <= 0) ? 1 : 0;
-          J3dir = (J3stepDif <= 0) ? 1 : 0;
-          J4dir = (J4stepDif <= 0) ? 1 : 0;
-          J5dir = (J5stepDif <= 0) ? 1 : 0;
-          J6dir = (J6stepDif <= 0) ? 1 : 0;
+          J1dir = (J1StepDelta <= 0) ? 1 : 0;
+          J2dir = (J2StepDelta <= 0) ? 1 : 0;
+          J3dir = (J3StepDelta <= 0) ? 1 : 0;
+          J4dir = (J4StepDelta <= 0) ? 1 : 0;
+          J5dir = (J5StepDelta <= 0) ? 1 : 0;
+          J6dir = (J6StepDelta <= 0) ? 1 : 0;
 
           // Determine if requested position is within axis limits (collision check)
-          if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+          if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
             J1axisFault = 1;
           }
-          if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+          if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
             J2axisFault = 1;
           }
-          if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+          if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
             J3axisFault = 1;
           }
-          if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+          if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
             J4axisFault = 1;
           }
-          if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+          if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
             J5axisFault = 1;
           }
-          if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+          if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
             J6axisFault = 1;
           }
           // Check J7, J8, J9 for axis limit violations
-          if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
+          if ((J7dir == 1 and (J7MasterStep + J7StepDelta > J7StepLim)) or (J7dir == 0 and (J7MasterStep - J7StepDelta < 0))) {
             J7axisFault = 1;
           }
-          if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
+          if ((J8dir == 1 and (J8MasterStep + J8StepDelta > J8StepLim)) or (J8dir == 0 and (J8MasterStep - J8StepDelta < 0))) {
             J8axisFault = 1;
           }
-          if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
+          if ((J9dir == 1 and (J9MasterStep + J9StepDelta > J9StepLim)) or (J9dir == 0 and (J9MasterStep - J9StepDelta < 0))) {
             J9axisFault = 1;
           }
           // Sum all axis faults to determine if move is valid
@@ -6246,7 +6249,7 @@ void loop() {
           // Execute motion step if no axis limit errors and kinematics valid
           if (TotalAxisFault == 0 && KinematicError == 0) {
             // Call motion routine with absolute step values and directions
-            driveMotorsL(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
+            driveMotorsL(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
             // Update current position tracking after motion
             updatePos();
             // Save current delay for rounding arc speed continuity
@@ -6551,84 +6554,84 @@ void loop() {
       SolveInverseKinematics();
 
       // Calculate destination motor steps for each joint from IK solution
-      int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-      int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-      int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-      int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-      int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-      int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+      int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+      int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+      int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+      int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+      int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+      int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
       // Calculate steps for external axes (J7, J8, J9)
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
 
       // Calculate step deltas (current position to target position) for each axis
-      int J1stepDif = J1StepM - J1futStepM;
-      int J2stepDif = J2StepM - J2futStepM;
-      int J3stepDif = J3StepM - J3futStepM;
-      int J4stepDif = J4StepM - J4futStepM;
-      int J5stepDif = J5StepM - J5futStepM;
-      int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = J7StepM - J7futStepM;
-      int J8stepDif = J8StepM - J8futStepM;
-      int J9stepDif = J9StepM - J9futStepM;
+      int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+      int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+      int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+      int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+      int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+      int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+      int J7StepDelta = J7MasterStep - J7futStepM;
+      int J8StepDelta = J8MasterStep - J8futStepM;
+      int J9StepDelta = J9MasterStep - J9futStepM;
 
       // Update current step position to target (commit motion to memory)
-      J1StepM = J1futStepM;
-      J2StepM = J2futStepM;
-      J3StepM = J3futStepM;
-      J4StepM = J4futStepM;
-      J5StepM = J5futStepM;
-      J6StepM = J6futStepM;
-      J7StepM = J7futStepM;
-      J8StepM = J8futStepM;
-      J9StepM = J9futStepM;
+      J1MasterStep = J1FutureMasterStep;
+      J2MasterStep = J2FutureMasterStep;
+      J3MasterStep = J3FutureMasterStep;
+      J4MasterStep = J4FutureMasterStep;
+      J5MasterStep = J5FutureMasterStep;
+      J6MasterStep = J6FutureMasterStep;
+      J7MasterStep = J7futStepM;
+      J8MasterStep = J8futStepM;
+      J9MasterStep = J9futStepM;
 
       // Determine motor directions based on step differences (1=backward, 0=forward)
-      J1dir = (J1stepDif <= 0) ? 1 : 0;
-      J2dir = (J2stepDif <= 0) ? 1 : 0;
-      J3dir = (J3stepDif <= 0) ? 1 : 0;
-      J4dir = (J4stepDif <= 0) ? 1 : 0;
-      J5dir = (J5stepDif <= 0) ? 1 : 0;
-      J6dir = (J6stepDif <= 0) ? 1 : 0;
-      J7dir = (J7stepDif <= 0) ? 1 : 0;
-      J8dir = (J8stepDif <= 0) ? 1 : 0;
-      J9dir = (J9stepDif <= 0) ? 1 : 0;
+      J1dir = (J1StepDelta <= 0) ? 1 : 0;
+      J2dir = (J2StepDelta <= 0) ? 1 : 0;
+      J3dir = (J3StepDelta <= 0) ? 1 : 0;
+      J4dir = (J4StepDelta <= 0) ? 1 : 0;
+      J5dir = (J5StepDelta <= 0) ? 1 : 0;
+      J6dir = (J6StepDelta <= 0) ? 1 : 0;
+      J7dir = (J7StepDelta <= 0) ? 1 : 0;
+      J8dir = (J8StepDelta <= 0) ? 1 : 0;
+      J9dir = (J9StepDelta <= 0) ? 1 : 0;
 
       // Check if requested position is within J1 axis limits
-      if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+      if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
         J1axisFault = 1;
       }
       // Check if requested position is within J2 axis limits
-      if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+      if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
         J2axisFault = 1;
       }
       // Check if requested position is within J3 axis limits
-      if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+      if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
         J3axisFault = 1;
       }
       // Check if requested position is within J4 axis limits
-      if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+      if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
         J4axisFault = 1;
       }
       // Check if requested position is within J5 axis limits
-      if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+      if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
         J5axisFault = 1;
       }
       // Check if requested position is within J6 axis limits
-      if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+      if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
         J6axisFault = 1;
       }
       // Check if requested position is within J7 (external axis) limits
-      if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
+      if ((J7dir == 1 and (J7MasterStep + J7StepDelta > J7StepLim)) or (J7dir == 0 and (J7MasterStep - J7StepDelta < 0))) {
         J7axisFault = 1;
       }
       // Check if requested position is within J8 (external axis) limits
-      if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
+      if ((J8dir == 1 and (J8MasterStep + J8StepDelta > J8StepLim)) or (J8dir == 0 and (J8MasterStep - J8StepDelta < 0))) {
         J8axisFault = 1;
       }
       // Check if requested position is within J9 (external axis) limits
-      if ((J9dir == 1 and (J9StepM + J9stepDif > J9StepLim)) or (J9dir == 0 and (J9StepM - J9stepDif < 0))) {
+      if ((J9dir == 1 and (J9MasterStep + J9StepDelta > J9StepLim)) or (J9dir == 0 and (J9MasterStep - J9StepDelta < 0))) {
         J9axisFault = 1;
       }
       // Sum all axis fault flags (0=no errors, >0 = some axes have limit violations)
@@ -6637,7 +6640,7 @@ void loop() {
       // If no axis limit errors and kinematics valid, write pre-calculated command to file
       if (TotalAxisFault == 0 && KinematicError == 0) {
         // Format motion command as comma-delimited string: steps, directions, speeds, accel, ramp
-        info = String(abs(J1stepDif)) + "," + String(abs(J2stepDif)) + "," + String(abs(J3stepDif)) + "," + String(abs(J4stepDif)) + "," + String(abs(J5stepDif)) + "," + String(abs(J6stepDif)) + "," + String(abs(J7stepDif)) + "," + String(abs(J8stepDif)) + "," + String(abs(J9stepDif)) + "," + String(J1dir) + "," + String(J2dir) + "," + String(J3dir) + "," + String(J4dir) + "," + String(J5dir) + "," + String(J6dir) + "," + String(J7dir) + "," + String(J8dir) + "," + String(J9dir) + "," + String(SpeedType) + "," + String(SpeedVal) + "," + String(ACCspd) + "," + String(DCCspd) + "," + String(ACCramp);
+        info = String(abs(J1StepDelta)) + "," + String(abs(J2StepDelta)) + "," + String(abs(J3StepDelta)) + "," + String(abs(J4StepDelta)) + "," + String(abs(J5StepDelta)) + "," + String(abs(J6StepDelta)) + "," + String(abs(J7StepDelta)) + "," + String(abs(J8StepDelta)) + "," + String(abs(J9StepDelta)) + "," + String(J1dir) + "," + String(J2dir) + "," + String(J3dir) + "," + String(J4dir) + "," + String(J5dir) + "," + String(J6dir) + "," + String(J7dir) + "," + String(J8dir) + "," + String(J9dir) + "," + String(SpeedType) + "," + String(SpeedVal) + "," + String(ACCspd) + "," + String(DCCspd) + "," + String(ACCramp);
         // Write formatted command string to SD card file
         writeSD(filename, info);
         // Send current robot position back to user
@@ -6982,60 +6985,60 @@ void loop() {
         SolveInverseKinematics();
 
         // Calculate target motor steps for each joint at this waypoint
-        int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-        int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-        int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-        int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-        int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-        int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+        int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+        int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+        int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+        int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+        int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+        int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
         // Calculate step difference (delta) from current position to waypoint target for each joint
-        int J1stepDif = J1StepM - J1futStepM;
-        int J2stepDif = J2StepM - J2futStepM;
-        int J3stepDif = J3StepM - J3futStepM;
-        int J4stepDif = J4StepM - J4futStepM;
-        int J5stepDif = J5StepM - J5futStepM;
-        int J6stepDif = J6StepM - J6futStepM;
+        int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+        int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+        int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+        int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+        int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+        int J6StepDelta = J6MasterStep - J6FutureMasterStep;
         // External axes J7-J9 not used in circle motion (6-axis only)
-        int J7stepDif = 0;
-        int J8stepDif = 0;
-        int J9stepDif = 0;
+        int J7StepDelta = 0;
+        int J8StepDelta = 0;
+        int J9StepDelta = 0;
 
         // Determine motor rotation direction based on step difference sign
         // ternary operator: if stepDif <= 0 then direction=1 (backward), else 0 (forward)
-        J1dir = (J1stepDif <= 0) ? 1 : 0;
-        J2dir = (J2stepDif <= 0) ? 1 : 0;
-        J3dir = (J3stepDif <= 0) ? 1 : 0;
-        J4dir = (J4stepDif <= 0) ? 1 : 0;
-        J5dir = (J5stepDif <= 0) ? 1 : 0;
-        J6dir = (J6stepDif <= 0) ? 1 : 0;
+        J1dir = (J1StepDelta <= 0) ? 1 : 0;
+        J2dir = (J2StepDelta <= 0) ? 1 : 0;
+        J3dir = (J3StepDelta <= 0) ? 1 : 0;
+        J4dir = (J4StepDelta <= 0) ? 1 : 0;
+        J5dir = (J5StepDelta <= 0) ? 1 : 0;
+        J6dir = (J6StepDelta <= 0) ? 1 : 0;
         // J7-J9 not moving during circle motion (direction = 0 = stopped)
         J7dir = 0;
         J8dir = 0;
         J9dir = 0;
 
         // Check if J1 axis position would exceed limits
-        if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+        if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
           J1axisFault = 1;
         }
         // Check if J2 axis position would exceed limits
-        if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+        if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
           J2axisFault = 1;
         }
         // Check if J3 axis position would exceed limits
-        if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+        if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
           J3axisFault = 1;
         }
         // Check if J4 axis position would exceed limits
-        if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+        if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
           J4axisFault = 1;
         }
         // Check if J5 axis position would exceed limits
-        if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+        if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
           J5axisFault = 1;
         }
         // Check if J6 axis position would exceed limits
-        if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+        if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
           J6axisFault = 1;
         }
         // Sum all joint fault flags (0=valid move, >0=at least one joint limit violation)
@@ -7045,7 +7048,7 @@ void loop() {
         if (TotalAxisFault == 0 && KinematicError == 0) {
           // Call low-level motion driver with absolute step counts and directions
           // driveMotorsL handles stepper pulse generation with defined delay between steps
-          driveMotorsL(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
+          driveMotorsL(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
         } else if (KinematicError == 1) {
           // Kinematics solver failed - target position unreachable
           Alarm = "ER";
@@ -7385,52 +7388,52 @@ void loop() {
         SolveInverseKinematics();
 
         //calc destination motor steps
-        int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
-        int J2futStepM = (JangleOut[1] + J2axisLimNeg) * J2StepDeg;
-        int J3futStepM = (JangleOut[2] + J3axisLimNeg) * J3StepDeg;
-        int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
-        int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
-        int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
+        int J1FutureMasterStep = (JointAnglesInverseKinematic[0] + J1axisLimNeg) * J1StepDeg;
+        int J2FutureMasterStep = (JointAnglesInverseKinematic[1] + J2axisLimNeg) * J2StepDeg;
+        int J3FutureMasterStep = (JointAnglesInverseKinematic[2] + J3axisLimNeg) * J3StepDeg;
+        int J4FutureMasterStep = (JointAnglesInverseKinematic[3] + J4axisLimNeg) * J4StepDeg;
+        int J5FutureMasterStep = (JointAnglesInverseKinematic[4] + J5axisLimNeg) * J5StepDeg;
+        int J6FutureMasterStep = (JointAnglesInverseKinematic[5] + J6axisLimNeg) * J6StepDeg;
 
         //calc delta from current to destination
-        int J1stepDif = J1StepM - J1futStepM;
-        int J2stepDif = J2StepM - J2futStepM;
-        int J3stepDif = J3StepM - J3futStepM;
-        int J4stepDif = J4StepM - J4futStepM;
-        int J5stepDif = J5StepM - J5futStepM;
-        int J6stepDif = J6StepM - J6futStepM;
-        int J7stepDif = 0;
-        int J8stepDif = 0;
-        int J9stepDif = 0;
+        int J1StepDelta = J1MasterStep - J1FutureMasterStep;
+        int J2StepDelta = J2MasterStep - J2FutureMasterStep;
+        int J3StepDelta = J3MasterStep - J3FutureMasterStep;
+        int J4StepDelta = J4MasterStep - J4FutureMasterStep;
+        int J5StepDelta = J5MasterStep - J5FutureMasterStep;
+        int J6StepDelta = J6MasterStep - J6FutureMasterStep;
+        int J7StepDelta = 0;
+        int J8StepDelta = 0;
+        int J9StepDelta = 0;
 
         //determine motor directions
-        J1dir = (J1stepDif <= 0) ? 1 : 0;
-        J2dir = (J2stepDif <= 0) ? 1 : 0;
-        J3dir = (J3stepDif <= 0) ? 1 : 0;
-        J4dir = (J4stepDif <= 0) ? 1 : 0;
-        J5dir = (J5stepDif <= 0) ? 1 : 0;
-        J6dir = (J6stepDif <= 0) ? 1 : 0;
+        J1dir = (J1StepDelta <= 0) ? 1 : 0;
+        J2dir = (J2StepDelta <= 0) ? 1 : 0;
+        J3dir = (J3StepDelta <= 0) ? 1 : 0;
+        J4dir = (J4StepDelta <= 0) ? 1 : 0;
+        J5dir = (J5StepDelta <= 0) ? 1 : 0;
+        J6dir = (J6StepDelta <= 0) ? 1 : 0;
         J7dir = 0;
         J8dir = 0;
         J9dir = 0;
 
         //determine if requested position is within axis limits
-        if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
+        if ((J1dir == 1 and (J1MasterStep + J1StepDelta > J1StepRange)) or (J1dir == 0 and (J1MasterStep - J1StepDelta < 0))) {
           J1axisFault = 1;
         }
-        if ((J2dir == 1 and (J2StepM + J2stepDif > J2StepLim)) or (J2dir == 0 and (J2StepM - J2stepDif < 0))) {
+        if ((J2dir == 1 and (J2MasterStep + J2StepDelta > J2StepLim)) or (J2dir == 0 and (J2MasterStep - J2StepDelta < 0))) {
           J2axisFault = 1;
         }
-        if ((J3dir == 1 and (J3StepM + J3stepDif > J3StepLim)) or (J3dir == 0 and (J3StepM - J3stepDif < 0))) {
+        if ((J3dir == 1 and (J3MasterStep + J3StepDelta > J3StepLim)) or (J3dir == 0 and (J3MasterStep - J3StepDelta < 0))) {
           J3axisFault = 1;
         }
-        if ((J4dir == 1 and (J4StepM + J4stepDif > J4StepLim)) or (J4dir == 0 and (J4StepM - J4stepDif < 0))) {
+        if ((J4dir == 1 and (J4MasterStep + J4StepDelta > J4StepLim)) or (J4dir == 0 and (J4MasterStep - J4StepDelta < 0))) {
           J4axisFault = 1;
         }
-        if ((J5dir == 1 and (J5StepM + J5stepDif > J5StepLim)) or (J5dir == 0 and (J5StepM - J5stepDif < 0))) {
+        if ((J5dir == 1 and (J5MasterStep + J5StepDelta > J5StepLim)) or (J5dir == 0 and (J5MasterStep - J5StepDelta < 0))) {
           J5axisFault = 1;
         }
-        if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
+        if ((J6dir == 1 and (J6MasterStep + J6StepDelta > J6StepLim)) or (J6dir == 0 and (J6MasterStep - J6StepDelta < 0))) {
           J6axisFault = 1;
         }
         TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault;
@@ -7438,7 +7441,7 @@ void loop() {
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsL(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
+          driveMotorsL(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
         } else if (KinematicError == 1) {
           Alarm = "ER";
           if (splineTrue == false) {

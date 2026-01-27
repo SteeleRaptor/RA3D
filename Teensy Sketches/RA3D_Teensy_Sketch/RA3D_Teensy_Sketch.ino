@@ -317,6 +317,9 @@ int J4LoopMode;
 int J5LoopMode;
 int J6LoopMode;
 
+//Variable for whether whole system is in closed loop
+int closedLoopTrue;
+
 #define ROBOT_nDOFs 6
 const int numJoints = 9;
 typedef float tRobotJoints[ROBOT_nDOFs];
@@ -1306,7 +1309,10 @@ void sendRobotPosSpline() {
 }
 
 void updatePos() {
-
+  //read encoders again for accuracy
+  if (closedLoopTrue){
+    readEncoders();
+  }
   JangleIn[0] = (J1StepM - J1zeroStep) / J1StepDeg;
   JangleIn[1] = (J2StepM - J2zeroStep) / J2StepDeg;
   JangleIn[2] = (J3StepM - J3zeroStep) / J3StepDeg;
@@ -1322,7 +1328,7 @@ void updatePos() {
 }
 
 
-
+//Update Master step and send position through serial
 void correctRobotPos() {
 
   J1StepM = J1encPos.read() / J1encMult;
@@ -1494,16 +1500,17 @@ void resetEncoders() {
   J5collisionTrue = 0;
   J6collisionTrue = 0;
 
-  //set encoders to current position
-  J1encPos.write(J1StepM * J1encMult);
-  J2encPos.write(J2StepM * J2encMult);
-  J3encPos.write(J3StepM * J3encMult);
-  J4encPos.write(J4StepM * J4encMult);
-  J5encPos.write(J5StepM * J5encMult);
-  J6encPos.write(J6StepM * J6encMult);
-  //delayMicroseconds(5);
 }
-
+//Made by Justin Fauson
+//Sets Master step to encoder position
+void readEncoders() {
+      J1StepM = J1encPos.read() / J1encMult;
+      J2StepM = J2encPos.read() / J2encMult;
+      J3StepM = J3encPos.read() / J3encMult;
+      J4StepM = J4encPos.read() / J4encMult;
+      J5StepM = J5encPos.read() / J5encMult;
+      J6StepM = J6encPos.read() / J6encMult;
+}
 void checkEncoders() {
   //read encoders
   J1EncSteps = J1encPos.read() / J1encMult;
@@ -4661,7 +4668,9 @@ void loop() {
       J4LoopMode = LoopMode.substring(3, 4).toInt();
       J5LoopMode = LoopMode.substring(4, 5).toInt();
       J6LoopMode = LoopMode.substring(5).toInt();
-
+      if (J1LoopMode == 0 || J2LoopMode == 0 || J3LoopMode == 0 || J4LoopMode == 0 || J5LoopMode == 0 || J6LoopMode == 0) {
+        closedLoopTrue = 1;
+      }
       int J1futStepM = (J1Angle + J1axisLimNeg) * J1StepDeg;
       int J2futStepM = (J2Angle + J2axisLimNeg) * J2StepDeg;
       int J3futStepM = (J3Angle + J3axisLimNeg) * J3StepDeg;
@@ -4671,7 +4680,9 @@ void loop() {
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
-
+      if (closedLoopTrue){
+        readEncoders();
+      }
       //calc delta from current to destination
       int J1stepDif = J1StepM - J1futStepM;
       int J2stepDif = J2StepM - J2futStepM;
@@ -4729,9 +4740,12 @@ void loop() {
 
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
+        //move to center positions except J5 to 45deg
         resetEncoders();
         driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
-        checkEncoders();
+        if (closedLoopTrue){
+          checkEncoders();
+        }
         sendRobotPos();
       } else if (KinematicError == 1) {
         Alarm = "ER";

@@ -129,13 +129,15 @@ const int EstopPin = 39;
 
 
 //set encoder multiplier
-float J1encMult = 10;
-float J2encMult = 10;
-float J3encMult = 10;
-float J4encMult = 10;
-float J5encMult = 5;
-float J6encMult = 10;
-int encOffset = 50;
+//all values were off by a factor of 2
+float J1encMult = 5;
+float J2encMult = 5;
+float J3encMult = 5;
+float J4encMult = 5;
+float J5encMult = 2.5;
+float J6encMult = 5;
+//reduce offset for higher precision
+int encOffset = 10;
 
 //set encoder pins
 Encoder J1encPos(14, 15);

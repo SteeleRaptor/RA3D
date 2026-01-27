@@ -4,75 +4,6 @@
 // AR4 Robot Control Software - Teensy 4.1 Motor & Kinematics Controller
 // =============================================================================================
 
-/*  
-    AR4 Robot Control Software
-    Copyright (c) 2024, Chris Annin
-    All rights reserved.
-
-    You are free to share, copy and redistribute in any medium
-    or format.  You are free to remix, transform and build upon
-    this material.
-
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions are met:
-
-          Redistributions of source code must retain the above copyright
-          notice, this list of conditions and the following disclaimer.
-          Redistribution of this software in source or binary forms shall be free
-          of all charges or fees to the recipient of this software.
-          Redistributions in binary form must reproduce the above copyright
-          notice, this list of conditions and the following disclaimer in the
-          documentation and/or other materials provided with the distribution.
-          you must give appropriate credit and indicate if changes were made. You may do
-          so in any reasonable manner, but not in any way that suggests the
-          licensor endorses you or your use.
-          Selling Annin Robotics software, robots, robot parts, or any versions of robots or software based on this
-          work is strictly prohibited.
-
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-    DISCLAIMED. IN NO EVENT SHALL CHRIS ANNIN BE LIABLE FOR ANY
-    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-    chris.annin@gmail.com
-*/
-
-// =============================================================================================
-// VERSION LOG
-// =============================================================================================
-// 1.0 - 2/6/21 - initial release
-// 1.1 - 2/20/21 - bug fix, calibration offset on negative axis calibration direction axis 2,4,5
-// 2.0 - 10/1/22 - added lookahead and spline functionality
-// 2.2 - 11/6/22 - added Move V for open cv integrated vision
-// 3.0 - 2/3/23 - open loop bypass moved to teensy board / add external axis 8 & 9 / bug fix live jog drift
-// 3.1 - 5/10/23 - gcode initial
-// 3.2 - 5/12/23 - remove RoboDK kinematics
-// 3.3 - 6/4/23 - update geometric kinematics
-// 4.0 - 11/5/23 - .txt .ar4 extension, gcode tab, kinematics tab. Initial MK2 release.
-// 4.1 - 11/23/23 - bug fix added - R06_neg_matrix[2][3] = -DHparams[5][2]; added to UPdate CMD & GCC diagnostic
-// 4.2 - 1/12/24 - bug fix - step direction delay
-// 4.3 - 1/21/24 - Gcode to SD card.  Estop button interrupt.
-// 4.3.1 - 2/1/24 bug fix - vision snap and find drop down
-// 4.4 - 3/2/24 added kinematic error handling
-// 4.5 - 6/29/24 simplified drive motors functions with arrays
-// 5.0 - 7/14/24 updated kinematics
-// 5.1 - 2/15/25 Modbus option
-// 5.2 - 6/7/25 Modbus option
-// 6.0 - 6/7/25 Virtual Robot
-// 6.1 - 8/29/25 updated accel and decel, auto calibrate & microsteps
-// 6.2 - 8/29/25 changed bootstrap theme, xbox upgrade
-// 6.3 - 10/8/25 - JK - added beta Linux support
-// 6.4 - 10/29/25 - added set robot command to store HW and version to eprom, MK4 update, fixed tool jog, re-added 2 step calibration, add servo amp test
-
-// Current firmware version
-const char *FIRMWARE_VERSION = "6.4";
-
 
 // =============================================================================================
 // SYSTEM INCLUDES & LIBRARIES
@@ -89,7 +20,6 @@ const char *FIRMWARE_VERSION = "6.4";
 
 // Error handling
 #include <stdexcept>
-#include <EEPROM.h>
 
 // =============================================================================================
 // COMPILER PRAGMAS - Suppress non-critical warnings
@@ -103,22 +33,6 @@ const char *FIRMWARE_VERSION = "6.4";
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #pragma GCC diagnostic ignored "-Waddress"
 #pragma GCC diagnostic ignored "-Wall"
-
-// =============================================================================================
-// DEBUG CONFIGURATION
-// =============================================================================================
-// Enable/disable debug output
-bool DEBUG = false;
-
-// Conditional debug print macros - only print if DEBUG is true
-#define DEBUG_PRINT(x) \
-  do { \
-    if (DEBUG) Serial.print(x); \
-  } while (0)
-#define DEBUG_PRINTLN(x) \
-  do { \
-    if (DEBUG) Serial.println(x); \
-  } while (0)
 
 // =============================================================================================
 // TYPE DEFINITIONS
@@ -617,6 +531,22 @@ float DHparams[6][4] = {
     Matrix_Copy(inout, out); \
   }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//DECLARATION OF VARIABLES
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+/// DHM Table parameters
+#define DHM_Alpha 0
+#define DHM_A 1
+#define DHM_Theta 2
+#define DHM_D 3 
+
+/// Custom robot base (user frame)
+Matrix4x4 Robot_BaseFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 /// Custom robot tool (tool frame, end of arm tool or TCP)
 Matrix4x4 Robot_ToolFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
@@ -671,6 +601,7 @@ float &Robot_Kin_DHM_Theta3(Robot_Kin_DHM_Table[2 * Table_Size + 2]);
 float &Robot_Kin_DHM_Theta4(Robot_Kin_DHM_Table[3 * Table_Size + 2]);
 float &Robot_Kin_DHM_Theta5(Robot_Kin_DHM_Table[4 * Table_Size + 2]);
 float &Robot_Kin_DHM_Theta6(Robot_Kin_DHM_Table[5 * Table_Size + 2]);
+
 
 
 
@@ -742,302 +673,8 @@ void robot_set_AR() {
   Robot_JointLimits_Upper[5] = J6axisLimPos;
 }
 
-void robot_data_reset() {
-  // Reset user base and tool frames
-  Matrix_Eye(Robot_BaseFrame);
-  Matrix_Eye(Robot_ToolFrame);
-
-  // Reset internal base frame and tool frames
-  for (int i = 0; i < 6; i++) {
-    Robot_Kin_Base[i] = 0.0;
-  }
-
-  // Reset joint senses and joint limits
-  for (int i = 0; i < ROBOT_nDOFs; i++) {
-    Robot_Senses[i] = +1.0;
-  }
-}
-
-// ============================================================================
-// EEPROM Configuration
-// ============================================================================
-
-// EEPROM Memory Map
-#define EEPROM_MAGIC_ADDR 0            // 4 bytes - magic number to verify valid data
-#define EEPROM_DEBUG_ADDR 4            // 1 byte = whether debug is active on boot
-#define EEPROM_ROBOT_MODEL_ADDR 5      // 32 bytes - robot model string
-#define EEPROM_ROBOT_VERSION_ADDR 37   // 32 bytes - robot version string
-#define EEPROM_DRIVER_BOARD_ADDR 69    // 32 bytes - driver board string
-#define EEPROM_SERIAL_NUMBER_ADDR 101  // 32 bytes - serial number string
-#define EEPROM_ASSET_TAG_ADDR 133      // 32 bytes - asset tag string
-
-#define EEPROM_MAGIC_NUMBER 0x41523401  // "AR4" + version 01
-
-
-// Default values (used if EEPROM not initialized)
-const char *DEFAULT_ROBOT_MODEL = "Unset";
-const char *DEFAULT_ROBOT_VERSION = "Unset";
-const char *DEFAULT_DRIVER_BOARD = "Unset";
-const char *DEFAULT_SERIAL_NUMBER = "Unset";
-const char *DEFAULT_ASSET_TAG = "Unset";
-const bool DEFAULT_DEBUG = DEBUG;
-
-String robot_model = DEFAULT_ROBOT_MODEL;
-String robot_version = DEFAULT_ROBOT_VERSION;
-String driver_board = DEFAULT_DRIVER_BOARD;
-String serial_number = DEFAULT_SERIAL_NUMBER;
-String asset_tag = DEFAULT_ASSET_TAG;
-
-
-// ============================================================================
-// EEPROM Functions
-// ============================================================================
-
-bool is_eeprom_initialized() {
-  /*
-     * Check if EEPROM has been initialized with valid data.
-     * 
-     * Returns:
-     *   true if EEPROM contains valid robot configuration
-     *   false if EEPROM is uninitialized or corrupted
-     */
-  uint32_t magic;
-  EEPROM.get(EEPROM_MAGIC_ADDR, magic);
-  return (magic == EEPROM_MAGIC_NUMBER);
-}
-
-void load_debug_from_eeprom() {
-  if (is_eeprom_initialized()) {
-    // Read from EEPROM
-    // If Debug is defined in EEPROM then turn it on now
-    bool debugBuf = false;
-    EEPROM.get(EEPROM_DEBUG_ADDR, debugBuf);
-    if (debugBuf) {
-      DEBUG = true;
-      DEBUG_PRINTLN("Loaded DEBUG=True from EEPROM - Setting DEBUG to True");
-    }
-  } else {
-    Serial.println("EEPROM not initialized in load_debug");
-  }
-}
-
-void save_debug_to_eeprom(bool value) {
-  bool debugBuf = value;
-  DEBUG_PRINT("Saving Value: ");
-  DEBUG_PRINT(debugBuf);
-  DEBUG_PRINTLN(" to EEPROM");
-  EEPROM.put(EEPROM_DEBUG_ADDR, debugBuf);
-  bool debugTest;
-  EEPROM.get(EEPROM_DEBUG_ADDR, debugTest);
-
-  if (debugTest != value) {
-    Serial.println("Error saving Debug Persistence - Values don't match");
-  }
-}
-
-void load_robot_id_from_eeprom() {
-  /*
-     * Load robot model and version from EEPROM.
-     * If EEPROM not initialized, use default values.
-     */
-  if (is_eeprom_initialized()) {
-    // Read from EEPROM
-    char charBuffer[31];
-    EEPROM.get(EEPROM_ROBOT_MODEL_ADDR, charBuffer);
-    robot_model = charBuffer;
-    DEBUG_PRINT("Debug - Loaded Robot Model from EEPROM: ");
-    DEBUG_PRINTLN(robot_model);
-    EEPROM.get(EEPROM_ROBOT_VERSION_ADDR, charBuffer);
-    robot_version = charBuffer;
-    DEBUG_PRINT("Debug - Loaded Robot Version from EEPROM: ");
-    DEBUG_PRINTLN(robot_version);
-    EEPROM.get(EEPROM_DRIVER_BOARD_ADDR, charBuffer);
-    driver_board = charBuffer;
-    DEBUG_PRINT("Debug - Loaded Driver Board from EEPROM: ");
-    DEBUG_PRINTLN(driver_board);
-    EEPROM.get(EEPROM_SERIAL_NUMBER_ADDR, charBuffer);
-    serial_number = charBuffer;
-    DEBUG_PRINT("Debug - Loaded Serial Number from EEPROM: ");
-    DEBUG_PRINTLN(serial_number);
-    EEPROM.get(EEPROM_ASSET_TAG_ADDR, charBuffer);
-    asset_tag = charBuffer;
-    DEBUG_PRINT("Debug - Loaded Asset Tag from EEPROM: ");
-    DEBUG_PRINTLN(asset_tag);
-
-  } else {
-    Serial.println("EEPROM not initialized in load_robot_id");
-    robot_model = DEFAULT_ROBOT_MODEL;
-    robot_version = DEFAULT_ROBOT_VERSION;
-    driver_board = DEFAULT_DRIVER_BOARD;
-    serial_number = DEFAULT_SERIAL_NUMBER;
-    asset_tag = DEFAULT_ASSET_TAG;
-  }
-}
-
-void save_robot_id_to_eeprom(const String robot_model, const String robot_version, const String driver_board, const String serial_number, const String asset_tag) {
-  /*
-     * Save robot model and version to EEPROM.
-     * 
-     * Args:
-     *   robot_model: Robot model string (max 31 chars)
-     *   robot_version: Robot version string (max 31 chars)
-     *   driver_board: Driver board string (max 31 chars)
-     *   serial_number: Serial number string (max 31 chars)
-     *   asset_tag: Asset Tag string (max 31 chars)
-     */
-  // Write magic number
-  uint32_t magic = EEPROM_MAGIC_NUMBER;
-  EEPROM.put(EEPROM_MAGIC_ADDR, magic);
-
-  char charBuffer[32] = { 0 };
-
-  // Write robot model
-  if (robot_model != "NA") {
-    robot_model.toCharArray(charBuffer, sizeof(charBuffer));
-    EEPROM.put(EEPROM_ROBOT_MODEL_ADDR, charBuffer);
-  }
-
-  // Write robot version
-  if (robot_version != "NA") {
-    robot_version.toCharArray(charBuffer, sizeof(charBuffer));
-    EEPROM.put(EEPROM_ROBOT_VERSION_ADDR, charBuffer);
-  }
-
-  // Write driver board
-  if (driver_board != "NA") {
-    driver_board.toCharArray(charBuffer, sizeof(charBuffer));
-    EEPROM.put(EEPROM_DRIVER_BOARD_ADDR, charBuffer);
-  }
-
-  // Write Serial Number
-  if (serial_number != "NA") {
-    serial_number.toCharArray(charBuffer, sizeof(charBuffer));
-    EEPROM.put(EEPROM_SERIAL_NUMBER_ADDR, charBuffer);
-  }
-
-  // Write Asset Tag
-  if (asset_tag != "NA") {
-    asset_tag.toCharArray(charBuffer, sizeof(charBuffer));
-    EEPROM.put(EEPROM_ASSET_TAG_ADDR, charBuffer);
-  }
-}
-
-void reboot() {
-  DEBUG_PRINT("Rebooting Driver Board: ");
-  DEBUG_PRINTLN(driver_board);
-  if (driver_board.indexOf("Teensy") >= 0) {
-    DEBUG_PRINTLN("Teensy 3.x / 4.x: ARM system reset");
-    SCB_AIRCR = 0x05FA0004;
-    while (true)
-      ;
-  } else {
-    // Unknown type — fallback or safe no-op
-    Serial.println("Unknown board type, no reboot performed.");
-  }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-// Persistent Hardware / Query Functions
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void handle_hello_command() {
-  /*
-     * Responds to HELLO command with system information in JSON format.
-     * Reads robot model/version from EEPROM (or uses defaults).
-     * 
-     * Command: HELLO\n
-     * Response: {"DriverModel":"Teensy 4.1","DriverVersion":"6.3","RobotModel":"AR4","RobotVersion":"Mk3"}\n
-     */
-
-  String response = "{";
-  response += "\"DriverModel\":\"" + String(driver_board) + "\",";
-  response += "\"FirmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\",";
-  response += "\"RobotModel\":\"" + String(robot_model) + "\",";
-  response += "\"RobotVersion\":\"" + String(robot_version) + "\",";
-  response += "\"SerialNumber\":\"" + String(serial_number) + "\",";
-  response += "\"AssetTag\":\"" + String(asset_tag) + "\"";
-  response += "}";
-
-  Serial.println(response);
-}
-
-
-void handle_set_robot_id_command(String robot_model, String robot_version, String driver_board, String serial_number, String asset_tag) {
-  /*
-     * Set robot model and version, save to EEPROM.
-     * 
-     * Response: Done\n (on success) or Error\n (on failure)
-     */
-
-  if (robot_model.length() == 0) {
-    DEBUG_PRINTLN("No Robot Model Provided - Not Setting");
-    robot_model = "NA";
-  } else if (robot_model.length() > 31) {
-    Serial.println("Error: Robot Model too long (max 31 chars)");
-    return;
-  }
-
-  if (robot_version.length() == 0) {
-    DEBUG_PRINTLN("No Robot Version Provded - Not Setting");
-    robot_version = "NA";
-    if (robot_version.length() > 31) {
-      Serial.println("Error: Robot Version too long (max 31 chars)");
-      return;
-    }
-  }
-
-  if (driver_board.length() == 0) {
-    DEBUG_PRINTLN("No Driver Board Provded - Not Setting");
-    driver_board = "NA";
-  } else if (driver_board.length() > 31) {
-    Serial.println("Error: Driver Board too long (max 31 chars)");
-    return;
-  }
-
-  if (serial_number.length() == 0) {
-    DEBUG_PRINTLN("No Serial Number - Not Setting");
-    serial_number = "NA";
-  } else if (serial_number.length() > 31) {
-    Serial.println("Error: Version too long (max 31 chars)");
-    return;
-  }
-
-  if (asset_tag.length() == 0) {
-    DEBUG_PRINTLN("No Asset Tag Provded - Not Setting");
-    asset_tag = "NA";
-  } else if (asset_tag.length() > 31) {
-    Serial.println("Error: Asset Tag too long (max 31 chars)");
-    return;
-  }
-
-  robot_model.trim();
-  robot_version.trim();
-  driver_board.trim();
-  serial_number.trim();
-  asset_tag.trim();
-
-  DEBUG_PRINT("Debug - Setting Robot Model: ");
-  DEBUG_PRINTLN(robot_model);
-  DEBUG_PRINT("Debug - Setting Robot Version: ");
-  DEBUG_PRINTLN(robot_version);
-  DEBUG_PRINT("Debug - Setting Driver Board: ");
-  DEBUG_PRINTLN(driver_board);
-  DEBUG_PRINT("Debug - Setting Serial Number: ");
-  DEBUG_PRINTLN(serial_number);
-  DEBUG_PRINT("Debug - Setting Asset Tag: ");
-  DEBUG_PRINTLN(asset_tag);
-
-  // Save to EEPROM
-  save_robot_id_to_eeprom(robot_model, robot_version, driver_board, serial_number, asset_tag);
-
-  Serial.println("Done");
-}
-
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //MATRICE OPERATIONS
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 template<typename T>
 bool robot_joints_valid(const T joints[ROBOT_nDOFs]) {
 
@@ -1050,7 +687,7 @@ bool robot_joints_valid(const T joints[ROBOT_nDOFs]) {
 }
 
 
-//This function returns a 4x4 matrix as an argument (pose) following the modified DH rules for the inputs T rx, T tx, T rz and T tz source : https://en.wikipedia.org/wiki/Denavit%E2%80%93Hartenberg_parameters
+//This function returns a 4x4 matrix as an argument (pose) following the modified DH rules for the inputs T rx, T tx, T rz and T tz source :
 template<typename T>
 void DHM_2_pose(T rx, T tx, T rz, T tz, Matrix4x4 pose) {
   T crx;
@@ -1393,7 +1030,7 @@ void SolveInverseKinematics() {
   // Extract Rz rotation (convert from degrees to radians)
   target[5] = xyzuvw_In[5] * M_PI / 180;
 
-  // Serial.println("X : " + String(target[0]) + " Y : " + String(target[1]) + " Z : " + String(target[2]) + " rx : " + String(xyzuvw_In[3]) + " ry : " + String(xyzuvw_In[4]) + " rz : " + String(xyzuvw_In[5]));
+  // Serial.println("X : " + String(target[0] + " Y : " + String(target[1]) + " Z : " + String(target[2]) + " rx : " + String(xyzuvw_In[3]) + " ry : " + String(xyzuvw_In[4]) + " rz : " + String(xyzuvw_In[5]));
 
   // Try multiple wrist configurations to find all valid solutions
   // Sweep J5 (wrist rotation) from -90 to +90 degrees in 30-degree increments
@@ -1443,7 +1080,6 @@ void SolveInverseKinematics() {
       // Use first solution instead
       solVal = 0;
     }
-
     // Serial.println(String(i) + "  Joint estimate : " + String(joints_estimate[i]) + " // Joint sol 1 : " + String(SolutionMatrix[i][0]) + " // Joint sol 2 : " + String(SolutionMatrix[i][1]));
   }
 
@@ -1529,7 +1165,6 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
     joints_approx[i0] = DK[60 + i0] * joints_approx_in[i0];
   }
 
-  //debug = String(Robot_Data[13]) + " * " + String(Robot_Data[19]) + " * " + String(Robot_Data[21]);
 
   xyzwpr_2_pose(*(T(*)[6]) & DK[36], base);
   xyzwpr_2_pose(*(T(*)[6]) & DK[42], tool);
@@ -1737,7 +1372,7 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // POSITION FEEDBACK & FORWARD KINEMATICS
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// void sendRobotPos()
+// void sendRobotPos
 //
 // Calculates current Cartesian position from joint angles using forward kinematics,
 // then reports complete robot state to host via serial. Includes:
@@ -3057,10 +2692,8 @@ void setup() {
   //Serial8.begin(38400);  // Modbus serial interface (pins 34 and 35)
   // Note: No Serial output before this line to maintain timing/initialization order
   
-  // Load persistent configuration from EEPROM
-  load_debug_from_eeprom();      // Restore debug mode setting from EEPROM
-  // Restore robot model, version, serial number info from persistent storage
-  load_robot_id_from_eeprom();   // Restore robot model, version, serial number info
+
+ 
 
   // Initialize Modbus master node for industrial device communication (slave ID 1)
   //node.begin(1, Serial8);
@@ -3223,189 +2856,6 @@ void loop() {
     // COMMAND DISPATCHER - Route to handler based on function code
     // ==================================================================================
     // Each command is identified by a 2-letter code followed by parameter data
-
-    if (function == "HO") {
-      // Debug output for received command
-      DEBUG_PRINTLN("Debug - Received HO command");
-      // Send system identification and status
-      handle_hello_command();  // Send system identification and status
-    }
-
-    else if (function == "RB") {
-      // System restart command - reboot Teensy controller
-      Serial.println("System Restarting");
-      // Perform software reset of Teensy 4.1
-      reboot();
-    }
-
-    else if (function == "DB") {
-      // DEBUG CONFIGURATION COMMAND - Enable/disable debug output and persistence
-      // Parameters: [D]<0|1> = debug state, [P]<0|1> = enable persistence across reboots
-      String help = "Command DB - Set Debug Parameters\n";
-      // Add help text for debug state parameter
-      help += "required [D] - Debug State 0/1 (off/on) Enables / Disabled Serial Debug Mode\n";
-      // Add help text for persistence parameter
-      help += "optional [P] - Persistence 0/1 Disable / Enable debug mode persist accross reboots\n\n";
-      // Add example command formats
-      help += "Example: DB[D]1[P]1 - Enabled Debug mode with persist\n";
-      // Add alternative example
-      help += "Example: DB[0] - Disable debug mode, don't change current persisted value\n\n";
-
-      // Find start position of debug parameter in command string
-      int debugStart = inData.indexOf("[D]");
-      // Find start position of persistence parameter
-      int persistStart = inData.indexOf("[P]", persistStart + 3);
-
-      if (debugStart == -1) {
-        // Debug parameter not found - invalid command format
-        inData = "";
-        // Clear command buffer
-        cmdBuffer1 = "";  // Clear command buffer
-        // Send help information to user
-        Serial.println(help);
-        // Return to main loop without processing
-        return;
-      }
-
-      // Extract debug value from command string
-      String debugValue = inData.substring(debugStart + 3, debugStart + 4);
-      // Validate debug value is 0 or 1
-      if (debugValue != "0" and debugValue != "1") {
-        // Invalid value provided
-        Serial.println("Valid values for debug are 0 and 1\n");
-        // Display help information
-        Serial.println(help);
-        // Clear command data
-        inData = "";
-        // Clear command buffer
-        cmdBuffer1 = "";  // Clear command buffer
-        // Return to main loop
-        return;
-      }
-
-      // Check if debug value is 0 (disable)
-      if (debugValue == "0") {
-        // Disable debug output
-        DEBUG = false;
-        // Print debug notification
-        DEBUG_PRINTLN("Debug - Debugging Live Toggled Off");
-      } else if (debugValue == "1") {
-        // Enable debug output
-        DEBUG = true;
-        // Print debug notification
-        DEBUG_PRINTLN("Debug - Debugging Live Toggled On");
-      }
-
-      // Check if persistence parameter was provided
-      if (persistStart > 0) {
-        // Extract persistence value from command
-        String persistValue = inData.substring(persistStart + 3, persistStart + 4);
-        // Validate persistence value is 0 or 1
-        if (persistValue != "0" and persistValue != "1") {
-          // Invalid value provided
-          Serial.println("Valid values for persist are 0 and 1\n");
-          // Display help information
-          Serial.println(help);
-          // Clear command data
-          inData = "";
-          // Clear command buffer
-          cmdBuffer1 = "";  // Clear command buffer
-          // Return to main loop
-          return;
-        } else {
-          // Log persistence setting action
-          DEBUG_PRINT("Setting Debug Persistence to: ");
-          // Print the value being set
-          DEBUG_PRINTLN(persistValue);
-
-          // Check if enabling persistence
-          if (persistValue == "1") {
-            // Save debug enabled to EEPROM
-            save_debug_to_eeprom(true);
-          } else {
-            // Save debug disabled to EEPROM
-            save_debug_to_eeprom(false);
-          }
-        }
-      }
-
-      // Send success response
-      Serial.println("Done");
-      // Clear command data
-      inData = "";
-      // clear buffer
-      cmdBuffer1 = "";  // clear buffer
-      // Return to main loop
-      return;
-
-    }
-
-    else if (function == "SR") {
-      // SET ROBOT IDENTIFICATION COMMAND - Store hardware/software info to EEPROM
-      // Parameters: [M]<model>[V]<version>[B]<board>[S]<serial>[A]<asset_tag>
-      // Log received command with data for debugging
-      DEBUG_PRINT("Debug - Received SR command with inData: ");
-      // Print command parameters
-      DEBUG_PRINTLN(inData);
-
-      // Find position of model parameter marker in string
-      int modelStart = inData.indexOf("[M]");
-      // Find position of version parameter marker
-      int versionStart = inData.indexOf("[V]", modelStart + 3);
-      // Find position of driver board parameter marker
-      int driverStart = inData.indexOf("[B]", versionStart + 3);
-      // Find position of serial number parameter marker
-      int serialStart = inData.indexOf("[S]", driverStart + 3);
-      // Find position of asset tag parameter marker
-      int assetStart = inData.indexOf("[A]", serialStart + 3);
-
-      // Validate all required parameters are present
-      if (modelStart == -1 || versionStart == -1 || driverStart == -1 || serialStart == -1 || assetStart == -1) {
-        // Display error if format is incorrect
-        Serial.println("Error: Invalid format (SR)");
-        // Clear command data
-        inData = "";
-        // <-- drop the bad message
-        cmdBuffer1 = "";  // <-- drop the bad message
-        // Return to main loop
-        return;
-      }
-
-      // Extract robot model string from command
-      robot_model = inData.substring(modelStart + 3, versionStart);
-      // Extract robot version string from command
-      robot_version = inData.substring(versionStart + 3, driverStart);
-      // Extract driver board string from command
-      driver_board = inData.substring(driverStart + 3, serialStart);
-      // Extract serial number string from command
-      serial_number = inData.substring(serialStart + 3, assetStart);
-      // Extract asset tag string from command
-      asset_tag = inData.substring(assetStart + 3);
-
-      // Debug output for extracted robot model
-      DEBUG_PRINT("Debug - Robot Model extracted: ");
-      // Print model value
-      DEBUG_PRINTLN(robot_model);
-      // Debug output for robot version
-      DEBUG_PRINT("Debug - Robot Version extracted: ");
-      // Print version value
-      DEBUG_PRINTLN(robot_version);
-      // Debug output for driver board
-      DEBUG_PRINT("Debug - Driver Board extracted: ");
-      // Print driver board value
-      DEBUG_PRINTLN(driver_board);
-      // Debug output for serial number
-      DEBUG_PRINT("Debug - Serial Number: ");
-      // Print serial number value
-      DEBUG_PRINTLN(serial_number);
-      // Debug output for asset tag
-      DEBUG_PRINT("Debug - Asset Tag extracted: ");
-      // Print asset tag value
-      DEBUG_PRINTLN(asset_tag);
-
-      // Call handler to save robot identification to EEPROM
-      handle_set_robot_id_command(robot_model, robot_version, driver_board, serial_number, asset_tag);
-    }
 
     // ==================================================================================
     // MODBUS COMMUNICATION COMMANDS - Industrial device control via RS-485
@@ -5351,7 +4801,7 @@ void loop() {
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
-      if (closedLoop){
+      if (closedLoopTrue){
         readEncoders();
       }
       //calc delta from current to destination
@@ -5413,7 +4863,7 @@ void loop() {
       if (TotalAxisFault == 0 && KinematicError == 0) {
         resetEncoders();
         driveMotorsJ(abs(J1StepDelta), abs(J2StepDelta), abs(J3StepDelta), abs(J4StepDelta), abs(J5StepDelta), abs(J6StepDelta), abs(J7StepDelta), abs(J8StepDelta), abs(J9StepDelta), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
-        if (closedLoop){
+        if (closedLoopTrue){
           checkEncoders();
         }
         sendRobotPos();

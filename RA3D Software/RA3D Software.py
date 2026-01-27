@@ -149,7 +149,9 @@ class TkWindow(Tk):
         # Status label
         self.portStatusLabel = Label(self.serialFrame, text="Status: Disconnected")
         self.portStatusLabel.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky=W)
-
+        # Reset button
+        self.resetButton = Button(self.serialFrame, text="Reset", command=self.armController.resetAwaitingResponse, width=10)
+        self.resetButton.grid(row=3, column=1, padx=5, pady=5)
         # ==========| Reported Position Frame |==========
         self.reportedPosFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
         self.reportedPosFrame.grid(row=0, column=1, columnspan=2, padx=5, pady=5, sticky=W+N+E+S)

@@ -10,6 +10,7 @@ class ArmController:
         self.serialController = serialController
         self.kinematics = Kinematics
         self.LoopMode = 0 #Default loop mode Closed
+        self.orginSet = False
         # Arm calibration variables
         self.armCalibrated = False # Flag to signify if the arm has been calibrated
         self.calibrationInProgress = False # Flag to signify if calibration is currently in progress
@@ -231,7 +232,7 @@ class ArmController:
         Ry = self.root.RyCoordEntry.get()
         Rz = self.root.RzCoordEntry.get()
         # Check if any values are blank
-        pattern = r"^-?\d+\.\d+$"  # Regular expression for a valid float
+        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
         allValuesNumeric = True
         if not re.match(pattern, x):
             self.root.terminalPrint("X is not a number")
@@ -257,7 +258,13 @@ class ArmController:
             self.sendML(x, y, z, Rx, Ry, Rz)
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
-    
+    def populateML(self):
+        self.root.xCoordEntry.config(text=self.x)
+        self.root.yCoordEntry.config(text=self.y)
+        self.root.zCoordEntry.config(text=self.z)
+        self.root.RxCoordEntry.config(text=self.Rx)
+        self.root.RyCoordEntry.config(text=self.Ry)
+        self.root.RzCoordEntry.config(text=self.Rz)
     def sendML(self, X, Y, Z, Rx, Ry, Rz):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
@@ -512,9 +519,12 @@ class ArmController:
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed")
             return
+        self.sendRJ(0, -40, 60, 0, 45, 0)
+    def moveHome(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed")
+            return
         self.sendRJ(0,0,0,0,90,0)
-        self.sendRJ(0, -40, 50, 0, 90, 0)
-
     #--------Origin-------
     def setOrigin(self):
         if self.serialController.boardConnected is False:
@@ -530,7 +540,12 @@ class ArmController:
         self.root.xCurCoordOrigin.config(text=self.curX)
         self.root.yCurCoordOrigin.config(text=self.curY)
         self.root.zCurCoordOrigin.config(text=self.curZ)
-
+        self.orginSet = True
+    def moveOrigin(self):
+        if self.originSet == True:
+            self.sendML(self.originX,self.OriginY,self.originZ,0,90,0)
+        else:
+            return
     def updateDeltaFromOrigin(self):
         if self.originX is None or self.originY is None or self.originZ is None:
             self.root.statusPrint("Origin not set")

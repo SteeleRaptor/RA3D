@@ -1,6 +1,7 @@
 from asyncio import wait
 import re
 import numpy as np
+import time
 from SerialController import SerialController
 from Kinematics import Kinematics
 
@@ -222,10 +223,9 @@ class ArmController:
         self.root.J5CurCoord.config(text=self.curJ5, color=jointColors[4])
         self.root.J6CurCoord.config(text=self.curJ6, color=jointColors[5])
         self.updateDeltaFromOrigin()
-    def getJointColors(J1,J2,J3,J4,J5,J6):
+    def getJointColors(self,J1,J2,J3,J4,J5,J6):
         Js = np.array([J1,J2,J3,J4,J5,J6])
-        Limits = np.array([self.J1Limit,self.J2Limit,self.J3Limit,self.J4Limit,self.J5Limit,self.J6Limit])
-        Limits = np.matrix([J1Limits,J2Limits,J3Limits,J4Limits,J5Limits,J6Limits])
+        Limits = np.matrix([self.J1Limits,self.J2Limits,self.J3Limits,self.J4Limits,self.J5Limits,self.J6Limits])
         
         LimitsNeg = Limits[:,0]
         LimitsPos = Limits[:,1]
@@ -443,7 +443,7 @@ class ArmController:
         self.root.terminalPrint("Sending RJ command...")
         # Create the command
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
-        command = f"RJA{J1}B{J2}C{J3}D{J4}E{J5}F{J6}J7{0}J8{0}J9{0}Sp{self.speed}Ac{self.acceleration}Dc{self.deceleration}Rm{self.ramp}WNLm{self.defaultMoveParameters.loopMode*6}\n"
+        command = MoveCommand([J1,J2,J3,J4,J5,J6], self.defaultMoveParameters)
         # Check if a bord is connected or if the arm is not calibrated
         if self.serialController.boardConnected is False:
             # Inform user in terminal then quit function to avoid sending instruction
@@ -643,7 +643,7 @@ class ArmController:
         # TODO Add line to wait for response
         while self.awaitingRequestPosition:
             self.requestPositionUpdate()
-            delay(1)
+            time.delay(1)
         self.origin.setOrigin(self.curPos)
         self.root.xCurCoordOrigin.config(text=self.curPos.x)
         self.root.yCurCoordOrigin.config(text=self.curPos.y)
@@ -773,3 +773,22 @@ class MoveParameters:
         self.loopMode = loopMode
     def getLoopMode(self):
         return self.loopMode
+#move command information, does not send a move command
+class MoveCommand:
+    def __init__(self,jointsOrPosition, moveParameters):
+        self.jointsOrPosition
+        if isinstance(Position, jointsOrPosition):
+            self.A = jointsOrPosition.x
+            self.B = jointsOrPosition.y
+            self.C = jointsOrPosition.z
+            self.D = jointsOrPosition.Rx
+            self.E = jointsOrPosition.Ry
+            self.F = jointsOrPosition.Rz
+        self.moveParameters = moveParameters
+    def __str__(self):
+        if isinstance(Position,self.jointsOrPosition):
+            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.F}Ry{self.E}Rx{self.D}J70.00J80.00J90.00Sp{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
+        else:
+            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.F}Ry{self.E}Rx{self.D}J70.00J80.00J90.00Sp{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
+        return command
+    

@@ -17,7 +17,7 @@ class PrintController:
         self.fileOpen = False
         self.printing = False
         self.printPaused = False
-        self.origin = root.armcontroller.origin
+        self.origin = root.armController.origin
         # Parameters for printing coordinates
         #self.xBounds = [300, 500] # X Min & X Max
         #self.yBounds = [-100, 100] # Y Min & Y Max
@@ -199,7 +199,7 @@ class PrintController:
             # TODO: Might make a custom datatype for storing position data that can be used
             newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
             #return newLine
-            return [printPos]
+            return [self.printPos]
 
     # This is the main function that will loop when printing a file
     def printLoop(self):

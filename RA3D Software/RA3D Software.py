@@ -150,7 +150,7 @@ class TkWindow(Tk):
         self.portStatusLabel = Label(self.serialFrame, text="Status: Disconnected")
         self.portStatusLabel.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky=W)
         # Reset button
-        self.resetButton = Button(self.serialFrame, text="Reset", command=self.armController.resetAwaitingResponse, width=10)
+        self.resetButton = Button(self.serialFrame, text="Reset", command=self.armController.reset, width=10)
         self.resetButton.grid(row=3, column=1, padx=5, pady=5)
         # ==========| Reported Position Frame |==========
         self.reportedPosFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
@@ -492,14 +492,16 @@ class TkWindow(Tk):
         #Move to Origin
         self.moveToOrigin = Button(self.originFrame, text="Move To Origin", command=self.armController.moveOrigin)
         self.moveToOrigin.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
+        self.moveToRecommendedOrigin = Button(self.originFrame, text="Move To Recomended Origin", command=self.armController.moveRecommendedOrigin)
+        self.moveToRecommendedOrigin.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky=W)
 
         #Delta Origin
         self.deltaOriginLabel = Label(self.originFrame, text="Delta from Origin:")
-        self.deltaOriginLabel.grid(row=4, column=0, columnspan=6, padx=5, pady=5, sticky=W)
+        self.deltaOriginLabel.grid(row=5, column=0, columnspan=6, padx=5, pady=5, sticky=W)
         
         #Delta coordinates
         self.originDeltaFrame = Frame(self.originFrame, highlightthickness=1, highlightbackground="#000000")
-        self.originDeltaFrame.grid(row=5, column=0, padx=5, pady=5)
+        self.originDeltaFrame.grid(row=6, column=0, padx=5, pady=5)
 
         self.xDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔX:")
         self.xDeltaOrigin = Label(self.originDeltaFrame, text="xxx") # 'xxx' until value reported

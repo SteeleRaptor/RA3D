@@ -1,8 +1,7 @@
 from tkinter import *
 from tkinter import filedialog
-import os
-import re
-from ArmController import Position, Origin
+import os, re, copy
+from ArmController import Position, Origin, MoveCommand,MoveParameters
 class PrintController:
     def __init__(self, root):
         self.root = root
@@ -24,8 +23,8 @@ class PrintController:
         #self.zBounds = [100, 300] # Z Min & Z Max
         #self.xyCenter = [(self.xBounds[0] + self.xBounds[1]) / 2, (self.yBounds[0] + self.yBounds[1]) / 2]
         # Parameters used for saving the last used coordinate information
-        self.lastPos = Position(self.origin)
-        self.printPos = Position(self.origin)
+        self.lastPos = Position(None,None,None,None,None,None,self.origin)
+        self.printPos = Position(None,None,None,None,None,None,self.origin)
         self.lastF = 0.0
         self.lastE = 0.0
         self.currentInstruction = 0
@@ -91,10 +90,11 @@ class PrintController:
             return
 
         # When starting print, reset the "last*" parameters
-        self.lastPos = self.origin.copy
-        self.lastX = self.originX
-        self.lastY = self.originY
-        self.lastZ = self.originZ
+        self.origin = self.root.armController.origin
+        print(self.origin.z, "test2")
+        self.printPos.origin = self.origin
+        self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,90,0,self.origin)
+        print(self.lastPos.z)
         self.lastF = 0.0
         self.lastE = 0.0
         if not self.printPaused:
@@ -157,31 +157,20 @@ class PrintController:
             x = float(xMatch.group(1)) if xMatch else None
             y = float(yMatch.group(1)) if yMatch else None
             z = float(zMatch.group(1)) if zMatch else None
+            print("z read:", z)
             f = float(fMatch.group(1)) if fMatch else None
             e = float(eMatch.group(1)) if eMatch else None
             # TODO: Temporary rotation information
-            Rz = 0
-            Ry = 90
-            Rx = 0
 
+            
             # If GCode instruction didn't contain a parameter, pull from last saved value
             # If instruction DID contain a parameter, offset the value to put it in the build volume
             if x == None:
-                x = self.lastX
-                self.printPos.x = self.lastPos.x.copy
-            else:
-                x = x + self.originX
-                self.lastX = x
+                x = self.lastPos.GetRelative()[0]
             if y == None:
-                y = self.lastY
-            else:
-                y = y + self.originY
-                self.lastY = y
+                y = self.lastPos.GetRelative()[1]
             if z == None:
-                z = self.lastZ
-            else:
-                z = z + self.originZ
-                self.lastZ = z
+                z = self.lastPos.GetRelative()[2]
             if f == None:
                 f = self.lastF
             else:
@@ -190,16 +179,17 @@ class PrintController:
                 e = self.lastE
             else:
                 self.lastE = e
-            
+            self.printPos.SetRelative(x,y,z,0,90,0)
+            self.lastPos = copy.deepcopy(self.printPos)
             # TODO: Additional processing to ensure X, Y, and Z are within build volume
             # TODO: Additional processing for F to control speed or something
             # Note that F is in units per minute (per LinuxCNC specifications)
             # https://linuxcnc.org/docs/html/gcode/machining-center.html#sub:feed-rate
             # TODO: Note that it is pointless to convert to strings because to send the instruction to the arm (through current methods) we give the coordinates
             # TODO: Might make a custom datatype for storing position data that can be used
-            newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
+            #newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
             #return newLine
-            return [self.printPos]
+            return self.printPos.GetAbsolute()
 
     # This is the main function that will loop when printing a file
     def printLoop(self):
@@ -207,6 +197,7 @@ class PrintController:
             return
         if self.currentInstruction > len(self.gcodeLines) - 1:
             self.root.statusPrint("End of program reached")
+            self.currentInstruction = 0
             self.printing = False
             return
 
@@ -228,7 +219,7 @@ class PrintController:
     def nextBedCalibration(self):
         if self.bedCalibration == True:
             currentCorner = self.calibrationCorners[self.bedCalStep]
-            posStep = currentCorner.copy
+            posStep = copy.deepcopy(currentCorner)
             posStep.z += 200
             self.root.armController.sendMJ(posStep)
             while self.root.armController.awaitingMovePosition:

@@ -107,7 +107,6 @@ float J5axisLimPos = 105;
 float J5axisLimNeg = 105-19;//J5 limit switch is about 19 degrees closer
 float J6axisLimPos = 180;
 float J6axisLimNeg = 180;
-float J7axisLimPos = 3450;
 float J7axisLimNeg = 0;
 float J8axisLimPos = 3450;
 float J8axisLimNeg = 0;
@@ -141,7 +140,6 @@ float J3axisLim = J3axisLimPos + J3axisLimNeg;
 float J4axisLim = J4axisLimPos + J4axisLimNeg;
 float J5axisLim = J5axisLimPos + J5axisLimNeg;
 float J6axisLim = J6axisLimPos + J6axisLimNeg;
-float J7axisLim = J7axisLimPos + J7axisLimNeg;
 float J8axisLim = J8axisLimPos + J8axisLimNeg;
 float J9axisLim = J9axisLimPos + J9axisLimNeg;
 
@@ -163,7 +161,7 @@ int J3StepLim = J3axisLim * J3StepDeg;
 int J4StepLim = J4axisLim * J4StepDeg;
 int J5StepLim = J5axisLim * J5StepDeg;
 int J6StepLim = J6axisLim * J6StepDeg;
-int J7StepLim = J7axisLim * J7StepDeg;
+//Removed because J7 is continous
 int J8StepLim = J8axisLim * J8StepDeg;
 int J9StepLim = J9axisLim * J9StepDeg;
 
@@ -247,7 +245,7 @@ String Alarm = "0";
 String speedViolation = "0";
 float minSpeedDelay = 200;
 float maxMMperSec = 192;
-float linWayDistSP = 1;
+float linWayDistSP = 1; //waypoints per distance?
 String debug = "";
 String flag = "";
 const int TRACKrotdir = 0;
@@ -1755,7 +1753,7 @@ void driveMotorsJ(int J1step, int J2step, int J3step, int J4step, int J5step, in
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DRIVE MOTORS G
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//drive motors G does not use acceleration but does use speed
 void driveMotorsG(int J1step, int J2step, int J3step, int J4step, int J5step, int J6step, int J7step, int J8step, int J9step, int J1dir, int J2dir, int J3dir, int J4dir, int J5dir, int J6dir, int J7dir, int J8dir, int J9dir, String SpeedType, float SpeedVal, float ACCspd, float DCCspd, float ACCramp) {
   int steps[] = { J1step, J2step, J3step, J4step, J5step, J6step, J7step, J8step, J9step };
   int dirs[] = { J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir };
@@ -1893,7 +1891,7 @@ void driveMotorsG(int J1step, int J2step, int J3step, int J4step, int J5step, in
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DRIVE MOTORS L
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//DrivemotorsL does not use speed, acceleration etc., Runs at a constant speed
 void driveMotorsL(int J1step, int J2step, int J3step, int J4step, int J5step, int J6step, int J7step, int J8step, int J9step, int J1dir, int J2dir, int J3dir, int J4dir, int J5dir, int J6dir, int J7dir, int J8dir, int J9dir, float curDelay) {
   // Array of steps, directions, pins, motor directions, and step counters
   int steps[9] = { J1step, J2step, J3step, J4step, J5step, J6step, J7step, J8step, J9step };
@@ -2133,7 +2131,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     int dir[numJoints] = { J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir };
     int StepM[numJoints] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
     int stepDif[numJoints] = { J1stepDif, J2stepDif, J3stepDif, J4stepDif, J5stepDif, J6stepDif, J7stepDif, J8stepDif, J9stepDif };
-    int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
+    int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
     int axisFault[numJoints] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     // Loop to check axis limits and set faults
@@ -2511,9 +2509,7 @@ void closedLoop(){
   if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
     J6axisFault = 1;
   }
-  if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
-    J7axisFault = 1;
-  }
+  //Removed because J7 is continous
   if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
     J8axisFault = 1;
   }
@@ -3155,12 +3151,8 @@ void loop() {
       J9length = inData.substring(J9lengthStart + 1, J9rotStart).toFloat();
       J9rot = inData.substring(J9rotStart + 1, J9stepsStart).toFloat();
       J9steps = inData.substring(J9stepsStart + 1).toFloat();
-
-      J7axisLimNeg = 0;
-      J7axisLimPos = J7length;
-      J7axisLim = J7axisLimPos + J7axisLimNeg;
+      
       J7StepDeg = J7steps / J7rot;
-      J7StepLim = J7axisLim * J7StepDeg;
 
       J8axisLimNeg = 0;
       J8axisLimPos = J8length;
@@ -3446,7 +3438,7 @@ void loop() {
       int J9dir;
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
+      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -3522,14 +3514,6 @@ void loop() {
           J6stepCen = ((J6axisLimNeg)-J6calBaseOff - J6calOff) * J6StepDeg;
         }
       }
-      if (J7req == 1) {
-        if (J7CalDir == 1) {
-          J7StepM = ((J7axisLim) + J7calBaseOff + J7calOff) * J7StepDeg;
-          J7stepCen = ((J7axisLimPos) + J7calBaseOff + J7calOff) * J7StepDeg;
-        } else {
-          J7StepM = (0 + J7calBaseOff + J7calOff) * J7StepDeg;
-          J7stepCen = ((J7axisLimNeg)-J7calBaseOff - J7calOff) * J7StepDeg;
-        }
       }
       if (J8req == 1) {
         if (J8CalDir == 1) {
@@ -3699,7 +3683,7 @@ void loop() {
       int J9dir;
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, J7StepLim, J8StepLim, J9StepLim };
+      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -4202,9 +4186,7 @@ void loop() {
         if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
           J6axisFault = 1;
         }
-        if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
-          J7axisFault = 1;
-        }
+        //Removed because J7 is continous
         if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
           J8axisFault = 1;
         }
@@ -4824,9 +4806,7 @@ void loop() {
       if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
         J6axisFault = 1;
       }
-      if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
-        J7axisFault = 1;
-      }
+      //Removed because J7 is continous
       if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
         J8axisFault = 1;
       }
@@ -4961,7 +4941,7 @@ void loop() {
       int J4stepDif = J4StepM - J4futStepM;
       int J5stepDif = J5StepM - J5futStepM;
       int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = J7StepM - J7futStepM;
+      int J7stepDif = J7_In
       int J8stepDif = J8StepM - J8futStepM;
       int J9stepDif = J9StepM - J9futStepM;
 
@@ -4997,9 +4977,7 @@ void loop() {
       if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
         J6axisFault = 1;
       }
-      if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
-        J7axisFault = 1;
-      }
+      //removed J7 axis limit because motor is continous
       if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
         J8axisFault = 1;
       }
@@ -5101,6 +5079,7 @@ void loop() {
       xyzuvw_Temp[3] = inData.substring(rzStart + 2, ryStart).toFloat();
       xyzuvw_Temp[4] = inData.substring(ryStart + 2, rxStart).toFloat();
       xyzuvw_Temp[5] = inData.substring(rxStart + 2, J7Start).toFloat();
+
       J7_In = inData.substring(J7Start + 2, J8Start).toFloat();
       J8_In = inData.substring(J8Start + 2, J9Start).toFloat();
       J9_In = inData.substring(J9Start + 2, SPstart).toFloat();
@@ -5131,6 +5110,7 @@ void loop() {
         nextCMDtype = checkData.substring(0, 1);
         checkData = checkData.substring(2);
       }
+      //Only used on special spline mode
       if (splineTrue == true and Rounding > 0 and nextCMDtype == "M") {
         //calculate new end point before rounding arc
         updatePos();
@@ -5222,7 +5202,9 @@ void loop() {
         function = "MA";
         rndTrue = true;
       } else {
+        //Updates xyzuvw_Out as the current position using forwardKinematics
         updatePos();
+        //Set input to InverseKinematics as desired position
         xyzuvw_In[0] = xyzuvw_Temp[0];
         xyzuvw_In[1] = xyzuvw_Temp[1];
         xyzuvw_In[2] = xyzuvw_Temp[2];
@@ -5230,8 +5212,6 @@ void loop() {
         xyzuvw_In[4] = xyzuvw_Temp[4];
         xyzuvw_In[5] = xyzuvw_Temp[5];
       }
-
-
 
       //xyz vector
       Xvect = xyzuvw_In[0] - xyzuvw_Out[0];
@@ -5252,14 +5232,15 @@ void loop() {
 
 
       //line dist and determine way point gap
+      //pythagorean theorem
       float lineDist = pow((pow((Xvect), 2) + pow((Yvect), 2) + pow((Zvect), 2) + pow((RZvect), 2) + pow((RYvect), 2) + pow((RXvect), 2)), .5);
       if (lineDist > 0) {
-
+        
         float wayPts = lineDist / linWayDistSP;
-        float wayPerc = 1 / wayPts;
+        float wayPerc = 1 / wayPts; //inverse of # of waypoints
 
         //pre calculate entire move and speeds
-
+        //Calculate JangleOut based on xyz_uvwIn
         SolveInverseKinematics();
         //calc destination motor steps for precalc
         int J1futStepM = (JangleOut[0] + J1axisLimNeg) * J1StepDeg;
@@ -5268,14 +5249,16 @@ void loop() {
         int J4futStepM = (JangleOut[3] + J4axisLimNeg) * J4StepDeg;
         int J5futStepM = (JangleOut[4] + J5axisLimNeg) * J5StepDeg;
         int J6futStepM = (JangleOut[5] + J6axisLimNeg) * J6StepDeg;
-
+        
         //calc delta from current to destination fpr precalc
+        //used to calculate curDelay, not drive motors
         int J1stepDif = J1StepM - J1futStepM;
         int J2stepDif = J2StepM - J2futStepM;
         int J3stepDif = J3StepM - J3futStepM;
         int J4stepDif = J4StepM - J4futStepM;
         int J5stepDif = J5StepM - J5futStepM;
         int J6stepDif = J6StepM - J6futStepM;
+        //----------Some modified logics from driveMotorsJ()-------------
 
         //FIND HIGHEST STEP FOR PRECALC
         int HighStep = J1stepDif;
@@ -5359,7 +5342,7 @@ void loop() {
 
         // calc external axis way pt moves
         int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
-        int J7stepDif = (J7StepM - J7futStepM) / (wayPts - 1);
+        int J7stepDif = (J7_In) / (wayPts - 1);
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
         int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);
         int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
@@ -5400,7 +5383,7 @@ void loop() {
           }
 
 
-          curDelay = calcStepGap;
+          curDelay = calcStepGap;//not sure why this undoes everything
 
           float curWayPerc = wayPerc * i;
           xyzuvw_In[0] = Xstart + (Xvect * curWayPerc);
@@ -5455,9 +5438,7 @@ void loop() {
           if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
             J6axisFault = 1;
           }
-          if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
-            J7axisFault = 1;
-          }
+          //Removed because J7 is continous
           if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
             J8axisFault = 1;
           }
@@ -5466,6 +5447,11 @@ void loop() {
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
 
+          if (abs(J1stepDif)>180 || abs(J2stepDif)>180 || abs(J3stepDif)>180 || abs(J4stepDif)>180 || abs(J5stepDif)>180 || abs(J6stepDif)>180){
+            Alarm = "TurnHazardMoveStopped";
+            Serial.println(alarm);
+            break;
+          }
           //send move command if no axis limit error
           if (TotalAxisFault == 0 && KinematicError == 0) {
             driveMotorsL(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, curDelay);
@@ -5766,9 +5752,7 @@ void loop() {
       if ((J6dir == 1 and (J6StepM + J6stepDif > J6StepLim)) or (J6dir == 0 and (J6StepM - J6stepDif < 0))) {
         J6axisFault = 1;
       }
-      if ((J7dir == 1 and (J7StepM + J7stepDif > J7StepLim)) or (J7dir == 0 and (J7StepM - J7stepDif < 0))) {
-        J7axisFault = 1;
-      }
+      //Removed because J7 is continous
       if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
         J8axisFault = 1;
       }

@@ -1,7 +1,9 @@
 from tkinter import *
 from tkinter import filedialog
 import os, re, copy
+
 from ArmController import Position, Origin, MoveCommand,MoveParameters
+
 class PrintController:
     def __init__(self, root):
         self.root = root
@@ -212,10 +214,12 @@ class PrintController:
         # Send the command to the arm
         # TODO Find/create a better move command, consider using moveG/drivemotorsG for gcode
         self.root.armController.sendML(X=point[0], Y=point[1], Z=point[2], Rx=point[3], Ry=point[4], Rz=point[5])
+
     def startPrintBedCalibration(self):
         self.bedCalibration = True
         self.bedCalStep = 1
         self.nextBedCalibration()
+
     def nextBedCalibration(self):
         if self.bedCalibration == True:
             currentCorner = self.calibrationCorners[self.bedCalStep]

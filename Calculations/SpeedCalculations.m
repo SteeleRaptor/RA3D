@@ -1,6 +1,6 @@
 %Near replica of Teensy sketch driveMotorsJ function
 clear;clc;close all
-[t,x] = driveMotorsJ(1000,1000,100,100,100,100,"s",5,10,10,20);
+[t,x] = driveMotorsJ(1000,1000,100,100,100,100,"s",5,10,10,15);
 stairs(t,x)
 ylabel("HighSteps")
 xlabel("t (seconds)")
@@ -55,6 +55,7 @@ function [t,x] = driveMotorsJ(J1step,J2step,J3step,J4step,J5step,J6step,SpeedTyp
       calcStepGap = minSpeedDelay;
       speedViolation = "1";
     end
+    %percentage of max speed
     elseif (SpeedType == "p")
     calcStepGap = minSpeedDelay / (SpeedVal / 100.0);
     end

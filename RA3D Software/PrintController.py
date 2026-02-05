@@ -1,8 +1,8 @@
 from tkinter import *
 from tkinter import filedialog
+<<<<<<< HEAD
 import os, re, copy, threading
 from ArmController import Position, Origin, MoveCommand,MoveParameters
-
 class PrintController:
     def __init__(self, root):
         self.root = root
@@ -215,6 +215,7 @@ class PrintController:
             return
         # Send the command to the arm
         # TODO Find/create a better move command, consider using moveG/drivemotorsG for gcode
+<<<<<<< HEAD
         self.root.armController.sendML(X=point[0], Y=point[1], Z=point[2], Rx=point[3], Ry=point[4], Rz=point[5], MoveParameters=self.printParemeters)
     def syncOrigin(self):
         self.origin = self.root.armController.origin
@@ -226,7 +227,6 @@ class PrintController:
         self.bedCalStep = 1
         self.syncOrigin()
         self.nextBedCalibration()
-
     def nextBedCalibration(self):
         if self.bedCalibration == True:
             bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep)

@@ -46,7 +46,6 @@ class TemperatureController:
         self.lastADCReading = None
         self.hotendTempCelsius = None
         self.bedTempCelsius = None
-        self.measurementState = 0 # 0 = Measure hotend, 1 = Measure bed
 
         # Set up the config register according to default values stated earlier
         self.setConfigReg()
@@ -88,7 +87,11 @@ class TemperatureController:
         # Return the reading
         return self.lastADCReading
     
-    def calculateHotendTemp(self, rawAdc):
+    def measureHotendTemp(self):
+        # Select the correct channel
+        self.selectADCChannel(0)
+        # Read the ADC
+        rawAdc = self.readADC()
         # Calculate the measured voltage
         Vmeas = rawAdc / pow(2, 15) * self.fullScaleVoltage
         # Convert the voltage into a resistance
@@ -100,7 +103,11 @@ class TemperatureController:
         # Return value
         return self.hotendTempCelsius
 
-    def calculateBedTemp(self, rawAdc):
+    def measureBedTemp(self):
+        # Select the correct channel
+        self.selectADCChannel(1)
+        # Read the ADC
+        rawAdc = self.readADC()
         # Calculate the measured voltage
         Vmeas = rawAdc / pow(2, 15) * self.fullScaleVoltage
         # Convert the voltage into a resistance
@@ -113,20 +120,7 @@ class TemperatureController:
         return self.bedTempCelsius
 
     def updateTemp(self):
-        # Alternates per call which thermistor to measure to not overwhelm the ADC
-        if (self.measurementState == 0):
-                # Handle reading and calculating hotend temperature
-                adcVal = self.readADC()
-                self.calculateHotendTemp(adcVal)
-                self.root.hotendActual.config(text=f"{round(self.hotendTempCelsius, 2)}°C")
-                # Change the ADC channel to A1 (Bed)
-                self.selectADCChannel(1)
-                self.measurementState = 1 # Toggle measurement state
-        else:
-                # Handle reading and calculating bed temperature
-                adcVal = self.readADC()
-                self.calculateBedTemp(adcVal)
-                self.root.bedActual.config(text=f"{round(self.bedTempCelsius, 2)}°C")
-                # Change the ADC channel to A0 (Hotend)
-                self.selectADCChannel(0)
-                self.measurementState = 0 # Toggle measurement state
+        temp = self.measureHotendTemp()
+        self.root.hotendActual.config(text=f"{round(temp, 2)}°C")
+        temp = self.measureBedTemp()
+        self.root.bedActual.config(text=f"{round(temp, 2)}°C")

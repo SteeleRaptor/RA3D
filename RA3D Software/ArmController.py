@@ -27,7 +27,7 @@ class ArmController:
         self.calJStage2 = [0, 0, 0, 1, 1, 1] # J4, J5, & J6 calibration in Stage 2
 
         # Speed parameters used for movement commands
-        self.defaultMoveParameters = MoveParameters(25,15,15,80,0)
+        self.defaultMoveParameters = MoveParameters(50,10,10,30,0,'m')
         #J Limits:
         self.J1Limits = [-170,170]
         self.J2Limits = [-42,90]
@@ -161,7 +161,28 @@ class ArmController:
             return "E"
         # Tell the serial controller to send the serial
         self.serialController.sendSerial(command)
+        self.awaitingMoveResponse = True
+    def postCalibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
+        self.getPostCalOffsets() # Update calibration offsets from entry fields
+        command = f"LEA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
+        self.root.terminalPrint("Command to send: ")
+        self.root.terminalPrint(command[0:-2])
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Command not sent due to no board connected")
+            return "E"
+        # Tell the serial controller to send the serial
+        self.serialController.sendSerial(command)
+        self.awaitingMoveResponse = True
 
+    def getPostCalOffsets(self):
+        self.J1CalOffset = float(self.root.J1OffsetEntryP.get())
+        self.J2CalOffset = float(self.root.J2OffsetEntryP.get())
+        self.J3CalOffset = float(self.root.J3OffsetEntryP.get())
+        self.J4CalOffset = float(self.root.J4OffsetEntryP.get())
+        self.J5CalOffset = float(self.root.J5OffsetEntryP.get())
+        self.J6CalOffset = float(self.root.J6OffsetEntryP.get())
+        self.root.terminalPrint(f"Post calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
+    
     def processPosition(self, response):
         # Collect all the indexes for finding values
         # General formatting of a response: A[val]B[val]C[val]D[val]E[val]F[val]G[val]H[val]I[val]J[val]K[val]L[val]M[val]N[val]O[val]P[val]Q[val]R[val]
@@ -190,21 +211,21 @@ class ArmController:
         '''if re.match(pattern, incomingJ1):
             print("Process Position Failed, not a number. Problem with Serial.")
             return'''
-        self.curJ2 = response[J2Idx+1:J3Idx].strip()
-        self.curJ3 = response[J3Idx+1:J4Idx].strip()
-        self.curJ4 = response[J4Idx+1:J5Idx].strip()
-        self.curJ5 = response[J5Idx+1:J6Idx].strip()
-        self.curJ6 = response[J6Idx+1:XPosIdx].strip()
-
+        self.curJ2 = float(response[J2Idx+1:J3Idx].strip())
+        self.curJ3 = float(response[J3Idx+1:J4Idx].strip())
+        self.curJ4 = float(response[J4Idx+1:J5Idx].strip())
+        self.curJ5 = float(response[J5Idx+1:J6Idx].strip())
+        self.curJ6 = float(response[J6Idx+1:XPosIdx].strip())
+        
         # XYZ Positions
-        self.curPos.x = response[XPosIdx+1:YPosIdx].strip()
-        self.curPos.y = response[YPosIdx+1:ZPosIdx].strip()
-        self.curPos.z = response[ZPosIdx+1:RzIdx].strip()
+        self.curPos.x = float(response[XPosIdx+1:YPosIdx].strip())
+        self.curPos.y = float(response[YPosIdx+1:ZPosIdx].strip())
+        self.curPos.z = float(response[ZPosIdx+1:RzIdx].strip())
 
         # RXYZ Angles
-        self.curPos.Rx = response[RxIdx+1:SpeedViolationIdx].strip()
-        self.curPos.Ry = response[RyIdx+1:RxIdx].strip()
-        self.curPos.Rz = response[RzIdx+1:RyIdx].strip()
+        self.curPos.Rx = float(response[RxIdx+1:SpeedViolationIdx].strip())
+        self.curPos.Ry = float(response[RyIdx+1:RxIdx].strip())
+        self.curPos.Rz = float(response[RzIdx+1:RyIdx].strip())
 
         # Display values on UI
         # XYZ
@@ -289,10 +310,10 @@ class ArmController:
         
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending ML command")
-            self.sendMJ(x, y, z, Rx, Ry, Rz)
+            self.sendMJ(x, y, z, Rx, Ry, Rz, self.defaultMoveParameters)
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
-    def sendMJ(self, X, Y, Z, Rx, Ry, Rz):
+    def sendMJ(self, X, Y, Z, Rx, Ry, Rz, moveParameters):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
@@ -301,7 +322,7 @@ class ArmController:
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         # Create the command
         commandPos = Position(X,Y,Z,Rx,Ry,Rz,None)
-        command = MoveCommand("MJ",commandPos, self.defaultMoveParameters)
+        command = MoveCommand("MJ",commandPos, moveParameters)
         self.root.terminalPrint("Command to send:")
         self.root.terminalPrint(str(command)[0:-2])
         # Check if board is not connected or arm is not calibrated
@@ -315,6 +336,7 @@ class ArmController:
             return
         # Send the serial command
         self.serialController.sendSerial(str(command))
+        self.awaitingMoveResponse = True # Set the awaiting move response flag 
     def populateMJ(self):
         self.root.xCoordEntry.delete(0, 'end')
         self.root.yCoordEntry.delete(0, 'end')
@@ -374,11 +396,11 @@ class ArmController:
         
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending ML command")
-            self.sendML(x, y, z, Rx, Ry, Rz)
+            self.sendML(x, y, z, Rx, Ry, Rz, self.defaultMoveParameters)
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
    
-    def sendML(self, X, Y, Z, Rx, Ry, Rz):
+    def sendML(self, X, Y, Z, Rx, Ry, Rz, moveParameters):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
@@ -387,7 +409,7 @@ class ArmController:
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         # Create the command
         commandPos = Position(X,Y,Z,Rx,Ry,Rz,None)
-        command = MoveCommand("ML",commandPos, self.defaultMoveParameters)
+        command = MoveCommand("ML",commandPos, moveParameters)
         self.root.terminalPrint(str(command)[0:-2])
         # Check if board is not connected or arm is not calibrated
         if self.serialController.boardConnected is False:
@@ -400,6 +422,7 @@ class ArmController:
             return
         # Send the serial command
         self.serialController.sendSerial(str(command))
+        self.awaitingMoveResponse = True # Set the awaiting move response flag 
     def reset(self):
         self.awaitingMoveResponse = False
         self.serialController.waitingForResponse = False
@@ -446,18 +469,18 @@ class ArmController:
         
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending RJ command")
-            self.sendRJ(J1, J2, J3, J4, J5, J6)
+            self.sendRJ(J1, J2, J3, J4, J5, J6, self.defaultMoveParameters)
         else:
             self.root.terminalPrint("RJ command not sent due to a value not being a number")
 
-    def sendRJ(self, J1, J2, J3, J4, J5, J6):
+    def sendRJ(self, J1, J2, J3, J4, J5, J6, moveParameters):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send MJ command as currently awaiting response from a previous move command")
             return
         self.root.terminalPrint("Sending RJ command...")
         # Create the command
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
-        command = MoveCommand("RJ",[J1,J2,J3,J4,J5,J6], self.defaultMoveParameters)
+        command = MoveCommand("RJ",[J1,J2,J3,J4,J5,J6], moveParameters)
         # Check if a bord is connected or if the arm is not calibrated
         if self.serialController.boardConnected is False:
             # Inform user in terminal then quit function to avoid sending instruction
@@ -638,12 +661,12 @@ class ArmController:
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed")
             return
-        self.sendRJ(0, -40, 60, 0, 45, 0)
+        self.sendRJ(0, -40, 60, 0, 45, 0, self.defaultMoveParameters)
     def moveHome(self):
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed")
             return
-        self.sendRJ(0,0,0,0,0,0)
+        self.sendRJ(0,0,0,0,0,0, self.defaultMoveParameters)
     #--------Origin-------
     def setOrigin(self):
         if self.serialController.boardConnected is False:
@@ -654,30 +677,29 @@ class ArmController:
             return
         self.root.terminalPrint("Setting current position as origin...")
         self.requestPositionManual
-        # TODO Add line to wait for response
-        while self.awaitingPosResponse:
-            self.requestPositionUpdate()
-            time.delay(1)
+        self.waitForResponse()
         self.origin.setOrigin(self.curPos)
         self.root.xCurCoordOrigin.config(text=self.curPos.x)
         self.root.yCurCoordOrigin.config(text=self.curPos.y)
         self.root.zCurCoordOrigin.config(text=self.curPos.z)
-        
+    def waitForResponse(self):
+        while self.awaitingPosResponse:
+            time.delay(0.05)
     def moveOrigin(self):
         if self.origin.checkOriginSet():
-            self.sendMJ(self.originX,self.originY,self.originZ,0,90,0)
+            self.sendMJ(self.originX,self.originY,self.originZ,0,90,0, self.defaultMoveParameters)
         else:
             return
     def updateDeltaFromOrigin(self):
         if not self.origin.checkOriginSet():
             self.root.statusPrint("Origin not set")
             return None, None, None
-        deltaX,deltaY,deltaZ = self.curPos.GetRelative
+        deltaX,deltaY,deltaZ = self.curPos.GetRelative()[:3]
         self.root.xDeltaOrigin.config(text=deltaX)
         self.root.yDeltaOrigin.config(text=deltaY)
         self.root.zDeltaOrigin.config(text=deltaZ)
     def moveRecommendedOrigin(self):
-        self.sendMJ(350,0,170,0,90,0)
+        self.sendMJ(350,0,170,0,90,0, self.defaultMoveParameters)
     #----------------------------Testing Functions----------------------------------------
 
     #example if given gcode or some other file and converted
@@ -713,12 +735,13 @@ class ArmController:
 # --- Other Classes ---
 class Position:
     def __init__(self, x, y, z, Rx, Ry, Rz, originObj):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.Rx = Rx
-        self.Ry = Ry
-        self.Rz = Rz
+        if x is not None and y is not None and z is not None:
+            self.x = float(x)
+            self.y = float(y)
+            self.z = float(z)
+            self.Rx = float(Rx)
+            self.Ry = float(Ry)
+            self.Rz = float(Rz)
         self.origin = originObj
     def GetAbsolute(self):
         return [self.x, self.y, self.z, self.Rx, self.Ry, self.Rz]
@@ -772,12 +795,13 @@ class Origin:
         return self.originSet
     
 class MoveParameters:
-    def __init__ (self,speed,acceleration,deceleration,ramp,loopMode):
+    def __init__ (self,speed,acceleration,deceleration,ramp,loopMode,speedType):
         self.speed = speed
         self.acceleration = acceleration
         self.deceleration = deceleration
         self.ramp = ramp
         self.loopMode = loopMode
+        self.speedType = speedType
     def setLoopMode(self,loopMode):
         self.loopMode = loopMode
     def getLoopMode(self):
@@ -806,10 +830,10 @@ class MoveCommand:
     def __str__(self):
         command = "Error"
         if self.type=="ML":
-            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J70.00J80.00J90.00Sp{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
+            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J70.00J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="MJ":
-            command = f"MJX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J70.00J80.00J90.00Sp{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
+            command = f"MJX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J70.00J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="RJ":
-            command = f"RJA{self.A}B{self.B}C{self.C}D{self.D}E{self.E}F{self.F}J70.00J80.00J90.00Sp{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}WNLm{self.moveParameters.loopMode*6}\n"
+            command = f"RJA{self.A}B{self.B}C{self.C}D{self.D}E{self.E}F{self.F}J70.00J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}WNLm{self.moveParameters.loopMode*6}\n"
         return command
     

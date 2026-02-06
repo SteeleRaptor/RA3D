@@ -4,7 +4,18 @@
     Copyright (c) 2024, Chris Annin
     All rights reserved.
 */
-
+/* Outline
+1. Global variables and definitions
+2. Robot data structure and kinematics functions
+3. Motion control functions
+4. Command parsing and execution
+5. Setup function
+6. Closed Loop function
+----- Main loop ------
+1. Update parameters function
+2. Jog functions
+3. Move functions
+*/
 #include <math.h>
 #include <limits>
 #include <avr/pgmspace.h>
@@ -4946,12 +4957,14 @@ void loop() {
     //----- MOVE J ---------------------------------------------------
     //-----------------------------------------------------------------------
     if (function == "MJ") {
+      //use drivemotorsJ
       moveJ(inData, true, false, false);
     }
 
     //----- MOVE G ---------------------------------------------------
     //-----------------------------------------------------------------------
     if (function == "MG") {
+      //use drivemotorsG
       moveJ(inData, true, false, true);
     }
 
@@ -5591,12 +5604,6 @@ void loop() {
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }
-
-
-
-
-
-
 
     //----- MOVE A (Arc) ---------------------------------------------------
     //-----------------------------------------------------------------------

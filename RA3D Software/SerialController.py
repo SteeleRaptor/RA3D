@@ -73,6 +73,7 @@ class SerialController:
 
     def disconnectPort(self):
         if self.boardConnected == True:
+            self.sendSerial("CL")
             self.boardConnected = False
             self.board.reset_output_buffer()
             self.board.reset_input_buffer()

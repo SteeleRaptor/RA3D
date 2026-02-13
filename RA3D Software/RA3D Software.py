@@ -10,6 +10,7 @@ from PrintController import PrintController
 from TemperatureController import TemperatureController
 
 class TkWindow(Tk):
+    
     def __init__(self):
         Tk.__init__(self)
         self.root = self
@@ -20,7 +21,7 @@ class TkWindow(Tk):
         self.updateDelay = 200 # Delay between update function calls in milliseconds
         # Set the window dimensions and position on screen
         w = 1200 # Window width
-        h = 515 # Window height
+        h = 600 # Window height
         ws = self.winfo_screenwidth() # Get screen width
         hs = self.winfo_screenheight() # Get screen height
         x = int((ws/2) - (w/2)) # Calculate x position for window to be in the center of the screen
@@ -163,7 +164,11 @@ class TkWindow(Tk):
         self.startLevel = Button(self.bedCalibrationFrame, text="Start Level", width=10, command=self.printController.startPrintBedCalibration)
         self.startLevel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
         self.nextLevel = Button(self.bedCalibrationFrame, text= "Next Corner", width=10, command=self.printController.nextBedCalibration)
-        self.nextLevel.grid(row=2, column=0, padx=5, pady=5, sticky=W)
+        self.nextLevel.grid(row=1, column=1, padx=5, pady=5, sticky=W)
+        self.sweepCorners = Button(self.bedCalibrationFrame, text= "Sweep Corners", width=10, command=self.printController.startCornerSweep)
+        self.sweepCorners.grid(row=2, column=0, padx=5, pady=5, sticky=W)
+        self.sweepCornersFull = Button(self.bedCalibrationFrame, text= "Full Corner Sweep", width=10, command=self.printController.startFullCornerSweep)
+        self.sweepCornersFull.grid(row=3, column=0, padx=5, pady=5, sticky=W)
         self.cornerLabel = Label(self.bedCalibrationFrame, text="Current corner: N/A")
         self.cornerLabel.grid(row=2, column=1, padx=5, pady=5, sticky=W)
 

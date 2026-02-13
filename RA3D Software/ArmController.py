@@ -812,7 +812,7 @@ class ArmController:
         self.root.yDeltaOrigin.config(text=deltaY)
         self.root.zDeltaOrigin.config(text=deltaZ)
     def moveRecommendedOrigin(self):
-        self.sendMJ(Position(400,0,350,0,90,0, None), self.defaultMoveParameters)
+        self.sendMJ(self.root.printController.recommendedOrigin, self.defaultMoveParameters)
     #----------------------------Testing Functions----------------------------------------
 
     #example if given gcode or some other file and converted

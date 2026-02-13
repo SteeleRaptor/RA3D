@@ -109,7 +109,7 @@ float J3axisLimNeg = 89;
 float J4axisLimPos = 180;
 float J4axisLimNeg = 180;
 float J5axisLimPos = 105;
-float J5axisLimNeg = 105-39;//This seems way too high, but the arm is moving itself into the wrong position
+float J5axisLimNeg = 105;//This seems way too high, but the arm is moving itself into the wrong position
 float J6axisLimPos = 180;
 float J6axisLimNeg = 180;
 float J7axisLimNeg = 0;
@@ -4959,9 +4959,9 @@ void loop() {
             J9axisFault = 1;
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
-
-          if (abs(J1stepDif)>180 || abs(J2stepDif)>180 || abs(J3stepDif)>180 || abs(J4stepDif)>180 || abs(J5stepDif)>180 || abs(J6stepDif)>180){
-            Alarm = "Turn Hazard Move Stopped";
+          float turnTolerance = 220; //max degrees that can be moved to avoid hazards
+          if (abs(J4stepDif) > turnTolerance || abs(J5stepDif) > turnTolerance || abs(J6stepDif) > turnTolerance){
+            Alarm = "Turn Hazard: J4:"+ J4stepDif + " J5:" + J5StepDif + " J6:" + J6stepDif;
             Serial.println(Alarm);
             break;
           }
@@ -4977,12 +4977,14 @@ void loop() {
               delay(5);
               Serial.println(Alarm);
             }
+            break;
           } else {
             Alarm = "EL" + String(J1axisFault) + String(J2axisFault) + String(J3axisFault) + String(J4axisFault) + String(J5axisFault) + String(J6axisFault) + String(J7axisFault) + String(J8axisFault) + String(J9axisFault);
             if (splineTrue == false) {
               delay(5);
               Serial.println(Alarm);
             }
+            break;
           }
         }
       }

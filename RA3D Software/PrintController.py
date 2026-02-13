@@ -252,6 +252,7 @@ class PrintController:
         self.currentInstruction += 1 # Increment currentInstruction
         self.root.progressBar["value"] = (self.currentInstruction / len(self.gcodeLines)) * 100 # Update progress bar to match
         self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
+        
         [message,feedRate, extrudeRate] = self.gcodeToTeensy(lineToConvert) # Convert line and updates printPos
         
         #Message Processing
@@ -363,6 +364,9 @@ class PrintController:
         #self.root.armController.moveOrigin()
         while self.root.armController.awaitingMoveResponse and self.flag == None:
             time.sleep(0.1)
+        if self.flag is not None:
+            self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
+            return
         moveOrder = [1,2,3,4,1,3,2,3]
         moveOrder= [x-1 for x in moveOrder]
         for i in moveOrder:
@@ -373,6 +377,9 @@ class PrintController:
             self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters)
             while self.root.armController.awaitingMoveResponse and self.flag == None:
                 self.root.armController.moveUpdate()
+            if self.flag is not None:
+                self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
+                return
             #Move To position
             #End calibration
         self.cornerSweeping = False

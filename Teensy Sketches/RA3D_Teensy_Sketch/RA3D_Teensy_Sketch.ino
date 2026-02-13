@@ -252,7 +252,6 @@ String speedViolation = "0";
 float minSpeedDelay = 200;
 float maxMMperSec = 192;
 float linWayDistSP = 1; //waypoints per distance?
-float linWayDistSP = 1; //waypoints per distance?
 String debug = "";
 String flag = "";
 const int TRACKrotdir = 0;
@@ -2118,7 +2117,6 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     int StepM[numJoints] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
     int stepDif[numJoints] = { J1stepDif, J2stepDif, J3stepDif, J4stepDif, J5stepDif, J6stepDif, J7stepDif, J8stepDif, J9stepDif };
     int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
-    int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
     int axisFault[numJoints] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     // Loop to check axis limits and set faults
@@ -3107,7 +3105,6 @@ void loop() {
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
       int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -3363,7 +3360,6 @@ void loop() {
       int J9dir;
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -4857,7 +4853,6 @@ void loop() {
 
         // calc external axis way pt moves
         int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
-        int J7stepDif = (J7_In) / (wayPts - 1);
         int J7stepDif = (J7_In) / (wayPts - 1);
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
         int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);

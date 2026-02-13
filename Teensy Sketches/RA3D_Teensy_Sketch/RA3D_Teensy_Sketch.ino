@@ -109,7 +109,7 @@ float J3axisLimNeg = 89;
 float J4axisLimPos = 180;
 float J4axisLimNeg = 180;
 float J5axisLimPos = 105;
-float J5axisLimNeg = 105-19;//J5 limit switch is about 19 degrees closer
+float J5axisLimNeg = 105;//This seems way too high, but the arm is moving itself into the wrong position
 float J6axisLimPos = 180;
 float J6axisLimNeg = 180;
 float J7axisLimNeg = 0;
@@ -251,7 +251,6 @@ String Alarm = "0";
 String speedViolation = "0";
 float minSpeedDelay = 200;
 float maxMMperSec = 192;
-float linWayDistSP = 1; //waypoints per distance?
 float linWayDistSP = 1; //waypoints per distance?
 String debug = "";
 String flag = "";
@@ -2118,7 +2117,6 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     int StepM[numJoints] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
     int stepDif[numJoints] = { J1stepDif, J2stepDif, J3stepDif, J4stepDif, J5stepDif, J6stepDif, J7stepDif, J8stepDif, J9stepDif };
     int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
-    int StepLim[numJoints] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
     int axisFault[numJoints] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     // Loop to check axis limits and set faults
@@ -3107,7 +3105,6 @@ void loop() {
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
       int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -3266,9 +3263,9 @@ void loop() {
       J2TargetStep = J2stepCen;
       J3TargetStep = J3stepCen;
       J4TargetStep = J4stepCen;
-      J5TargetStep = J5step90;
+      J5TargetStep = J5stepCen;
       J6TargetStep = J6stepCen;*/
-      driveMotorsJ(J1stepCen, J2stepCen, J3stepCen, J4stepCen, J5step90, J6stepCen, J7stepCen, J8stepCen, J9stepCen, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      driveMotorsJ(J1stepCen, J2stepCen, J3stepCen, J4stepCen, J5stepCen, J6stepCen, J7stepCen, J8stepCen, J9stepCen, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
       sendRobotPos();
       inData = "";  // Clear recieved buffer
     }
@@ -3364,7 +3361,6 @@ void loop() {
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
       int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
-      int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
       int JcalPin[9] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
       int JStep[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -3373,22 +3369,46 @@ void loop() {
       //set master steps to be ajusted by offset
       //may need to inverse the sign for this
       if (J1req == 1) {
-        J1StepM = J1StepM - J1callOffExtraDeg;
+        if (J1CalDir) {
+          J1StepM = J1StepM + J1calOffExtra * J1StepDeg;
+        } else {
+          J1StepM = J1StepM - J1calOffExtra * J1StepDeg;
+        }
       }
       if (J2req == 1) {
-        J2StepM = J2StepM - J2callOffExtraDeg;
+        if (J2CalDir) {
+          J2StepM = J2StepM + J2calOffExtra * J2StepDeg;
+        } else {
+          J2StepM = J2StepM - J2calOffExtra * J2StepDeg;
+        }
       }
       if (J3req == 1) {
-        J3StepM = J3StepM - J3callOffExtraDeg;
+        if (J3CalDir) {
+          J3StepM = J3StepM + J3calOffExtra * J3StepDeg;
+        } else {
+          J3StepM = J3StepM - J3calOffExtra * J3StepDeg;
+        }
       }
       if (J4req == 1) {
-        J4StepM = J4StepM - J4callOffExtraDeg;
+        if (J4CalDir) {
+          J4StepM = J4StepM + J4calOffExtra * J4StepDeg;
+        } else {
+          J4StepM = J4StepM - J4calOffExtra * J4StepDeg;
+        }
       }
       if (J5req == 1) {
-        J5StepM = J5StepM - J5callOffExtraDeg;
+        if (J5CalDir) {
+          J5StepM = J5StepM + J5calOffExtra * J5StepDeg;
+        } else {
+          J5StepM = J5StepM - J5calOffExtra * J5StepDeg;
+        }
       }
       if (J6req == 1) {
-        J6StepM = J6StepM - J6callOffExtraDeg;
+        if (J6CalDir) {
+          J6StepM = J6StepM + J6calOffExtra * J6StepDeg;
+        } else {
+          J6StepM = J6StepM - J6calOffExtra * J6StepDeg;
+        }
       }
       if (J7req == 1) {
         J7StepM = J7StepM - J7callOffExtraDeg;
@@ -3400,60 +3420,42 @@ void loop() {
         J9StepM = J9StepM - J9callOffExtraDeg;
       }
 
-      //Invert Direction
+      //Invert Direction if negative offset
       /// J1 ///
-      if (J1CalDir) {
-        J1dir = 0;
-      } else {
-        J1dir = 1;
+      if (J1callOffExtraDeg < 0) {
+        J1dir = !(J1dir);// ?  0: 1;
       }
       /// J2 ///
-      if (J2CalDir) {
-        J2dir = 0;
-      } else {
-        J2dir = 1;
+      if (J2callOffExtraDeg < 0) {
+        J2dir = !(J2dir);
       }
       /// J3 ///
-      if (J3CalDir) {
-        J3dir = 0;
-      } else {
-        J3dir = 1;
+      if (J3callOffExtraDeg < 0) {
+        J3dir = !(J3dir);
       }
       /// J4 ///
-      if (J4CalDir) {
-        J4dir = 0;
-      } else {
-        J4dir = 1;
+      if (J4callOffExtraDeg < 0) {
+        J4dir = !(J4dir);
       }
       /// J5 ///
-      if (J5CalDir) {
-        J5dir = 0;
-      } else {
-        J5dir = 1;
+      if (J5callOffExtraDeg < 0) {
+        J5dir = !(J5dir);
       }
       /// J6 ///
-      if (J6CalDir) {
-        J6dir = 0;
-      } else {
-        J6dir = 1;
+      if (J6callOffExtraDeg < 0) {
+        J6dir = !(J6dir);
       }
       /// J7 ///
-      if (J7CalDir) {
-        J7dir = 0;
-      } else {
-        J7dir = 1;
+      if (J7callOffExtraDeg < 0) {
+        J7dir = !(J7dir);
       }
       /// J8 ///
-      if (J8CalDir) {
-        J8dir = 0;
-      } else {
-        J8dir = 1;
+      if (J8callOffExtraDeg < 0) {
+        J8dir = !(J8dir);
       }
       /// J9 ///
-      if (J9CalDir) {
-        J9dir = 0;
-      } else {
-        J9dir = 1;
+      if (J9callOffExtraDeg < 0) {
+        J9dir = !(J9dir);
       }
 
       float ACCspd = 10;
@@ -3463,7 +3465,7 @@ void loop() {
       float ACCramp = 50;
       setEncoders();
       //Drive by amount changed
-      driveMotorsJ(J1callOffExtraDeg, J2callOffExtraDeg, J3callOffExtraDeg, J4callOffExtraDeg, J5callOffExtraDeg, J6callOffExtraDeg, J7callOffExtraDeg, J8callOffExtraDeg, J9callOffExtraDeg, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      driveMotorsJ(abs(J1callOffExtraDeg), abs(J2callOffExtraDeg), abs(J3callOffExtraDeg), abs(J4callOffExtraDeg), abs(J5callOffExtraDeg), abs(J6callOffExtraDeg), abs(J7callOffExtraDeg), abs(J8callOffExtraDeg), abs(J9callOffExtraDeg), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
       sendRobotPos();
       inData = "";  // Clear recieved buffer
     }
@@ -4852,7 +4854,6 @@ void loop() {
         // calc external axis way pt moves
         int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
         int J7stepDif = (J7_In) / (wayPts - 1);
-        int J7stepDif = (J7_In) / (wayPts - 1);
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
         int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);
         int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
@@ -4958,9 +4959,9 @@ void loop() {
             J9axisFault = 1;
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
-
-          if (abs(J1stepDif)>180 || abs(J2stepDif)>180 || abs(J3stepDif)>180 || abs(J4stepDif)>180 || abs(J5stepDif)>180 || abs(J6stepDif)>180){
-            Alarm = "Turn Hazard Move Stopped";
+          float turnTolerance = 220; //max degrees that can be moved to avoid hazards
+          if (abs(J4stepDif) > turnTolerance || abs(J5stepDif) > turnTolerance || abs(J6stepDif) > turnTolerance){
+            Alarm = "Turn Hazard: J4:"+ J4stepDif + " J5:" + J5StepDif + " J6:" + J6stepDif;
             Serial.println(Alarm);
             break;
           }
@@ -4976,12 +4977,14 @@ void loop() {
               delay(5);
               Serial.println(Alarm);
             }
+            break;
           } else {
             Alarm = "EL" + String(J1axisFault) + String(J2axisFault) + String(J3axisFault) + String(J4axisFault) + String(J5axisFault) + String(J6axisFault) + String(J7axisFault) + String(J8axisFault) + String(J9axisFault);
             if (splineTrue == false) {
               delay(5);
               Serial.println(Alarm);
             }
+            break;
           }
         }
       }

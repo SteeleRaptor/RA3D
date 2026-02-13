@@ -94,6 +94,8 @@ class SerialController:
             else:
                 time.sleep(0.05)
             self.checkResponseQueue()
+            if not self.responseQueue.empty():
+                print("Response Queue:",list(self.responseQueue.queue))
     def checkResponseQueue(self):
         # Check if there is anything in the response queue
         try:
@@ -106,24 +108,34 @@ class SerialController:
                 self.waitingForResponse = False
         except queue.Empty:
             pass
-    
+    def cleanQueue(self, item):
+        size = int(self.responseQueue.qsize())
+        for i in range(size):
+            if self.responseQueue.queue[i] == item:
+                self.responseQueue.queue.remove(i)
+        print("response queue cleaned")
     #Advances the response queue every 5 seconds
     def sortResponseThread(self):
         while True:
             if self.responseReady:
                 response = self.getLastResponse()
                 self.sortResponse(response)
-            time.sleep(1)
+            time.sleep(.01)
 
     #Function process response because correct response is not guaranteed for a command
     def sortResponse(self, response):
+        # TODO: Add in a message/action for every response and edit teensy to send more information
         self.root.terminalPrint(f"Received Response: {response}")
         if response[:2]== "ER":
             self.root.statusPrint(f"Kinematic Error: {response[2:]}")
-            self.root.terminalPrint(f"Kinematic Error: {response[2:]}")
+            self.root.printController.flag = "Kinematic Error"
+            self.root.armController.awaitingMoveResponse = False
+            #Have to clean queue because the arm sends a thousand ERs for some reason
+            self.cleanQueue("ER")
         elif response[:2] == "EL":
-            self.root.statusPrint(f"Error Axis Fault: {response[2:]}")
-            self.root.terminalPrint(f"Error Axis Fault: {response[2:]}")
+            self.root.statusPrint(f"Error Axis Fault, Out of Reach: {response[2:]}")
+            self.root.printController.flag = "Axis Fault"
+            self.root.armController.awaitingMoveResponse = False
         elif response[:2] == "TL":
             if self.root.armController.testingLimitSwitches:
                 #Limit switch test
@@ -144,15 +156,20 @@ class SerialController:
             self.root.statusPrint(f"Echo: {response[4:]}")
         elif response == "\n":
             pass
-        elif response == "TurnHazardMoveStopped":
+        elif response == "Turn Hazard Move Stopped":
             self.root.statusPrint(f"Encountered Hazard Move Stopped: {response[2:]}")
+            self.root.printController.cancelPrint()
+            self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
+            self.root.printController.flag = "Turn Hazard"
+            self.root.armController.awaitingMoveResponse = False
+            
         elif response[:3] == "POS" and self.root.armController.calibrationInProgress:
             self.root.statusPrint("Position received from arm during calibration")
             self.root.armController.calibrateArmUpdate(response=response)
         elif response[:3] == "POS" and self.root.armController.awaitingMoveResponse:
             self.root.statusPrint("Position received from arm after move command")
             self.root.armController.moveUpdate(response=response)
-        elif response[:3] == "POS" and self.root.armController.awaitingPositionUpdate:
+        elif response[:3] == "POS" and self.root.armController.awaitingPosResponse:
             self.root.statusPrint("Position received from arm after position request")
             self.root.armController.requestPositionUpdate(response=response)
         elif response[:3] == "POS":

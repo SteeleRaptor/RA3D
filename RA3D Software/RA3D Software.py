@@ -7,7 +7,7 @@ from datetime import datetime
 from SerialController import SerialController
 from ArmController import ArmController
 from PrintController import PrintController
-from TemperatureController import TemperatureController
+#from TemperatureController import TemperatureController
 
 class TkWindow(Tk):
     
@@ -32,7 +32,7 @@ class TkWindow(Tk):
         self.serialController = SerialController(self.root)
         self.armController = ArmController(self.root, self.serialController)
         self.printController = PrintController(self.root)
-        self.temperatureController = TemperatureController(self.root)
+        #self.temperatureController = TemperatureController(self.root)
 
 
         # Create and draw widgets onto the window
@@ -692,7 +692,7 @@ class TkWindow(Tk):
             self.printController.printLoop()
 
         # TODO: Temporary
-        self.temperatureController.updateTemp()
+        #self.temperatureController.updateTemp()
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)

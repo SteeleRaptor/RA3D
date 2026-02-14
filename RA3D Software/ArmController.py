@@ -1,12 +1,11 @@
 from asyncio import wait
-import re
 import numpy as np
-import time
-import threading
+import re, time, threading
 from SerialController import SerialController
 from Kinematics import Kinematics
 
 class ArmController:
+    #region init
     def __init__(self, root, serialController):
         # Save references to the main window and the serial controller
         self.root = root
@@ -61,7 +60,9 @@ class ArmController:
         self.awaitingTestResponse = False # Flag for if we are awaiting a response after sending a test command such as for the limit switches or encoders
         self.finishTest = False           # Flag for signifying to the program that the user wants to stop a test
         self.awaitingPosResponse = False  # Flag for requesting current position
+    #endregion init
 
+    #region ========|Calibration|==========
     def startArmCalibration(self):
         # Check if calibration is already in progress and exit if so
         if self.calibrationInProgress is True:
@@ -131,63 +132,9 @@ class ArmController:
                 # Print out the response received
                 self.root.terminalPrint(response)
                 self.root.timeoutStartedCal = False
-                
-    #if no calibrate response
-    def calibrateTimeout(self):
-        timeout = 35
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and (self.calibrationState == 2 or self.calibrationState == 1):
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        #if no longer calibrating, exit function
-        if self.calibrationState == 0 or self.calibrationInProgress == False:
-            return
-        #if response for stage 1 hasn't come back yet
-        if self.calibrationState == 1 or self.calibrationState == 2:
-            # If not, inform user of Stage 1 Failure
-            self.root.statusPrint(f"Stage 1 Calibration FAILED")
-            self.root.terminalPrint("Calibration timed out")
-            # Exit calibration
-            self.calibrationState = 0
-            self.calibrationInProgress = False
-            # Force arm calibration flag to False
-            self.armCalibrated = False
-            return
-        timeout = 35
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and (self.calibrationState == 3 or self.calibrationState == 4):
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        #special case if stage 2 hasn't been sent yet
-        if self.calibrationState == 3:
-            time.sleep(2)
-        #if response for stage 2 hasn't come back yet
-        if self.calibrationState == 4:
-            # If not, inform user of Stage 2 Failure
-            self.root.statusPrint("Stage 2 Calibration FAILED")
-            self.root.terminalPrint("Calibration timed out")
-            # Exit calibration
-            self.calibrationState = 0
-            self.calibrationInProgress = False
-            # Force arm calibration flag to False
-            self.armCalibrated = False
-        self.root.timeoutStartedCal = False
 
-    def startSpecificCalibration(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
-        # Check if calibration is already in progress and exit if so
-        if self.calibrationInProgress is True:
-            self.root.statusPrint("Calibration already in progress")
-            return
-        # Check if arm is busy with something else
-        if self.checkIfBusy() is True:
-            self.root.statusPrint("Arm is busy with something else at the moment")
-            return
-        self.root.statusPrint("Beginning arm calibration")
-        self.calibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
+    def overrideCalibration(self):
+        self.armCalibrated = True
 
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
         self.getCalOffsets() # Update calibration offsets from entry fields
@@ -199,18 +146,6 @@ class ArmController:
             return "E"
         # Tell the serial controller to send the serial
         self.serialController.sendSerial(command)
-
-    def startPostCalibration(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
-        # Check if calibration is already in progress and exit if so
-        if self.calibrationInProgress is True:
-            self.root.statusPrint("Calibration already in progress")
-            return
-        # Check if arm is busy with something else
-        if self.checkIfBusy() is True:
-            self.root.statusPrint("Arm is busy with something else at the moment")
-            return
-        self.root.statusPrint("Beginning post calibration")
-        self.postCalibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
 
     def postCalibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
         self.getPostCalOffsets() # Update calibration offsets from entry fields
@@ -246,6 +181,19 @@ class ArmController:
         self.J6CalOffset = float(self.root.J6OffsetEntryP.get())
         self.root.terminalPrint(f"Post calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
     
+    def getCalOffsets(self):
+        # Grab values from the entry fields, convert to integers, and save
+        self.J1CalOffset = float(self.root.J1OffsetEntry.get())
+        self.J2CalOffset = float(self.root.J2OffsetEntry.get())
+        self.J3CalOffset = float(self.root.J3OffsetEntry.get())
+        self.J4CalOffset = float(self.root.J4OffsetEntry.get())
+        self.J5CalOffset = float(self.root.J5OffsetEntry.get())
+        self.J6CalOffset = float(self.root.J6OffsetEntry.get())
+        self.root.terminalPrint(f"Calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
+    #endregion Calibration
+
+    #region ========|Position|=============
+
     def processPosition(self, response):
         # Collect all the indexes for finding values
         # General formatting of a response: A[val]B[val]C[val]D[val]E[val]F[val]G[val]H[val]I[val]J[val]K[val]L[val]M[val]N[val]O[val]P[val]Q[val]R[val]
@@ -303,21 +251,159 @@ class ArmController:
         self.root.J5CurCoord.config(text=self.curJ5, fg=jointColors[4])
         self.root.J6CurCoord.config(text=self.curJ6, fg=jointColors[5])
         self.updateDeltaFromOrigin()
+    def requestPositionManual(self):
+        # Check if a board is connected
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed to request position update. No board is connected")
+            return
+        # Check if the arm is busy with anything else
+        if self.checkIfBusy() is True:
+            self.root.statusPrint("Failed to request position update. Arm is busy.")
+            return
+        self.root.statusPrint("Requesting position update...")
+        self.serialController.sendSerial("RP\n") # Send instruction
+        self.awaitingPosResponse = True # Set the flag
 
-    def processPositionTimeout(self):
-        timeout = 5
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and self.awaitingPosResponse:
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        if self.awaitingPosResponse is True:
-            self.root.terminalPrint("Position response timed out")
-            self.root.statusPrint("Position response timed out")
+    def requestPositionUpdate(self, response=None):
+        # Return if we aren't awaiting a position response
+        if self.awaitingPosResponse is False:
+            return
+        # Check if the serial controller has a response ready
+        if response is not None:
+            self.root.terminalPrint(response)
+            # Inform user and process the position response
+            self.root.statusPrint("Position request fulfilled")
+            self.processPosition(response)
+            # Reset the awaiting position respone flag
             self.awaitingPosResponse = False
-        self.root.timeoutStartedPos = False
+            self.root.timeoutStartedPos = False
+    #endregion process position
 
+    #region GUI Functions
+    def startPostCalibration(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
+        # Check if calibration is already in progress and exit if so
+        if self.calibrationInProgress is True:
+            self.root.statusPrint("Calibration already in progress")
+            return
+        # Check if arm is busy with something else
+        if self.checkIfBusy() is True:
+            self.root.statusPrint("Arm is busy with something else at the moment")
+            return
+        self.root.statusPrint("Beginning post calibration")
+        self.postCalibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
+
+    def startSpecificCalibration(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
+        # Check if calibration is already in progress and exit if so
+        if self.calibrationInProgress is True:
+            self.root.statusPrint("Calibration already in progress")
+            return
+        # Check if arm is busy with something else
+        if self.checkIfBusy() is True:
+            self.root.statusPrint("Arm is busy with something else at the moment")
+            return
+        self.root.statusPrint("Beginning arm calibration")
+        self.calibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
+
+    #getxyz
+    def populateMJ(self):
+        self.root.xCoordEntry.delete(0, 'end')
+        self.root.yCoordEntry.delete(0, 'end')
+        self.root.zCoordEntry.delete(0, 'end')
+        self.root.RxCoordEntry.delete(0, 'end')
+        self.root.RyCoordEntry.delete(0, 'end')
+        self.root.RzCoordEntry.delete(0, 'end')
+        self.root.xCoordEntry.insert(0,str(self.curPos.x))
+        self.root.yCoordEntry.insert(0,str(self.curPos.y))
+        self.root.zCoordEntry.insert(0,str(self.curPos.z))
+        self.root.RxCoordEntry.insert(0,str(self.curPos.Rx))
+        self.root.RyCoordEntry.insert(0,str(self.curPos.Ry))
+        self.root.RzCoordEntry.insert(0,str(self.curPos.Rz))
+    def populateJoints(self):
+        self.root.J1CoordEntry.delete(0, 'end')
+        self.root.J2CoordEntry.delete(0, 'end')
+        self.root.J3CoordEntry.delete(0, 'end')
+        self.root.J4CoordEntry.delete(0, 'end')
+        self.root.J5CoordEntry.delete(0, 'end')
+        self.root.J6CoordEntry.delete(0, 'end')
+        self.root.J1CoordEntry.insert(0,str(self.curJ1))
+        self.root.J2CoordEntry.insert(0,str(self.curJ2))
+        self.root.J3CoordEntry.insert(0,str(self.curJ3))
+        self.root.J4CoordEntry.insert(0,str(self.curJ4))
+        self.root.J5CoordEntry.insert(0,str(self.curJ5))
+        self.root.J6CoordEntry.insert(0,str(self.curJ6))
+    def prepRJCommand(self):
+        # Read the values from each entry box
+        J1 = self.root.J1CoordEntry.get()
+        J2 = self.root.J2CoordEntry.get()
+        J3 = self.root.J3CoordEntry.get()
+        J4 = self.root.J4CoordEntry.get()
+        J5 = self.root.J5CoordEntry.get()
+        J6 = self.root.J6CoordEntry.get()
+        # Check if any values are blank
+        allValuesNumeric = True
+        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
+
+        if not re.match(pattern, J1):
+            self.root.terminalPrint("J1 is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, J2):
+            self.root.terminalPrint("J2 is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, J3):
+            self.root.terminalPrint("J3 is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, J4):
+            self.root.terminalPrint("J4 is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, J5):
+            self.root.terminalPrint("J5 is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, J6):
+            self.root.terminalPrint("J6 is not a number")
+            allValuesNumeric = False
+        
+        if allValuesNumeric:
+            self.root.terminalPrint("All values numeric, sending RJ command")
+            self.sendRJ(J1, J2, J3, J4, J5, J6, self.defaultMoveParameters)
+        else:
+            self.root.terminalPrint("RJ command not sent due to a value not being a number")
+
+    def prepMLCommand(self):
+        # Read the values from each entry box
+        x  = self.root.xCoordEntry.get()
+        y  = self.root.yCoordEntry.get()
+        z  = self.root.zCoordEntry.get()
+        Rx = self.root.RxCoordEntry.get()
+        Ry = self.root.RyCoordEntry.get()
+        Rz = self.root.RzCoordEntry.get()
+        # Check if any values are blank
+        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
+        allValuesNumeric = True
+        if not re.match(pattern, x):
+            self.root.terminalPrint("X is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, y):
+            self.root.terminalPrint("Y is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, z):
+            self.root.terminalPrint("Z is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, Rx):
+            self.root.terminalPrint("Rx is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, Ry):
+            self.root.terminalPrint("Ry is not a number")
+            allValuesNumeric = False
+        if not re.match(pattern, Rz):
+            self.root.terminalPrint("Rz is not a number")
+            allValuesNumeric = False
+        
+        if allValuesNumeric:
+            self.root.terminalPrint("All values numeric, sending ML command")
+            commandPos = Position(x,y,z,Rx,Ry,Rz,None)
+            self.sendML(commandPos, self.defaultMoveParameters)
+        else:
+            self.root.statusPrint("ML command not sent due to a value not being a number")
     def getJointColors(self,J1,J2,J3,J4,J5,J6):
         if J1 == None:
             return ["#000000"]*6
@@ -386,6 +472,20 @@ class ArmController:
             self.sendMJ(Position(float(x),float(y),float(z),float(Rx),float(Ry),float(Rz),None), self.defaultMoveParameters)
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
+    def setOpenLoop(self):
+        self.defaultMoveParameters.setLoopMode(1)
+        self.root.loopStatus.config(text="Open Loop")
+    def setClosedLoop(self):
+        self.defaultMoveParameters.setLoopMode(0)
+        self.root.loopStatus.config(text="Closed Loop")
+    def reset(self):
+        self.awaitingMoveResponse = False
+        self.serialController.waitingForResponse = False
+        self.calibrationInProgress = False
+        self.awaitingPosResponse = False
+    #endregion GUI
+    
+    #region Move Commands
     def sendMJ(self,commandPos, moveParameters):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
@@ -412,71 +512,6 @@ class ArmController:
         self.awaitingMoveResponse = True # Set the awaiting move response flag
         self.serialController.sendSerial(str(command))
 
-    #getxyz
-    def populateMJ(self):
-        self.root.xCoordEntry.delete(0, 'end')
-        self.root.yCoordEntry.delete(0, 'end')
-        self.root.zCoordEntry.delete(0, 'end')
-        self.root.RxCoordEntry.delete(0, 'end')
-        self.root.RyCoordEntry.delete(0, 'end')
-        self.root.RzCoordEntry.delete(0, 'end')
-        self.root.xCoordEntry.insert(0,str(self.curPos.x))
-        self.root.yCoordEntry.insert(0,str(self.curPos.y))
-        self.root.zCoordEntry.insert(0,str(self.curPos.z))
-        self.root.RxCoordEntry.insert(0,str(self.curPos.Rx))
-        self.root.RyCoordEntry.insert(0,str(self.curPos.Ry))
-        self.root.RzCoordEntry.insert(0,str(self.curPos.Rz))
-    def populateJoints(self):
-        self.root.J1CoordEntry.delete(0, 'end')
-        self.root.J2CoordEntry.delete(0, 'end')
-        self.root.J3CoordEntry.delete(0, 'end')
-        self.root.J4CoordEntry.delete(0, 'end')
-        self.root.J5CoordEntry.delete(0, 'end')
-        self.root.J6CoordEntry.delete(0, 'end')
-        self.root.J1CoordEntry.insert(0,str(self.curJ1))
-        self.root.J2CoordEntry.insert(0,str(self.curJ2))
-        self.root.J3CoordEntry.insert(0,str(self.curJ3))
-        self.root.J4CoordEntry.insert(0,str(self.curJ4))
-        self.root.J5CoordEntry.insert(0,str(self.curJ5))
-        self.root.J6CoordEntry.insert(0,str(self.curJ6))
-
-    def prepMLCommand(self):
-        # Read the values from each entry box
-        x  = self.root.xCoordEntry.get()
-        y  = self.root.yCoordEntry.get()
-        z  = self.root.zCoordEntry.get()
-        Rx = self.root.RxCoordEntry.get()
-        Ry = self.root.RyCoordEntry.get()
-        Rz = self.root.RzCoordEntry.get()
-        # Check if any values are blank
-        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
-        allValuesNumeric = True
-        if not re.match(pattern, x):
-            self.root.terminalPrint("X is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, y):
-            self.root.terminalPrint("Y is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, z):
-            self.root.terminalPrint("Z is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, Rx):
-            self.root.terminalPrint("Rx is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, Ry):
-            self.root.terminalPrint("Ry is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, Rz):
-            self.root.terminalPrint("Rz is not a number")
-            allValuesNumeric = False
-        
-        if allValuesNumeric:
-            self.root.terminalPrint("All values numeric, sending ML command")
-            commandPos = Position(x,y,z,Rx,Ry,Rz,None)
-            self.sendML(commandPos, self.defaultMoveParameters)
-        else:
-            self.root.statusPrint("ML command not sent due to a value not being a number")
-   
     def sendML(self, pos, moveParameters, extruderate=None):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
@@ -501,58 +536,6 @@ class ArmController:
         # Send the serial command
         self.awaitingMoveResponse = True # Set the awaiting move response flag 
         self.serialController.sendSerial(str(command))
-        
-    def reset(self):
-        self.awaitingMoveResponse = False
-        self.serialController.waitingForResponse = False
-        self.calibrationInProgress = False
-        self.awaitingPosResponse = False
- 
-    #custom move linear command that calculates inverse kinematics before sending and uses RJ
-    #This function may not be much different but InverseKinematics is needed for printing
-    def moveLinearCustom(self, X, Y, Z, Rx, Ry, Rz):
-        
-        outgoingJointAngles = self.kinematics.solveInverseKinematics([X, Y, Z, Rx, Ry, Rz])
-        # TODO Configure a way to use driveMotorsL instead driveMotorsJ
-        self.sendRJ(outgoingJointAngles[0], outgoingJointAngles[1], outgoingJointAngles[2], outgoingJointAngles[3], outgoingJointAngles[4], outgoingJointAngles[5])
-    
-    def prepRJCommand(self):
-        # Read the values from each entry box
-        J1 = self.root.J1CoordEntry.get()
-        J2 = self.root.J2CoordEntry.get()
-        J3 = self.root.J3CoordEntry.get()
-        J4 = self.root.J4CoordEntry.get()
-        J5 = self.root.J5CoordEntry.get()
-        J6 = self.root.J6CoordEntry.get()
-        # Check if any values are blank
-        allValuesNumeric = True
-        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
-
-        if not re.match(pattern, J1):
-            self.root.terminalPrint("J1 is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, J2):
-            self.root.terminalPrint("J2 is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, J3):
-            self.root.terminalPrint("J3 is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, J4):
-            self.root.terminalPrint("J4 is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, J5):
-            self.root.terminalPrint("J5 is not a number")
-            allValuesNumeric = False
-        if not re.match(pattern, J6):
-            self.root.terminalPrint("J6 is not a number")
-            allValuesNumeric = False
-        
-        if allValuesNumeric:
-            self.root.terminalPrint("All values numeric, sending RJ command")
-            self.sendRJ(J1, J2, J3, J4, J5, J6, self.defaultMoveParameters)
-        else:
-            self.root.terminalPrint("RJ command not sent due to a value not being a number")
-
     def sendRJ(self, J1, J2, J3, J4, J5, J6, moveParameters):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send MJ command as currently awaiting response from a previous move command")
@@ -596,38 +579,29 @@ class ArmController:
                 self.processPosition(response)
             self.awaitingMoveResponse = False # Reset the flag
             self.root.timeoutStartedMove = False
+    #custom move linear command that calculates inverse kinematics before sending and uses RJ
+    #This function may not be much different but InverseKinematics is needed for printing
+    def moveLinearCustom(self, X, Y, Z, Rx, Ry, Rz):
+        
+        outgoingJointAngles = self.kinematics.solveInverseKinematics([X, Y, Z, Rx, Ry, Rz])
+        # TODO Configure a way to use driveMotorsL instead driveMotorsJ
+        self.sendRJ(outgoingJointAngles[0], outgoingJointAngles[1], outgoingJointAngles[2], outgoingJointAngles[3], outgoingJointAngles[4], outgoingJointAngles[5])
     
-    def moveTimeout(self):
-        timeout = 15
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and self.awaitingMoveResponse:
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        #If awiating move response is still true, then we know we timed out so inform the user
-        if self.awaitingMoveResponse is True:
-            self.root.statusPrint("Move response timed out")
-            self.awaitingMoveResponse = False
-            self.root.timeoutStartedMove = False
-            self.root.printController.flag = "Move Timeout"
+    # Moves the robot to a safe position to be turned off
+    def moveSafe(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed")
             return
-        self.root.timeoutStartedMove = False
-
-    def getCalOffsets(self):
-        # Grab values from the entry fields, convert to integers, and save
-        self.J1CalOffset = float(self.root.J1OffsetEntry.get())
-        self.J2CalOffset = float(self.root.J2OffsetEntry.get())
-        self.J3CalOffset = float(self.root.J3OffsetEntry.get())
-        self.J4CalOffset = float(self.root.J4OffsetEntry.get())
-        self.J5CalOffset = float(self.root.J5OffsetEntry.get())
-        self.J6CalOffset = float(self.root.J6OffsetEntry.get())
-        self.root.terminalPrint(f"Calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
+        self.sendRJ(0, -40, 60, 0, 45, 0, self.defaultMoveParameters)
     
-    # Checks if any of the flags relating to the arm performing a task are True and if so, return True
-    def checkIfBusy(self):
-        return self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingTestResponse or self.awaitingPosResponse
+    def moveHome(self):
+        if self.serialController.boardConnected is False:
+            self.root.statusPrint("Failed")
+            return
+        self.sendRJ(0,0,0,0,0,0, self.defaultMoveParameters)
+    #endregion move commands
     
+    #region ======Testing============
     def toggleLimitTest(self):
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed to start limit switch test. No board is connected")
@@ -691,7 +665,6 @@ class ArmController:
             # Therefore, we forcibly tell the serialController that it isn't waiting for a response
             self.serialController.waitingForResponse = False
 
-
     def encoderTestUpdate(self):
         if self.awaitingTestResponse is False:
             self.serialController.sendSerial("RE\n") # Send instruction
@@ -720,7 +693,9 @@ class ArmController:
                 self.testingEncoders = False # Reset the test flag
                 self.finishTest = False # Reset the finish testing flag
                 self.root.statusPrint("Stopping encoder test")
-
+    #endregion testing
+    
+    #region Jogs
     def startToolJog(self):
         pass
     def stopToolJog(self):
@@ -733,54 +708,18 @@ class ArmController:
         pass
     def offsetTool(self):
         pass
-    # Request position for debugging purposes
-    def requestPositionManual(self):
-        # Check if a board is connected
-        if self.serialController.boardConnected is False:
-            self.root.statusPrint("Failed to request position update. No board is connected")
-            return
-        # Check if the arm is busy with anything else
-        if self.checkIfBusy() is True:
-            self.root.statusPrint("Failed to request position update. Arm is busy.")
-            return
-        self.root.statusPrint("Requesting position update...")
-        self.serialController.sendSerial("RP\n") # Send instruction
-        self.awaitingPosResponse = True # Set the flag
+    #endregion Jogs
 
-    def requestPositionUpdate(self, response=None):
-        # Return if we aren't awaiting a position response
-        if self.awaitingPosResponse is False:
-            return
-        # Check if the serial controller has a response ready
-        if response is not None:
-            self.root.terminalPrint(response)
-            # Inform user and process the position response
-            self.root.statusPrint("Position request fulfilled")
-            self.processPosition(response)
-            # Reset the awaiting position respone flag
-            self.awaitingPosResponse = False
-            self.root.timeoutStartedPos = False
-
-    def setOpenLoop(self):
-        self.defaultMoveParameters.setLoopMode(1)
-        self.root.loopStatus.config(text="Open Loop")
-    def setClosedLoop(self):
-        self.defaultMoveParameters.setLoopMode(0)
-        self.root.loopStatus.config(text="Closed Loop")
-    def overrideCalibration(self):
-        self.armCalibrated = True
-    # Moves the robot to a safe position to be turned off
-    def moveSafe(self):
-        if self.serialController.boardConnected is False:
-            self.root.statusPrint("Failed")
-            return
-        self.sendRJ(0, -40, 60, 0, 45, 0, self.defaultMoveParameters)
-    def moveHome(self):
-        if self.serialController.boardConnected is False:
-            self.root.statusPrint("Failed")
-            return
-        self.sendRJ(0,0,0,0,0,0, self.defaultMoveParameters)
-    #--------Origin-------
+    #region Other Functions
+    def waitForResponse(self):
+        while self.awaitingPosResponse:
+            time.delay(0.05)
+    # Checks if any of the flags relating to the arm performing a task are True and if so, return True
+    def checkIfBusy(self):
+        return self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingTestResponse or self.awaitingPosResponse
+    #endregion other functions
+    #region ========|Origin|==================
+    #TODO Update this function to work with the origin class
     def setOrigin(self):
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed to set origin. No board is connected")
@@ -795,9 +734,7 @@ class ArmController:
         self.root.xCurCoordOrigin.config(text=self.curPos.x)
         self.root.yCurCoordOrigin.config(text=self.curPos.y)
         self.root.zCurCoordOrigin.config(text=self.curPos.z)
-    def waitForResponse(self):
-        while self.awaitingPosResponse:
-            time.delay(0.05)
+    
     def moveOrigin(self):
         if self.origin.checkOriginSet():
             self.sendMJ(Position(self.origin.x,self.origin.y,self.origin.z,0,90,0, None), self.defaultMoveParameters)
@@ -813,9 +750,8 @@ class ArmController:
         self.root.zDeltaOrigin.config(text=deltaZ)
     def moveRecommendedOrigin(self):
         self.sendMJ(self.root.printController.recommendedOrigin, self.defaultMoveParameters)
-    #----------------------------Testing Functions----------------------------------------
-
-    #example if given gcode or some other file and converted
+    #endregion origin
+    #region ========|Test Movements WIP|======
     def lineTest(self):
         uBound = [90,90]
         vBound = [0,90]
@@ -833,19 +769,85 @@ class ArmController:
         pass
     def dynamicgcodeTest(self, gcodeList):
         pass
-    #Convert absolute coordinates to relative based on origin
-    def absoluteToRelative(self, absX, absY, absZ):
-        relX = float(absX) - float(self.originX)
-        relY = float(absY) - float(self.originY)
-        relZ = float(absZ) - float(self.originZ)
-        return relX, relY, relZ
-    def relativeToAbsolute(self, relX, relY, relZ):
-        absX = float(relX) + float(self.originX)
-        absY = float(relY) + float(self.originY)
-        absZ = float(relZ) + float(self.originZ)
-        return absX, absY, absZ
+    #endregion
 
-# --- Other Classes ---
+    #region ========|Timeouts|===============            
+    #if no calibrate response
+    def calibrateTimeout(self):
+        timeout = 35
+        timeInc = 0.1
+        timeElapsed = 0
+        #while timeout is not reached and still waiting for position response, keep waiting
+        while timeElapsed < timeout and (self.calibrationState == 2 or self.calibrationState == 1):
+            time.sleep(timeInc)
+            timeElapsed += timeInc
+        #if no longer calibrating, exit function
+        if self.calibrationState == 0 or self.calibrationInProgress == False:
+            return
+        #if response for stage 1 hasn't come back yet
+        if self.calibrationState == 1 or self.calibrationState == 2:
+            # If not, inform user of Stage 1 Failure
+            self.root.statusPrint(f"Stage 1 Calibration FAILED")
+            self.root.terminalPrint("Calibration timed out")
+            # Exit calibration
+            self.calibrationState = 0
+            self.calibrationInProgress = False
+            # Force arm calibration flag to False
+            self.armCalibrated = False
+            return
+        timeout = 35
+        timeInc = 0.1
+        timeElapsed = 0
+        #while timeout is not reached and still waiting for position response, keep waiting
+        while timeElapsed < timeout and (self.calibrationState == 3 or self.calibrationState == 4):
+            time.sleep(timeInc)
+            timeElapsed += timeInc
+        #special case if stage 2 hasn't been sent yet
+        if self.calibrationState == 3:
+            time.sleep(2)
+        #if response for stage 2 hasn't come back yet
+        if self.calibrationState == 4:
+            # If not, inform user of Stage 2 Failure
+            self.root.statusPrint("Stage 2 Calibration FAILED")
+            self.root.terminalPrint("Calibration timed out")
+            # Exit calibration
+            self.calibrationState = 0
+            self.calibrationInProgress = False
+            # Force arm calibration flag to False
+            self.armCalibrated = False
+        self.root.timeoutStartedCal = False
+    def processPositionTimeout(self):
+        timeout = 5
+        timeInc = 0.1
+        timeElapsed = 0
+        #while timeout is not reached and still waiting for position response, keep waiting
+        while timeElapsed < timeout and self.awaitingPosResponse:
+            time.sleep(timeInc)
+            timeElapsed += timeInc
+        if self.awaitingPosResponse is True:
+            self.root.terminalPrint("Position response timed out")
+            self.root.statusPrint("Position response timed out")
+            self.awaitingPosResponse = False
+        self.root.timeoutStartedPos = False
+    def moveTimeout(self):
+        timeout = 15
+        timeInc = 0.1
+        timeElapsed = 0
+        #while timeout is not reached and still waiting for position response, keep waiting
+        while timeElapsed < timeout and self.awaitingMoveResponse:
+            time.sleep(timeInc)
+            timeElapsed += timeInc
+        #If awiating move response is still true, then we know we timed out so inform the user
+        if self.awaitingMoveResponse is True:
+            self.root.statusPrint("Move response timed out")
+            self.awaitingMoveResponse = False
+            self.root.timeoutStartedMove = False
+            self.root.printController.flag = "Move Timeout"
+            return
+        self.root.timeoutStartedMove = False
+    #endregion Timeouts
+
+#region--- Other Classes ---
 class Position:
     def __init__(self, x, y, z, Rx, Ry, Rz, originObj):
         if x is not None and y is not None and z is not None:
@@ -950,3 +952,4 @@ class MoveCommand:
         elif self.type=="RJ":
             command = f"RJA{self.A}B{self.B}C{self.C}D{self.D}E{self.E}F{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}WNLm{self.moveParameters.loopMode*6}\n"
         return command
+#endregion other classes

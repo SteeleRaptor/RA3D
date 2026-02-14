@@ -10,7 +10,7 @@ from PrintController import PrintController
 from TemperatureController import TemperatureController
 
 class TkWindow(Tk):
-    
+    # region init
     def __init__(self):
         Tk.__init__(self)
         self.root = self
@@ -46,7 +46,8 @@ class TkWindow(Tk):
         self.timeoutStartedCal = False
         self.timeoutStartedMove = False
         self.timeoutStartedPos = False
-
+    #endregion init
+    #region Tabs
     # Creates the interface tabs
     def createTabs(self):
         # Create a notebook to manage the tabs
@@ -634,7 +635,8 @@ class TkWindow(Tk):
         # Temporary text to inform user that there is nothing here yet
         Label(self.settingsTab, text="Nothing to see here at the moment (WIP)").pack(fill="both", expand=True)
         # TODO Add settings for print control speed, acceleration...
-       
+    #endregion Tabs
+    #region main update function
     def update(self):
         self.updateDebugVars() # Update the debug tab variables
 
@@ -696,7 +698,8 @@ class TkWindow(Tk):
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)
-
+    #endregion main update function
+    #region other functions
     def updateDebugVars(self):
         # SerialController vars
         self.serDebugBoardLabel.config(text=f"boardConnected = {self.serialController.boardConnected}")
@@ -720,7 +723,10 @@ class TkWindow(Tk):
         else:
             # If not, enable the connect button
             self.connectButton.config(state="normal")
-
+    def setSettings(self):
+        pass
+    #endregion other functions
+    #region Print Functions
     # Used to print to the in window terminal
     def terminalPrint(self, message):
         print(message) # Print to the Python terminal as well
@@ -738,7 +744,8 @@ class TkWindow(Tk):
         self.terminalPrint(message)
     def warningPrint(self, message):
         messagebox.showinfo("Warning", message)
-
+    #endregion print functions
+    #region popup
     def createPostCalibration(self):
         # Create a new top-level window
         popup = Toplevel(self.root)
@@ -815,10 +822,9 @@ class TkWindow(Tk):
         # Add a button to close the popup
         close_button = Button(popup, text="Close", command=popup.destroy)
         close_button.pack(pady=10)
-        
-    def setSettings(self):
-        pass
-
+    #endregion popup
+    
+#Start the Program
 if __name__ == "__main__":
     app = TkWindow()
     app.mainloop()

@@ -512,18 +512,18 @@ class ArmController:
         self.awaitingMoveResponse = True # Set the awaiting move response flag
         self.serialController.sendSerial(str(command))
 
-    def sendML(self, pos, moveParameters, extruderate=None):
         if self.awaitingMoveResponse:
+    def sendML(self, pos, moveParameters, extrudeRate=None):
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
-            return
+            return'''
         
         self.root.terminalPrint("Sending ML command...")
         # Taken from AR4.py, line XXXX
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         # Create the command
         
-        command = MoveCommand("ML",pos, moveParameters, J7=extruderate)
-        self.root.terminalPrint(str(command)[0:-2])
+        command = MoveCommand("ML",pos, moveParameters, J7=extrudeRate)
+        #self.root.terminalPrint(str(command)[0:-2])
         # Check if board is not connected or arm is not calibrated
         if self.serialController.boardConnected is False:
             # Inform user in terminal then quit function to avoid sending instruction
@@ -590,13 +590,13 @@ class ArmController:
     # Moves the robot to a safe position to be turned off
     def moveSafe(self):
         if self.serialController.boardConnected is False:
-            self.root.statusPrint("Failed")
+            self.root.statusPrint("Failed to move to safe positiion")
             return
         self.sendRJ(0, -40, 60, 0, 45, 0, self.defaultMoveParameters)
     
     def moveHome(self):
         if self.serialController.boardConnected is False:
-            self.root.statusPrint("Failed")
+            self.root.statusPrint("Failed to move home")
             return
         self.sendRJ(0,0,0,0,0,0, self.defaultMoveParameters)
     #endregion move commands
@@ -925,7 +925,7 @@ class MoveParameters:
 class MoveCommand:
     def __init__(self,type,jointsOrPosition, moveParameters, J7=0):
         self.jointsOrPosition = jointsOrPosition
-        if isinstance(jointsOrPosition, Position,):
+        if isinstance(jointsOrPosition, Position):
             self.A = jointsOrPosition.x
             self.B = jointsOrPosition.y
             self.C = jointsOrPosition.z
@@ -939,10 +939,13 @@ class MoveCommand:
             self.D = jointsOrPosition[3]
             self.E = jointsOrPosition[4]
             self.F = jointsOrPosition[5]
-        self.J7 = J7
+        if J7 != None:
+            self.J7 = J7
+        else:
+            self.J7 = 0
         self.moveParameters = moveParameters
         self.type = type
-        print("type is: ",self.type, type)
+        #debugging print("type is: ",self.type, type)
     def __str__(self):
         command = "Error"
         if self.type=="ML":

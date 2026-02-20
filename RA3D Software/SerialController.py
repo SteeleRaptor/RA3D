@@ -140,6 +140,7 @@ class SerialController:
         elif response[:2] == "TL":
             if self.root.armController.testingLimitSwitches:
                 #Limit switch test
+                self.root.terminalPrint(f"Received TL Response: {response}")
                 self.armController.limitTestUpdate(response=response)
             else:
                 self.root.terminalPrint(f"Received Unexpected Response: {response}")

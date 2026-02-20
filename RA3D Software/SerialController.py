@@ -123,6 +123,7 @@ class SerialController:
             time.sleep(.01)
 
     #Function process response because correct response is not guaranteed for a command
+    #reponse must be passed back to some functions because the response is out of the queue
     def sortResponse(self, response):
         # TODO: Add in a message/action for every response and edit teensy to send more information
         self.root.terminalPrint(f"Received Response: {response}")
@@ -139,7 +140,7 @@ class SerialController:
         elif response[:2] == "TL":
             if self.root.armController.testingLimitSwitches:
                 #Limit switch test
-                self.armController.limitTestUpdate()
+                self.armController.limitTestUpdate(response=response)
             else:
                 self.root.terminalPrint(f"Received Unexpected Response: {response}")
         elif response[:2] == "RE":

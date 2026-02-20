@@ -683,6 +683,10 @@ class TkWindow(Tk):
                 response = self.serialController.getLastResponse()
                 self.serialController.sortResponse(response)
                 #sort serial
+            #if response is not ready update limittest so that it sends a signal
+            else:
+                self.armController.limitTestUpdate()
+                
         if self.armController.testingEncoders:
             if self.serialController.responseReady:
                 response = self.serialController.getResponse()

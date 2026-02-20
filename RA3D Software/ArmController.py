@@ -512,11 +512,10 @@ class ArmController:
         self.awaitingMoveResponse = True # Set the awaiting move response flag
         self.serialController.sendSerial(str(command))
 
-        if self.awaitingMoveResponse:
     def sendML(self, pos, moveParameters, extrudeRate=None):
+        if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
-            return'''
-        
+            return
         self.root.terminalPrint("Sending ML command...")
         # Taken from AR4.py, line XXXX
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"

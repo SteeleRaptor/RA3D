@@ -64,7 +64,7 @@ class PrintController:
         if self.flag != None:
             self.root.statusPrint(f"Print paused due to error: {self.flag}")
             self.pausePrint()
-            return'''
+            return
         message = "comment"
         #G code lines will skip past comments
         while message == "comment":
@@ -182,6 +182,7 @@ class PrintController:
             else:
                 #self.pausePrint()
                 return ["Error",0,0]
+    
         # TODO: Additional processing for F to control speed or something
         # Note that F is in units per minute (per LinuxCNC specifications)
         # https://linuxcnc.org/docs/html/gcode/machining-center.html#sub:feed-rate
@@ -329,9 +330,9 @@ class PrintController:
         if self.printing == True:
             self.root.statusPrint("Cannot start bed calibration while printing")
             return
-        '''if self.origin.originSet == False or self.origin == None:
+        if self.origin.originSet == False or self.origin == None:
             self.root.statusPrint("Origin not set, cannot begin leveling")
-            return'''
+            return
         if self.cornerSweeping == True:
             self.root.statusPrint("Cannot start bed calibration while corner sweeping")
             return

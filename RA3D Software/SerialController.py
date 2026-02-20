@@ -124,60 +124,60 @@ class SerialController:
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
-    def sortResponse(self, response):
+    def sortResponse(self, sortResponse):
         # TODO: Add in a message/action for every response and edit teensy to send more information
-        self.root.terminalPrint(f"Received Response: {response}")
-        if response[:2]== "ER":
-            self.root.statusPrint(f"Kinematic Error: {response[2:]}")
+        self.root.terminalPrint(f"Received Response: {sortResponse}")
+        if sortResponse[:2]== "ER":
+            self.root.statusPrint(f"Kinematic Error: {sortResponse[2:]}")
             self.root.printController.flag = "Kinematic Error"
             self.root.armController.awaitingMoveResponse = False
             #Have to clean queue because the arm sends a thousand ERs for some reason
             self.cleanQueue("ER")
-        elif response[:2] == "EL":
-            self.root.statusPrint(f"Error Axis Fault, Out of Reach: {response[2:]}")
+        elif sortResponse[:2] == "EL":
+            self.root.statusPrint(f"Error Axis Fault, Out of Reach: {sortResponse[2:]}")
             self.root.printController.flag = "Axis Fault"
             self.root.armController.awaitingMoveResponse = False
-        elif response[:2] == "TL":
+        elif sortResponse[:2] == "TL":
             if self.root.armController.testingLimitSwitches:
                 #Limit switch test
-                self.root.terminalPrint(f"Received TL Response: {response}")
-                self.armController.limitTestUpdate(response=response)
+                self.root.terminalPrint(f"Received TL Response: {sortResponse}")
+                self.armController.limitTestUpdate(response=sortResponse)
             else:
-                self.root.terminalPrint(f"Received Unexpected Response: {response}")
-        elif response[:2] == "RE":
+                self.root.terminalPrint(f"Received Unexpected Response: {sortResponse}")
+        elif sortResponse[:2] == "RE":
             #read encoders
             pass
-        elif response[:4] == "Done":
+        elif sortResponse[:4] == "Done":
             #Home position finished
             #Command set output on/off finished
             #send position to arm
             pass
-        elif response[:6] == "WTDone":
+        elif sortResponse[:6] == "WTDone":
             self.root.statusPrint("Wait command finished")
-        elif response[:4] == "echo":
-            self.root.statusPrint(f"Echo: {response[4:]}")
-        elif response == "\n":
+        elif sortResponse[:4] == "echo":
+            self.root.statusPrint(f"Echo: {sortResponse[4:]}")
+        elif sortResponse == "\n":
             pass
-        elif response == "Turn Hazard Move Stopped":
-            self.root.statusPrint(f"Encountered Hazard Move Stopped: {response[2:]}")
+        elif sortResponse == "Turn Hazard Move Stopped":
+            self.root.statusPrint(f"Encountered Hazard Move Stopped: {sortResponse[2:]}")
             self.root.printController.cancelPrint()
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             self.root.printController.flag = "Turn Hazard"
             self.root.armController.awaitingMoveResponse = False
             
-        elif response[:3] == "POS" and self.root.armController.calibrationInProgress:
+        elif sortResponse[:3] == "POS" and self.root.armController.calibrationInProgress:
             self.root.statusPrint("Position received from arm during calibration")
-            self.root.armController.calibrateArmUpdate(response=response)
-        elif response[:3] == "POS" and self.root.armController.awaitingMoveResponse:
+            self.root.armController.calibrateArmUpdate(response=sortResponse)
+        elif sortResponse[:3] == "POS" and self.root.armController.awaitingMoveResponse:
             self.root.statusPrint("Position received from arm after move command")
-            self.root.armController.moveUpdate(response=response)
-        elif response[:3] == "POS" and self.root.armController.awaitingPosResponse:
+            self.root.armController.moveUpdate(response=sortResponse)
+        elif sortResponse[:3] == "POS" and self.root.armController.awaitingPosResponse:
             self.root.statusPrint("Position received from arm after position request")
-            self.root.armController.requestPositionUpdate(response=response)
-        elif response[:3] == "POS":
-            self.root.armController.processPosition(response)
+            self.root.armController.requestPositionUpdate(response=sortResponse)
+        elif sortResponse[:3] == "POS":
+            self.root.armController.processPosition(sortResponse)
         else:
-            self.root.statusPrint(f"Received Unrecognized Response: {response}")
+            self.root.statusPrint(f"Received Unrecognized Response: {sortResponse}")
     
     # Returns the last response received
     def getLastResponse(self):

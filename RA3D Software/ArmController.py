@@ -618,6 +618,7 @@ class ArmController:
             self.root.statusPrint("Starting limit switch test")
 
     def limitTestUpdate(self,response=None):
+        self.root.terminalPrint("response in limitTestUpdate is "+response)
         if self.awaitingTestResponse is False:
             self.serialController.sendSerial("TL\n") # Send instruction
             self.awaitingTestResponse = True # Set the flag

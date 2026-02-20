@@ -625,7 +625,7 @@ class ArmController:
         # Check if serial controller has a response ready
         if response is not None:
             # If so, read it in
-            self.root.terminalPrint(response)
+            self.root.terminalPrint("testing limit switch "+response)
             # Limit switch test will never return an error so we can always directly process
             self.root.J1LimState.config(text=response[response.find('J1')+5:response.find("   J2")].strip())
             self.root.J2LimState.config(text=response[response.find('J2')+5:response.find("   J3")].strip())

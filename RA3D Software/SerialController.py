@@ -17,10 +17,9 @@ class SerialController:
         self.baud = 9600
         self.board = None
         self.boardConnected = False
-
+        self.running = False#To keep thread running only while connceted
         # Threading Variables
         self.serialThread = None
-        self.waitingForResponse = False # Used as a flag to signify if we are already awaiting a response
         self.responseQueue = queue.Queue()
         self.responseReady = False # Used as a flag to check if a response is ready to be read
         self.lastResponse = None # Stores whatever the last response was from serial until requested
@@ -58,92 +57,120 @@ class SerialController:
             # then connecting again doesn't throw error even though it 
             # doesn't actually connect to the port and essentially bricks 
             # the program from connecting to another port until restarted
+
             tempBoard = serial.Serial(self.port, self.baud)
             self.root.statusPrint(f"Port {port} opened successfully")
             self.board = tempBoard
             self.board.reset_output_buffer()
             self.board.reset_input_buffer()
+
+            time.sleep(2)  # allow Arduino auto-reset
             self.boardConnected = True
             self.responseQueue = queue.Queue()
+
             self.serialThread = threading.Thread(target=self.serialReader, daemon=True)
-            self.sortThread = threading.Thread(target=self.sortResponseThread, daemon=True)
+            #self.sortThread = threading.Thread(target=self.sortResponseThread, daemon=True)
+            self.running = True #Keeps threads running, must be true before starting serialthread
             self.serialThread.start()
-            self.sortThread.start()
+            #self.sortThread.start()
+            self.processResponses() #start sorting resposnes
+            
             
         except SerialException:
             self.root.statusPrint(f"Failed to open port: {port}")
 
     def disconnectPort(self):
         if self.boardConnected == True:
+            self.running = False
+            time.sleep(0.1)  # let threads exit cleanly
+
             self.sendSerial("CL")
+            try:
+                self.board.reset_input_buffer()
+                self.board.reset_output_buffer()
+                self.board.close()
+            except:
+                pass
             self.boardConnected = False
-            self.board.reset_output_buffer()
-            self.board.reset_input_buffer()
-            self.board.close()
+            
 
     # Repeatedly checks the serial port for new responses
     def serialReader(self):
-        while True:
+        while True:#self.running:
             # Check if a board is connected
-            if self.boardConnected is True:
-                # If there are any bytes of data waiting...
-                if self.board.in_waiting > 0:
-                    # Read them in and store them in the response queue
-                    data = str(self.board.readline().decode('utf-8').strip())
-                    self.responseQueue.put(data)
+            #print("serial thread running")
+            if self.boardConnected:
+                try:
+                   # If there are any bytes of data waiting...
+                    if self.board.in_waiting > 0:
+                        # Read them in and store them in the response queue
+                        # errors ignore prevents decode crashes from partial UTF-8 bytes.D
+                        data = self.board.readline().decode('utf-8', errors='ignore').strip()
+                        #if data
+                        if data:
+                            self.responseQueue.put(data)
+                except:
+                    pass
             else:
                 time.sleep(0.05)
-            self.checkResponseQueue()
+            #self.checkResponseQueue()
+            #Debugging
             if not self.responseQueue.empty():
-                print("Response Queue:",list(self.responseQueue.queue))
-    def checkResponseQueue(self):
-        # Check if there is anything in the response queue
-        try:
-            if self.boardConnected:
-                if self.lastResponse is None:
-                    #trying to implement this as a queue that holds multiple responses
-                    self.lastResponse = self.responseQueue.get_nowait()
-                self.responseReady = True
-                #if an exception is not raised, then a response has been read in
-                self.waitingForResponse = False
-        except queue.Empty:
-            pass
+                #print("Response Queue:",list(self.responseQueue.queue))
+                pass
+
     def cleanQueue(self, item):
         size = int(self.responseQueue.qsize())
         for i in range(size):
             if self.responseQueue.queue[i] == item:
                 self.responseQueue.queue.remove(i)
         print("response queue cleaned")
-    #Advances the response queue every 5 seconds
-    def sortResponseThread(self):
-        while True:
-            if self.responseReady:
-                response = self.getLastResponse()
-                self.sortResponse(response)
-            time.sleep(.01)
+
+    #Advances the response queue every .01 seconds    
+    def processResponses(self):
+        while not self.responseQueue.empty() and not self.waiting:
+            response = self.responseQueue.get()
+            self.sortResponse(response)
+        #exit this thread if serial is not connected
+        if not self.running:
+            return
+        #print("processing responses")
+        self.root.after(100, self.processResponses)
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
     def sortResponse(self, sortResponse):
+        #shorthand for ease
+        PC = self.root.printController
+        AC = self.root.armController
+        R = self.root
+        flag = None
         # TODO: Add in a message/action for every response and edit teensy to send more information
-        self.root.terminalPrint(f"Received Response: {sortResponse}")
+        # TODO I will change this so that only unexpected responses or errors are processed here
+        
+        #self.root.terminalPrint(f"Received Response: {sortResponse}")
+        self.root.terminalPrint("Sorting response...")
+        if sortResponse[:5]== "Estop":
+            PC.printing = False
+            flag = "Estop"
+            R.warningPrint("Estop pushed, stopping print")
         if sortResponse[:2]== "ER":
-            self.root.statusPrint(f"Kinematic Error: {sortResponse[2:]}")
-            self.root.printController.flag = "Kinematic Error"
-            self.root.armController.awaitingMoveResponse = False
+            R.statusPrint(f"Kinematic Error: {sortResponse[2:]}")
+            flag = "Kinematic Error"
+            AC.awaitingMoveResponse = False
             #Have to clean queue because the arm sends a thousand ERs for some reason
             self.cleanQueue("ER")
         elif sortResponse[:2] == "EL":
-            self.root.statusPrint(f"Error Axis Fault, Out of Reach: {sortResponse[2:]}")
-            self.root.printController.flag = "Axis Fault"
-            self.root.armController.awaitingMoveResponse = False
+            R.statusPrint(f"Error Axis Fault, Out of Reach: {sortResponse[2:]}")
+            flag = "Axis Fault"
+            AC.awaitingMoveResponse = False
         elif sortResponse[:2] == "TL":
-            if self.root.armController.testingLimitSwitches:
+            if AC.testingLimitSwitches:
                 #Limit switch test
-                self.root.terminalPrint(f"Received TL Response: {sortResponse}")
-                self.armController.limitTestUpdate(response=sortResponse)
+                R.terminalPrint(f"Received TL Response: {sortResponse}")
+                AC.limitTestUpdate(response=sortResponse)
             else:
-                self.root.terminalPrint(f"Received Unexpected Response: {sortResponse}")
+                R.terminalPrint(f"Received Unexpected Response: {sortResponse}")
         elif sortResponse[:2] == "RE":
             #read encoders
             pass
@@ -153,58 +180,72 @@ class SerialController:
             #send position to arm
             pass
         elif sortResponse[:6] == "WTDone":
-            self.root.statusPrint("Wait command finished")
+            R.statusPrint("Wait command finished")
         elif sortResponse[:4] == "echo":
-            self.root.statusPrint(f"Echo: {sortResponse[4:]}")
+            R.statusPrint(f"Echo: {sortResponse[4:]}")
         elif sortResponse == "\n":
             pass
         elif sortResponse == "Turn Hazard Move Stopped":
             self.root.statusPrint(f"Encountered Hazard Move Stopped: {sortResponse[2:]}")
-            self.root.printController.cancelPrint()
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
-            self.root.printController.flag = "Turn Hazard"
-            self.root.armController.awaitingMoveResponse = False
-            
-        elif sortResponse[:3] == "POS" and self.root.armController.calibrationInProgress:
+            #flag = "Turn Hazard"
+            AC.awaitingMoveResponse = False
+        elif sortResponse[:3] == "POS" and AC.calibrationInProgress:
             self.root.statusPrint("Position received from arm during calibration")
-            self.root.armController.calibrateArmUpdate(response=sortResponse)
-        elif sortResponse[:3] == "POS" and self.root.armController.awaitingMoveResponse:
+            AC.calibrateArmUpdate(response=sortResponse)
+        elif sortResponse[:3] == "POS" and AC.awaitingMoveResponse:
             self.root.statusPrint("Position received from arm after move command")
-            self.root.armController.moveUpdate(response=sortResponse)
-        elif sortResponse[:3] == "POS" and self.root.armController.awaitingPosResponse:
+            #AC.moveUpdate(response=sortResponse)
+        elif sortResponse[:3] == "POS" and AC.awaitingPosResponse:
             self.root.statusPrint("Position received from arm after position request")
-            self.root.armController.requestPositionUpdate(response=sortResponse)
+            AC.requestPositionUpdate(response=sortResponse)
         elif sortResponse[:3] == "POS":
-            self.root.armController.processPosition(sortResponse)
+            AC.processPosition(sortResponse)
         else:
-            self.root.statusPrint(f"Received Unrecognized Response: {sortResponse}")
+            R.statusPrint(f"Received Unrecognized Response: {sortResponse}")
+        if flag is not None:
+            PC.flag = flag
     
-    # Returns the last response received
-    def getLastResponse(self):
-        response = self.lastResponse
-        self.responseReady = False
-        self.lastResponse = None
-        return response
-        
+    
+    def getNextResponse(self):
+        try:
+            return self.responseQueue.get_nowait()
+        except queue.Empty:
+            return None
+    
+    #There are 2 ways responses are porcessed, they are processes at an interval by processResponse or waited for
+    #Then the response is sorted and
+    #wait for a specific response but timeout if not recieved, standard timeout is 2 seconds
+    def waitForResponse(self, prefix, timeout=2):
+        start = time.time()
+        self.waiting = True #so response is not taken from processReponses
+        while time.time() - start < timeout:
+            try:
+                response = self.responseQueue.get(timeout=0.1)
+                if response.startswith(prefix):
+                    #self.root.terminalPrint("response processed after waiting")
+                    self.waiting = False
+                    return response
+            except queue.Empty:
+                pass
+        self.waiting = False
+        return None
+    
     # Sends a string over serial to the connected port
     def sendSerial(self, command):
         # Check if a board is connected
         if self.boardConnected == False:
             self.root.statusPrint("Failed to send command: No board connected")
             return
-        # If a board is connected, check if we are already waiting for a serial response
-        if self.waitingForResponse:
-            self.root.statusPrint("Failed to send command. Currently awaiting serial response")
-            return
-        self.board.reset_input_buffer()
+        #self.board.reset_input_buffer()
         # If we aren't awaiting for a serial response, then send the command
-        self.root.statusPrint(f"Sending Command: {command}")
+        #self.root.statusPrint(f"Sending Command: {command}")
         self.board.write(command.encode())
-        self.root.terminalPrint("Command sent")
+        #self.root.terminalPrint("Command sent")
         # Reset the input buffer
-        self.board.reset_input_buffer()
-        self.waitingForResponse = True # Note that it is always assume that there will be a response to be read back in
-
+        #self.board.reset_input_buffer()
+    # stop waiting for response if something timedout
+  
     def refreshCOMPorts(self):
         self.root.portList = self.getCOMPorts() # Create options list from found COM ports
         self.root.portSelection.set("Select Port")

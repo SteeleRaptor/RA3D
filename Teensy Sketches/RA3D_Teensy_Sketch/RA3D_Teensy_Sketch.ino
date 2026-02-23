@@ -2269,6 +2269,8 @@ void shiftCMDarray() {
 void EstopProg() {
   estopActive = true;
   flag = "EB";
+  Serial.println("Estop")
+  delay(5) //Give some time so that the estop function is received 
   sendRobotPos();
 }
 

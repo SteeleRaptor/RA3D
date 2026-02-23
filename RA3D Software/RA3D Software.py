@@ -46,6 +46,7 @@ class TkWindow(Tk):
         self.timeoutStartedCal = False
         self.timeoutStartedMove = False
         self.timeoutStartedPos = False
+        self.printThreadStarted = False
     #endregion init
     #region Tabs
     # Creates the interface tabs
@@ -163,13 +164,13 @@ class TkWindow(Tk):
         self.bedCalibrationFrame.grid(row=0, column=2, padx=5, pady=5, sticky=W+E+N+S)
         self.bedCalibrationLabel = Label(self.bedCalibrationFrame, text= "Bed Leveling")
         self.bedCalibrationLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        self.startLevel = Button(self.bedCalibrationFrame, text="Start Level", width=10, command=self.printController.startPrintBedCalibration)
+        self.startLevel = Button(self.bedCalibrationFrame, text="Start Level", width=12, command=self.printController.startPrintBedCalibration)
         self.startLevel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        self.nextLevel = Button(self.bedCalibrationFrame, text= "Next Corner", width=10, command=self.printController.nextBedCalibration)
+        self.nextLevel = Button(self.bedCalibrationFrame, text= "Next Corner", width=12, command=self.printController.nextBedCalibration)
         self.nextLevel.grid(row=1, column=1, padx=5, pady=5, sticky=W)
-        self.sweepCorners = Button(self.bedCalibrationFrame, text= "Sweep Corners", width=10, command=self.printController.startCornerSweep)
+        self.sweepCorners = Button(self.bedCalibrationFrame, text= "Sweep Corners", width=12, command=self.printController.startCornerSweep)
         self.sweepCorners.grid(row=2, column=0, padx=5, pady=5, sticky=W)
-        self.sweepCornersFull = Button(self.bedCalibrationFrame, text= "Full Corner Sweep", width=10, command=self.printController.startFullCornerSweep)
+        self.sweepCornersFull = Button(self.bedCalibrationFrame, text= "Full Corner Sweep", width=15, command=self.printController.startFullCornerSweep)
         self.sweepCornersFull.grid(row=3, column=0, padx=5, pady=5, sticky=W)
         self.cornerLabel = Label(self.bedCalibrationFrame, text="Current corner: N/A")
         self.cornerLabel.grid(row=2, column=1, padx=5, pady=5, sticky=W)
@@ -497,9 +498,9 @@ class TkWindow(Tk):
         self.J6CoordLabel.grid(row=2, column=4, padx=(5, 0), pady=5)
         self.J6CoordEntry.grid(row=2, column=5, padx=(0, 5), pady=5)
         #Move to safe position button
-        self.moveToSafeButton = Button(self.moveFrame, text="Move to Safe Position", command=self.armController.moveSafe, width=20)
+        self.moveToSafeButton = Button(self.moveFrame, text="Move to Safe Position", command=self.armController.prepMoveSafe, width=20)
         self.moveToSafeButton.grid(row=6, column=0, columnspan=6, padx=5, pady=5)
-        self.moveToHomeButton = Button(self.moveFrame, text="Move to Home Position", command=self.armController.moveHome, width=20)
+        self.moveToHomeButton = Button(self.moveFrame, text="Move to Home Position", command=self.armController.prepMoveHome, width=20)
         self.moveToHomeButton.grid(row=7, column=0, columnspan=6, padx=5, pady=5)
         # ==========| Loop Frame |==========
         self.loopFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
@@ -582,12 +583,10 @@ class TkWindow(Tk):
         # boardConnected
         self.serDebugBoardLabel = Label(self.serDebugFrame, text="boardConnected = ")
         self.serDebugBoardLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        # waitingForResponse
-        self.serDebugWaitLabel = Label(self.serDebugFrame, text="waitingForResponse = ")
-        self.serDebugWaitLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W)
         # responseReady
         self.serDebugRespLabel = Label(self.serDebugFrame, text="responseReady = ")
         self.serDebugRespLabel.grid(row=3, column=0, padx=5, pady=5, sticky=W)
+        #TODO add more debug variables
 
         # ===| ArmController Variables |===
         self.armDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000")
@@ -653,39 +652,28 @@ class TkWindow(Tk):
                 self.timeoutStartedCal=True
                 calibrationTimeout = threading.Thread(target=self.armController.calibrateTimeout)
                 calibrationTimeout.start()
-            if self.serialController.responseReady: 
-                response = self.serialController.getLastResponse()
-                self.serialController.sortResponse(response)
+                response = self.serialController.getNextResponse()
+                if response:
+                    self.serialController.sortResponse(response)
             else:
                 self.armController.calibrateArmUpdate()
             #sort serial
+
         if self.armController.awaitingMoveResponse:
             if self.timeoutStartedMove==False:
                 self.timeoutStartedMove=True
                 moveTimeout = threading.Thread(target=self.armController.moveTimeout)
                 moveTimeout.start()
-            if self.serialController.responseReady: 
-                response = self.serialController.getLastResponse()
+
+            response = self.serialController.getNextResponse()
+            if response:
                 self.serialController.sortResponse(response)
             #self.armController.moveUpdate()
             #sort serial
 
-        if self.armController.awaitingPosResponse:
-            if self.timeoutStartedPos==False:
-                self.timeoutStartedPos=True
-                positionTimeout = threading.Thread(target=self.armController.processPositionTimeout)
-                positionTimeout.start()
-            if self.serialController.responseReady:
-                response = self.serialController.getLastResponse()
-                self.serialController.sortResponse(response)
-        if self.armController.testingLimitSwitches:
-            if self.serialController.responseReady:
-                response = self.serialController.getLastResponse()
-                self.serialController.sortResponse(response)
-                #sort serial
-            #if response is not ready update limittest so that it sends a signal
-            self.armController.limitTestUpdate()
-
+        
+                
+        #TODO turn whole process into a thread
         if self.armController.testingEncoders:
             if self.serialController.responseReady:
                 response = self.serialController.getResponse()
@@ -693,20 +681,25 @@ class TkWindow(Tk):
                 #sort serial
         
         # ==========| PrintController |==========
-        if self.printController.printing:
-            self.printController.printLoop()
+
+        #TODO make print loop a thread so that the user can still use the software if the print is waiting
+        if self.printController.printing and not self.printThreadStarted:
+            printThread = threading.Thread(target=self.printController.printLoop)
+            printThread.start()
+            self.printThreadStarted = True
+        
 
         # TODO: Temporary
         #self.temperatureController.updateTemp()
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)
+
     #endregion main update function
     #region other functions
     def updateDebugVars(self):
         # SerialController vars
         self.serDebugBoardLabel.config(text=f"boardConnected = {self.serialController.boardConnected}")
-        self.serDebugWaitLabel.config(text=f"waitingForResponse = {self.serialController.waitingForResponse}")
         self.serDebugRespLabel.config(text=f"responseReady = {self.serialController.responseReady}")
 
         # ArmController vars
@@ -746,7 +739,8 @@ class TkWindow(Tk):
         # Also print the full message to the terminal
         self.terminalPrint(message)
     def warningPrint(self, message):
-        messagebox.showinfo("Warning", message)
+        messagebox.showinfo("Warning! ", message)
+        self.statusPrint(message)
     #endregion print functions
     #region popup
     def createPostCalibration(self):

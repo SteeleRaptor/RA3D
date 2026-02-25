@@ -43,10 +43,14 @@ class TkWindow(Tk):
         updateThread = threading.Thread(target=self.update)
         updateThread.start()
         
+        #TODO remove these eventually
         self.timeoutStartedCal = False
         self.timeoutStartedMove = False
-        self.timeoutStartedPos = False
+    
         self.printThreadStarted = False
+
+        
+
     #endregion init
     #region Tabs
     # Creates the interface tabs

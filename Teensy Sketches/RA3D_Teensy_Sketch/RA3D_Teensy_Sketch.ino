@@ -108,7 +108,7 @@ float J3axisLimPos = 52;
 float J3axisLimNeg = 89;
 float J4axisLimPos = 180;
 float J4axisLimNeg = 180;
-float J5axisLimPos = 105;
+float J5axisLimPos = 100;//changed from 105 to 100 because it is shorter
 float J5axisLimNeg = 105;//This seems way too high, but the arm is moving itself into the wrong position
 float J6axisLimPos = 180;
 float J6axisLimNeg = 180;
@@ -2182,27 +2182,39 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
 //READ DATA
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+//process serial without delays
 void processSerial() {
-  if (Serial.available() > 0 and cmdBuffer3 == "") {
-    char recieved = Serial.read();
-    recData += recieved;
-    // Process message when new line character is recieved
-    if (recieved == '\n') {
-      //place data in last position
-      cmdBuffer3 = recData;
-      //determine if move command
+
+  // Read all available serial data (non-blocking)
+  while (Serial.available() > 0) {
+
+    char received = Serial.read();
+    recData += received;
+
+    // Process full command on newline
+    if (received == '\n') {
+
       recData.trim();
       String procCMDtype = recData.substring(0, 2);
+
+      // Store into primary buffer if empty
+      if (cmdBuffer3 == "") {
+        cmdBuffer3 = recData;
+      }
+
+      // ---- Handle SS command ----
       if (procCMDtype == "SS") {
         splineTrue = false;
         splineEndReceived = true;
       }
+
+      // ---- Handle spline logic ----
       if (splineTrue == true) {
+
         if (moveSequence == "") {
           moveSequence = "firsMoveActive";
         }
-        //close serial so next command can be read in
+
         if (Alarm == "0") {
           sendRobotPosSpline();
         } else {
@@ -2211,41 +2223,24 @@ void processSerial() {
         }
       }
 
-      recData = "";  // Clear recieved buffer
-
+      // Shift command buffers
       shiftCMDarray();
 
+      // ---- Preload second MS command (non-blocking) ----
+      if (procCMDtype == "MS" &&
+          moveSequence == "firsMoveActive" &&
+          cmdBuffer2 == "" &&
+          cmdBuffer1 != "" &&
+          splineTrue == true) {
 
-      //if second position is empty and first move command read in process second move ahead of time
-      if (procCMDtype == "MS" and moveSequence == "firsMoveActive" and cmdBuffer2 == "" and cmdBuffer1 != "" and splineTrue == true) {
         moveSequence = "secondMoveProcessed";
-        while (cmdBuffer2 == "") {
-          if (Serial.available() > 0) {
-            char recieved = Serial.read();
-            recData += recieved;
-            if (recieved == '\n') {
-              cmdBuffer2 = recData;
-              recData.trim();
-              procCMDtype = recData.substring(0, 2);
-              if (procCMDtype == "MS") {
-                //close serial so next command can be read in
-                delay(5);
-                if (Alarm == "0") {
-                  sendRobotPosSpline();
-                } else {
-                  Serial.println(Alarm);
-                  Alarm = "0";
-                }
-              }
-              recData = "";  // Clear recieved buffer
-            }
-          }
-        }
       }
+
+      // Clear buffer for next message
+      recData = "";
     }
   }
 }
-
 
 void shiftCMDarray() {
   if (cmdBuffer1 == "") {
@@ -2267,11 +2262,13 @@ void shiftCMDarray() {
 
 
 void EstopProg() {
-  estopActive = true;
   flag = "EB";
-  Serial.println("Estop")
-  delay(5) //Give some time so that the estop function is received 
-  sendRobotPos();
+  if (!estopActive){
+    estopActive = true;
+    Serial.println("Estop");
+    delay(100); //Give some time so that the estop function is received 
+    sendRobotPos();
+  }
 }
 
 
@@ -2316,8 +2313,6 @@ void setup() {
 
   pinMode(EstopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(EstopPin), EstopProg, LOW);
-
-
 
   digitalWrite(J1stepPin, HIGH);
   digitalWrite(J2stepPin, HIGH);
@@ -4963,7 +4958,7 @@ void loop() {
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
           float turnTolerance = 220; //max degrees that can be moved to avoid hazards
           if (abs(J4stepDif) > turnTolerance || abs(J5stepDif) > turnTolerance || abs(J6stepDif) > turnTolerance){
-            Alarm = "Turn Hazard: J4:"+ J4stepDif + " J5:" + J5StepDif + " J6:" + J6stepDif;
+            Alarm = "Turn Hazard: J4:" + String(J4stepDif) + " J5:" + String(J5stepDif) + " J6:" + String(J6stepDif);
             Serial.println(Alarm);
             break;
           }

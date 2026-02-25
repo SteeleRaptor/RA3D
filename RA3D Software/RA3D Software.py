@@ -34,7 +34,6 @@ class TkWindow(Tk):
         self.printController = PrintController(self.root)
         self.temperatureController = TemperatureController(self.root)
 
-
         # Create and draw widgets onto the window
         self.createTabs()
         self.root.terminalPrint("GUI created")
@@ -46,7 +45,20 @@ class TkWindow(Tk):
         self.timeoutStartedCal = False
         self.timeoutStartedMove = False
         self.timeoutStartedPos = False
+
+        self.root.protocol("WM_DELETE_WINDOW", self.shutdownProgram)
+
     #endregion init
+
+    #region Shutdown
+    # This function is meant to do various shutdown tasks so the program doesn't break anything
+    def shutdownProgram(self):
+        # Call the temperatureController's shutdown function which releases its control on the GPIOs
+        self.temperatureController.shutdown()
+        # Close the window
+        self.root.destroy()
+    #endregion
+
     #region Tabs
     # Creates the interface tabs
     def createTabs(self):
@@ -118,7 +130,10 @@ class TkWindow(Tk):
         self.hotendTargetLabel = Label(self.temperatureFrame, text="Target:")
         self.hotendTargetLabel.grid(row=1, column=0, padx=5, pady=5)
         self.hotendTarget = Entry(self.temperatureFrame, width=5)
+        self.hotendTarget.insert(0, "0")
         self.hotendTarget.grid(row=1, column=1, padx=5, pady=5)
+        self.hotendCtrlButton = Button(self.temperatureFrame, text="Control", width=10, command=lambda: self.temperatureController.toggleControl("hotend"))
+        self.hotendCtrlButton.grid(row=1, column=2, padx=5, pady=5)
         self.hotendActualLabel = Label(self.temperatureFrame, text="Actual:")
         self.hotendActualLabel.grid(row=2, column=0, padx=5, pady=5)
         self.hotendActual = Label(self.temperatureFrame, text="xxx")
@@ -130,7 +145,10 @@ class TkWindow(Tk):
         self.bedTargetLabel = Label(self.temperatureFrame, text="Target:")
         self.bedTargetLabel.grid(row=4, column=0, padx=5, pady=5)
         self.bedTarget = Entry(self.temperatureFrame, width=5)
+        self.bedTarget.insert(0, "0")
         self.bedTarget.grid(row=4, column=1, padx=5, pady=5)
+        self.bedCtrlButton = Button(self.temperatureFrame, text="Control", width=10, command=lambda: self.temperatureController.toggleControl("bed"))
+        self.bedCtrlButton.grid(row=4, column=2, padx=5, pady=5)
         self.bedActualLabel = Label(self.temperatureFrame, text="Actual:")
         self.bedActualLabel.grid(row=5, column=0, padx=5, pady=5)
         self.bedActual = Label(self.temperatureFrame, text="xxx")
@@ -571,7 +589,7 @@ class TkWindow(Tk):
 
     def fillDebugTab(self):
         # ==========| Variables Frame |==========
-        self.debugVarFrame = Frame(self.debugTab, highlightthickness=2, highlightbackground="#000000", width=200, height=460)
+        self.debugVarFrame = Frame(self.debugTab, highlightthickness=2, highlightbackground="#000000", width=300, height=460)
         self.debugVarFrame.grid(row=0, column=0, padx=5, pady=5)
         self.debugVarFrame.grid_propagate(False)
         # ===| SerialController Variables |===
@@ -605,9 +623,11 @@ class TkWindow(Tk):
         self.armDebugCalStateLabel.grid(row=3, column=0, padx=5, pady=5, sticky=W)
         self.overrideCalibrationButton = Button(self.debugVarFrame,text="Override Calibration", command=self.armController.overrideCalibration)
         self.overrideCalibrationButton.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        # ==========| Terminal Frame |==========
+    
         # ===| PrintController Variables |===
         
+        # ==========| Terminal Frame |==========
+
         self.termFrame = Frame(self.debugTab, bg="#00FFFF", highlightthickness=2, highlightbackground="#000000")
         self.termFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
 

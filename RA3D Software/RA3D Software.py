@@ -42,6 +42,7 @@ class TkWindow(Tk):
         updateThread = threading.Thread(target=self.update)
         updateThread.start()
         
+        #TODO remove these eventually
         self.timeoutStartedCal = False
         self.timeoutStartedMove = False
         self.timeoutStartedPos = False
@@ -49,6 +50,9 @@ class TkWindow(Tk):
         self.root.protocol("WM_DELETE_WINDOW", self.shutdownProgram)
 
         self.printThreadStarted = False
+
+        
+
     #endregion init
 
     #region Shutdown

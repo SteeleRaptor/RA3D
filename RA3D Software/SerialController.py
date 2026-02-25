@@ -23,6 +23,8 @@ class SerialController:
         self.responseQueue = queue.Queue()
         self.responseReady = False # Used as a flag to check if a response is ready to be read
         self.lastResponse = None # Stores whatever the last response was from serial until requested
+        
+        self.waiting = False
 
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
@@ -39,7 +41,9 @@ class SerialController:
                 self.root.portDropdown.config(state="disabled") # Disable port dropdown
                 self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
                 self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
+
         else:
+
             # If so, disconnect from the port
             self.root.statusPrint("Disconnecting from port")
             self.disconnectPort()
@@ -64,7 +68,7 @@ class SerialController:
             self.board.reset_output_buffer()
             self.board.reset_input_buffer()
 
-            time.sleep(2)  # allow Arduino auto-reset
+            time.sleep(1)  # allow Arduino auto-reset
             self.boardConnected = True
             self.responseQueue = queue.Queue()
 
@@ -154,6 +158,7 @@ class SerialController:
             PC.printing = False
             flag = "Estop"
             R.warningPrint("Estop pushed, stopping print")
+            self.cleanQueue("Estop")
         if sortResponse[:2]== "ER":
             R.statusPrint(f"Kinematic Error: {sortResponse[2:]}")
             flag = "Kinematic Error"
@@ -185,7 +190,7 @@ class SerialController:
             R.statusPrint(f"Echo: {sortResponse[4:]}")
         elif sortResponse == "\n":
             pass
-        elif sortResponse == "Turn Hazard Move Stopped":
+        elif sortResponse[:11] == "Turn Hazard":
             self.root.statusPrint(f"Encountered Hazard Move Stopped: {sortResponse[2:]}")
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             #flag = "Turn Hazard"

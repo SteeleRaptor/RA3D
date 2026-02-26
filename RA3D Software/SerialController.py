@@ -127,7 +127,7 @@ class SerialController:
         size = int(self.responseQueue.qsize())
         for i in range(size):
             if self.responseQueue.queue[i] == item:
-                self.responseQueue.queue.remove(i)
+                del queue[i]
         print("response queue cleaned")
 
     #Advances the response queue every .01 seconds    

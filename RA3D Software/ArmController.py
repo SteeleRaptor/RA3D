@@ -137,7 +137,10 @@ class ArmController:
                 # Print out the response received
                 self.root.terminalPrint(response)
                 self.root.timeoutStartedCal = False
+                #On every calibration reset to recomended
+                self.setOrigin(self.printController.recommendedOrigin)
 
+    #for debugging
     def overrideCalibration(self):
         self.armCalibrated = True
 
@@ -847,20 +850,28 @@ class ArmController:
     #region ========|Origin|==================
     #TODO Update this function to work with the origin class
     #TODO improve request position to wait
-    def setOrigin(self):
+    def setOrigin(self,origin=None):
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Failed to set origin. No board is connected")
             return
-        if self.checkIfBusy() is True:
-            self.root.statusPrint("Failed to set origin. Arm is busy.")
-            return
+        
         self.root.terminalPrint("Setting current position as origin...")
-        self.requestPositionAndWait #requests and waits
-
-        self.origin.setOrigin(self.curPos)
-        self.root.xCurCoordOrigin.config(text=self.curPos.x)
-        self.root.yCurCoordOrigin.config(text=self.curPos.y)
-        self.root.zCurCoordOrigin.config(text=self.curPos.z)
+        #origin can be set by an origin or at current position
+        if origin is None:
+            if self.checkIfBusy() is True:
+                self.root.statusPrint("Failed to set origin. Arm is busy.")
+                return
+            self.requestPositionAndWait #requests and waits
+            self.origin.setOrigin(self.curPos)
+            self.root.xCurCoordOrigin.config(text=self.curPos.x)
+            self.root.yCurCoordOrigin.config(text=self.curPos.y)
+            self.root.zCurCoordOrigin.config(text=self.curPos.z)
+        else:
+            self.origin=copy.deepcopy(origin)
+            self.root.xCurCoordOrigin.config(text=self.curPos.x)
+            self.root.yCurCoordOrigin.config(text=self.curPos.y)
+            self.root.zCurCoordOrigin.config(text=self.curPos.z)
+        
     
     def moveOrigin(self):
         if self.origin.checkOriginSet():
@@ -868,17 +879,16 @@ class ArmController:
 
 
     def updateDeltaFromOrigin(self):
-
         if not self.origin.checkOriginSet():
             self.root.statusPrint("Origin not set")
-            return None, None, None
+        
         [deltaX,deltaY,deltaZ] = self.curPos.GetRelative()[:3]
         self.root.xDeltaOrigin.config(text=deltaX)
         self.root.yDeltaOrigin.config(text=deltaY)
         self.root.zDeltaOrigin.config(text=deltaZ)
 
     def moveRecommendedOrigin(self):
-        self.sendMJ(self.root.printController.recommendedOrigin, self.defaultMoveParameters)
+        self.sendMJ(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters)
 
     #endregion origin
     #region ========|Test Movements WIP|======

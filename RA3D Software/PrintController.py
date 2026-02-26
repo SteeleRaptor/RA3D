@@ -8,8 +8,6 @@ class PrintController:
     def __init__(self, root):
         self.root = root
         #Placeholder boundaries, should be adjusted
-        
-        
         self.bufferBoundary = 10 # Warning pops up if this boundary is entered
         self.selectedFilepath = None
         self.gcodeLines = []
@@ -22,26 +20,29 @@ class PrintController:
         self.bedCalStep = 0
         self.plateHeight = 300
         YEdge = 80
-        XEdge = [250,400]
-        self.bedCalibrateHeight = 50
+        XEdge = [250,400]#for corner calibration
+        self.bedCalibrateHeight = 50 #Height moved up for calibration
         FLCorner = Position(XEdge[1],-YEdge,self.plateHeight,0,90,0,None)
         FRCorner = Position(XEdge[1],YEdge,self.plateHeight,0,90,0,None)
         BLCorner = Position(XEdge[0],-YEdge,self.plateHeight,0,90,0,None)
         BRCorner = Position(XEdge[0],YEdge,self.plateHeight,0,90,0,None)
-        self.recommendedOrigin = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,90,0,None)
-
+        #recomended Origin for move
+        self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,90,0,None)
+        #extract position to origin
+        self.recommendedOrigin = Origin(self.recommendedOrigin.x,self.recommendedOrigin.y,self.recommendedOrigin.z)
         
+        #Assume origin is at recommended origin
+        self.origin = self.recommendedOrigin
+
+        #TODO These might be changed to reflect xedge, yedge
         self.maxBoundaryX = [200,500]
         self.maxBoundaryY = [-130,130]
         self.maxBoundaryZ = [290,800]
-        #self.maxBoundaryX[0] = XEdge[0] - self.bufferBoundary
-        #self.maxBoundaryX[1] = XEdge[1] + self.bufferBoundary
         
         #Flag variable for errors
         self.flag = None
-        #self.origin = root.armController.origin
-        #self.origin = Origin(self.recommendedOrigin.x,self.recommendedOrigin.y,self.recommendedOrigin.z)
-        self.origin = Origin(None,None,None)
+        
+        #self.origin = Origin(None,None,None)
         #corners are absolute, may change to relative to origin
         self.calibrationCorners = [FRCorner,BRCorner,BLCorner,FLCorner]
         # Parameters for printing coordinates
@@ -328,7 +329,7 @@ class PrintController:
         #Assuming that pausing print is desired if there is a flag
         if self.flag is not None:
             self.pausePrint()
-            self.root.statusPrint(f"Print paused due to error: {self.flag}")
+            self.root.warningPrint(f"Print paused due to error: {self.flag}")
             return self.flag
         return None
 
@@ -400,6 +401,12 @@ class PrintController:
         cornerSweepThread = threading.Thread(target=self.fullCornerSweep)
         cornerSweepThread.start()
 
+    #will cancel any related printing setup functions
+    def cancelAny(self):
+        self.endSweepOrCal()
+        #just in case someone thinks this will cancel the print
+        if self.printing:
+            self.cancelPrint()
     #endregion gui
 
     #region ===============| Other Functions |=================
@@ -433,28 +440,39 @@ class PrintController:
 
     #Move to one corner and slowly descend on it
     def bedCalibrationStep(self):
+        #set label
         currentCornerPos = self.calibrationCorners[self.bedCalStep-1]
         self.root.cornerLabel.config(text=f"Current Corner: {self.bedCalStep}")
+
+        #For better positioning move home than origin so J4 starts at 0 rather than 180
+        self.root.armController.moveHome()
+        self.root.armController.moveOrigin()
+
+        #Move above
         posStep = copy.deepcopy(currentCornerPos)
-        posStep.z += 100
-        self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters)
+        posStep.z += self.bedCalibrateHeight
         self.root.armController.sendML(posStep,moveParameters=self.defaultPrintParameters)
-        posStep.z -= 50
+        
+        #Move halfway
+        self.root.armController.sendML(posStep,moveParameters=self.defaultPrintParameters)
+        posStep.z -= self.bedCalibrateHeight/2
+
+        #Move to corner to touch plate
         self.root.armController.sendML(currentCornerPos,moveParameters=self.defaultPrintParameters)
         self.root.statusPrint(f"Corner {self.bedCalStep} calibration complete")
         self.bedCalStep += 1
-        #Move To position
+
         #End calibration
         if self.bedCalStep == 5: #Is at 5 after 4 is completed so done
-            self.bedCalibration=False
-            self.root.armController.moveHome()
+            self.endSweepOrCal()
 
 
     # Used to sweep the corners without lifting to ensure kinematics are level to bed
-    def cornerSweep(self, height):
+    def cornerSweep(self, height, full=False):
        
         if self.flag is not None:
             self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
+            self.endSweepOrCal()
             return
         moveOrder = [1,2,3,4,1,3,2,4]
         moveOrder= [x-1 for x in moveOrder] #adjust to 0 base index
@@ -463,27 +481,41 @@ class PrintController:
             pos = copy.deepcopy(self.calibrationCorners[i])
             pos.z = height
             self.root.cornerLabel.config(text=f"Current Corner: {i+1}")
-            self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=2)
+            if self.cornerSweeping:
+                self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=10)
+            #dont continue if no longer sweeping
+            else:
+                return
             if self.flag is not None:
                 self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
+                self.endSweepOrCal
                 return
             #Move To position
             #End calibration
-        self.cornerSweeping = False
+        #if not doing a fullSweep()
+        if not full:
+            self.endSweepOrCal()
+        
     
-    def fullCornerSweep(self):
+    def endSweepOrCal(self):
+        self.cornerSweeping = False
+        self.bedCalibration=False
+        self.bedCalStep == 0
+        self.root.cornerLabel.config(text=f"Current Corner: N/A")
+        self.root.armController.moveHome()
 
+    def fullCornerSweep(self):
         self.root.armController.moveHome()
         self.root.armController.moveOrigin()
         heightDelta = 200
         currentHeight = self.plateHeight
         endHeight = currentHeight + heightDelta
-        while currentHeight < endHeight:
-            self.cornerSweep(currentHeight)
+        while currentHeight < endHeight and self.cornerSweeping:
+            self.cornerSweep(currentHeight,full=True)
             currentHeight += 20
             if self.flag is not None:
                 self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
-                return
+                self.endSweepOrCal()
     
     #endregion Calibration
         

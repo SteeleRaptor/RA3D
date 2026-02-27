@@ -60,6 +60,10 @@ class ArmController:
         self.awaitingTestResponse = False # Flag for if we are awaiting a response after sending a test command such as for the limit switches or encoders
         self.finishTest = False           # Flag for signifying to the program that the user wants to stop a test
         self.awaitingPosResponse = False  # Flag for requesting current position
+
+        #Tool jog variables
+        self.V1 = 1 #axis 1
+        self.V2 = 1 #positive
     
     #endregion init
 
@@ -82,6 +86,8 @@ class ArmController:
         self.calibrationInProgress = True
         # Move to next state of calibration
         self.calibrationState = 1
+        #On every calibration reset to recomended
+        self.setOrigin(origin=self.root.printController.recommendedOrigin)
         # Call the calibration update function
         self.calibrateArmUpdate()
 
@@ -98,6 +104,7 @@ class ArmController:
                                  calJ5=self.calJStage1[4],
                                  calJ6=self.calJStage1[5])
             self.calibrationState = 2
+
         elif self.calibrationState == 2: # Await CalStage1 Response & process when ready
             # Check if the serial controller has a response ready
             if response is not None:
@@ -137,12 +144,13 @@ class ArmController:
                 # Print out the response received
                 self.root.terminalPrint(response)
                 self.root.timeoutStartedCal = False
-                #On every calibration reset to recomended
-                self.setOrigin(self.printController.recommendedOrigin)
+                
 
     #for debugging
     def overrideCalibration(self):
+        self.setOrigin(origin=self.root.printController.recommendedOrigin)
         self.armCalibrated = True
+        
 
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
         self.getCalOffsets() # Update calibration offsets from entry fields
@@ -779,11 +787,34 @@ class ArmController:
     def startToolJog(self):
         if self.checkIfAllBusy():
             self.root.terminalPrint("Arm busy")
+            return
+        MP = self.defaultMoveParameters
+        #Vector will change a tool axis of the arm
+        #1st number is which axis 1-6
+        #2nd number is direction 0 negative, 1 positive
+        #V = "10"
+        V = str(self.V1)+str(self.V2) #concatenate values
+        #Note acceleration ramp don't matter because they're overriden
+        command = f"LTV{V}S{MP.speedType}{MP.speed}Ac{MP.acceleration}Dc{MP.deceleration}Rm{MP.ramp}WFLM{MP.loopMode*6}"
+        self.root.serialController.sendSerial(command)
+
+    #will send parameters back
+    def requestToolParameters(self):
         pass
+    
+    def selectToolJogAxis(self,axis):
+        self.V1 = axis
+        self.root.termianlPrint(f"Jog set to axis {axis}")
+
+    def changeToolJogDirection(self):
+        self.V2 ^= 1
+
     def stopToolJog(self):
         if self.checkIfAllBusy():
-            self.root.terminalPrint("Arm busy")
-        pass
+            return
+        command = "S"
+        self.root.serialController.sendSerial(command)
+        
     def startCartesianJog(self):
         if self.checkIfAllBusy():
             self.root.terminalPrint("Arm busy")
@@ -857,20 +888,22 @@ class ArmController:
         
         self.root.terminalPrint("Setting current position as origin...")
         #origin can be set by an origin or at current position
-        if origin is None:
+        if origin.x is None:
             if self.checkIfBusy() is True:
                 self.root.statusPrint("Failed to set origin. Arm is busy.")
                 return
             self.requestPositionAndWait #requests and waits
             self.origin.setOrigin(self.curPos)
+            self.curPos.origin = self.origin
             self.root.xCurCoordOrigin.config(text=self.curPos.x)
             self.root.yCurCoordOrigin.config(text=self.curPos.y)
             self.root.zCurCoordOrigin.config(text=self.curPos.z)
         else:
             self.origin=copy.deepcopy(origin)
-            self.root.xCurCoordOrigin.config(text=self.curPos.x)
-            self.root.yCurCoordOrigin.config(text=self.curPos.y)
-            self.root.zCurCoordOrigin.config(text=self.curPos.z)
+            self.curPos.origin = self.origin
+            self.root.xCurCoordOrigin.config(text=self.origin.x)
+            self.root.yCurCoordOrigin.config(text=self.origin.y)
+            self.root.zCurCoordOrigin.config(text=self.origin.z)
         
     
     def moveOrigin(self):
@@ -883,6 +916,11 @@ class ArmController:
             self.root.statusPrint("Origin not set")
         
         [deltaX,deltaY,deltaZ] = self.curPos.GetRelative()[:3]
+
+        deltaX = round(deltaX,2)
+        deltaY = round(deltaY,2)
+        deltaZ = round(deltaZ,2)
+
         self.root.xDeltaOrigin.config(text=deltaX)
         self.root.yDeltaOrigin.config(text=deltaY)
         self.root.zDeltaOrigin.config(text=deltaZ)

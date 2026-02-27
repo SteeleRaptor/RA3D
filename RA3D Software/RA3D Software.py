@@ -46,12 +46,10 @@ class TkWindow(Tk):
         #TODO remove these eventually
         self.timeoutStartedCal = False
         self.timeoutStartedMove = False
-    
         self.printThreadStarted = False
 
-        
-
     #endregion init
+
     #region Tabs
     # Creates the interface tabs
     def createTabs(self):
@@ -61,21 +59,25 @@ class TkWindow(Tk):
         # Create the tabs
         self.printTab = Frame(self.notebook, bg="#FF0000")
         self.armTab = Frame(self.notebook, bg="#00FF00")
+        self.toolTab = Frame(self.notebook, bg="#5301AB")
         self.debugTab = Frame(self.notebook, bg="#0000FF")
         self.settingsTab = Frame(self.notebook, bg="#FFFF00")
         # Put the tabs on screen
         self.printTab.pack(fill="both", expand=True)
         self.armTab.pack(fill="both", expand=True)
+        self.toolTab.pack(fill="both", expand=True)
         self.debugTab.pack(fill="both", expand=True)
         self.settingsTab.pack(fill="both", expand=True)
         # Add the tabs to the notebook
         self.notebook.add(self.printTab, text="Printing")
         self.notebook.add(self.armTab, text="Arm Control")
+        self.notebook.add(self.toolTab, text="Tool (Hot End)")
         self.notebook.add(self.debugTab, text="Debug")
         self.notebook.add(self.settingsTab, text="Settings")
         # Call the various functions for creating the widgets in each tab
         self.fillPrintTab()
         self.fillArmTab()
+        self.fillToolTab()
         self.fillDebugTab()
         self.fillSettingsTab()
 
@@ -576,6 +578,45 @@ class TkWindow(Tk):
         self.zDeltaOriginLabel.grid(row=3, column=4, padx=5, pady=5)
         self.zDeltaOrigin.grid(row=3, column=5, padx=5, pady=5)
 
+    def fillToolTab(self):
+        # ===Tool jog frame===
+        self.toolJogFrame = Frame(self.toolTab, highlightthickness=2, highlightbackground="#000000")
+        self.toolJogFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+N+E+S)
+        # Label
+        self.toolJogLabel = Label(self.toolJogFrame, text="Tool Jog:")
+        self.toolJogLabel.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=W)
+        #Start and stop
+        self.startToolJog = Button(self.toolJogFrame, text="Start tool jog", command=self.armController.startToolJog)
+        self.startToolJog.grid(row=1, column=0, padx=5, pady=5,sticky=W)
+        self.stopToolJog = Button(self.toolJogFrame, text="Stop tool jog", command=self.armController.stopToolJog)
+        self.stopToolJog.grid(row=2, column=0, padx=5, pady=5,sticky=W)
+        self.toolJogdirection = Label(self.toolJogFrame, text="Direction: N/A")
+        self.toolJogdirection.grid(row=1,column=1)
+        self.changeToolJogDirection = Button(self.toolJogFrame, text="Change direction",command=self.armController.changeToolJogDirection)
+        self.changeToolJogDirection.grid(row=2,column=1)
+        #Select Axis
+        self.selectAxisFrame = Frame(self.toolJogFrame)
+        self.selectAxisFrame.grid(row=3, column=0, padx=5, pady=5, sticky=W+E)
+        self.selectAxisLabel = Label(self.selectAxisFrame, text="Select Axis For Jog")
+        self.selectAxisLabel.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=W)
+
+        # Make the select buttons
+        self.toolJogSetX = Button(self.selectAxisFrame, text="X", command=lambda: self.armController.selectToolJogAxis(1), width=7)
+        self.toolJogSetY = Button(self.selectAxisFrame, text="Y", command=lambda: self.armController.selectToolJogAxis(2), width=7)
+        self.toolJogSetZ = Button(self.selectAxisFrame, text="Z", command=lambda: self.armController.selectToolJogAxis(3), width=7)
+        self.toolJogSetRz = Button(self.selectAxisFrame, text="Rz", command=lambda: self.armController.selectToolJogAxis(4), width=7)
+        self.toolJogSetRy = Button(self.selectAxisFrame, text="Ry", command=lambda: self.armController.selectToolJogAxis(5), width=7)
+        self.toolJogSetRx = Button(self.selectAxisFrame, text="Rx", command=lambda: self.armController.selectToolJogAxis(6), width=7)
+    
+        # Place buttons
+        self.toolJogSetX.grid(row=1, column=0, padx=5, pady=5,)
+        self.toolJogSetY.grid(row=1, column=1, padx=5, pady=5)
+        self.toolJogSetZ.grid(row=1, column=2, padx=5, pady=5)
+        self.toolJogSetRz.grid(row=2, column=0, padx=5, pady=5)
+        self.toolJogSetRy.grid(row=2, column=1, padx=5, pady=5)
+        self.toolJogSetRx.grid(row=2, column=2, padx=5, pady=5)
+
+
     def fillDebugTab(self):
         # ==========| Variables Frame |==========
         self.debugVarFrame = Frame(self.debugTab, highlightthickness=2, highlightbackground="#000000", width=200, height=460)
@@ -825,6 +866,7 @@ class TkWindow(Tk):
         # Add a button to close the popup
         close_button = Button(popup, text="Close", command=popup.destroy)
         close_button.pack(pady=10)
+
     #endregion popup
     
 #Start the Program

@@ -29,7 +29,7 @@ class PrintController:
         #recomended Origin for move
         self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,90,0,None)
         #extract position to origin
-        self.recommendedOrigin = Origin(self.recommendedOrigin.x,self.recommendedOrigin.y,self.recommendedOrigin.z)
+        self.recommendedOrigin = Origin(self.recommendedOriginPosition.x,self.recommendedOriginPosition.y,self.recommendedOriginPosition.z)
         
         #Assume origin is at recommended origin
         self.origin = self.recommendedOrigin
@@ -58,6 +58,7 @@ class PrintController:
         self.feedRate = 0
         self.extrudeRate = 0
         self.currentInstruction = 0
+        self.axis6 = True
         
     #endregion init
     #region ================== Main Functions =====================
@@ -150,13 +151,21 @@ class PrintController:
             # TODO: This needs handling or removal
             return ""
         elif lineToConvert[0:2] == "G0" or lineToConvert[0:2] == "G1": # Move (treating G0 & G1 as equal)
-
+        
             xMatch = re.search(r"X(-?\d+\.?\d*)", lineToConvert)
             yMatch = re.search(r"Y(-?\d+\.?\d*)", lineToConvert)
             zMatch = re.search(r"Z(-?\d+\.?\d*)", lineToConvert)
             fMatch = re.search(r"F(-?\d+\.?\d*)", lineToConvert)
             eMatch = re.search(r"E(-?\d+\.?\d*)", lineToConvert)
 
+            if self.axis6:
+                aMatch = re.search(r"A(-?\d+\.?\d*)", lineToConvert)
+                bMatch = re.search(r"B(-?\d+\.?\d*)", lineToConvert)
+                cMatch = re.search(r"C(-?\d+\.?\d*)", lineToConvert)
+                a = float(aMatch.group(1)) if aMatch else None
+                b = float(bMatch.group(1)) if bMatch else None
+                c = float(cMatch.group(1)) if cMatch else None
+            
             #Coordinates here are RELATIVE
             x = float(xMatch.group(1)) if xMatch else None
             y = float(yMatch.group(1)) if yMatch else None
@@ -174,16 +183,24 @@ class PrintController:
                 y = self.lastPos.GetRelative()[1]
             if z == None:
                 z = self.lastPos.GetRelative()[2]
+            #get last feedrate if missing feedrate
             if f == None:
-                f = 0.0
+                f = self.lastF
             else:
                 self.lastF = f
+            #Do not extrude if not told to
             if e == None:
-                e = self.lastE
+                e = 0
             else:
                 self.lastE = e
             atBoundary = False
-            self.printPos.SetRelative(x,y,z,0,90,0)
+            
+            #if using 6 axis g code
+            if self.axis6:
+                self.printPos.SetPosition(x,y,z,c,b,a)
+            else:
+                self.printPos.SetRelative(x,y,z,0,90,0)
+
             #If values are within boundaries
             if self.printPos.y > self.maxBoundaryY[1]:
                 self.printPos.y = self.maxBoundaryY[1]-1
@@ -204,7 +221,6 @@ class PrintController:
             self.feedRate = f
             self.extrudeRate = e
 
-            
             #Check if point is in boundary else pause print
             if self.checkBoundary(self.printPos):
                 return "Success"

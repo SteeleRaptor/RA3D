@@ -590,8 +590,8 @@ class TkWindow(Tk):
         self.startToolJog.grid(row=1, column=0, padx=5, pady=5,sticky=W)
         self.stopToolJog = Button(self.toolJogFrame, text="Stop tool jog", command=self.armController.stopToolJog)
         self.stopToolJog.grid(row=2, column=0, padx=5, pady=5,sticky=W)
-        self.toolJogdirection = Label(self.toolJogFrame, text="Direction: N/A")
-        self.toolJogdirection.grid(row=1,column=1)
+        self.toolJogDirection = Label(self.toolJogFrame, text="Direction: N/A")
+        self.toolJogDirection.grid(row=1,column=1)
         self.changeToolJogDirection = Button(self.toolJogFrame, text="Change direction",command=self.armController.changeToolJogDirection)
         self.changeToolJogDirection.grid(row=2,column=1)
         #Select Axis

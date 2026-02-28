@@ -795,8 +795,9 @@ class ArmController:
         #V = "10"
         V = str(self.V1)+str(self.V2) #concatenate values
         #Note acceleration ramp don't matter because they're overriden
-        command = f"LTV{V}S{MP.speedType}{MP.speed}Ac{MP.acceleration}Dc{MP.deceleration}Rm{MP.ramp}WFLM{MP.loopMode*6}"
+        command = f"LTV{V}S{MP.speedType}{MP.speed}Ac{MP.acceleration}Dc{MP.deceleration}Rm{MP.ramp}WFLM{MP.loopMode*6}\n"
         self.root.serialController.sendSerial(command)
+        #self.root.serialController.sendSerial("start") #Don't know why it needs another command to start
 
     #will send parameters back
     def requestToolParameters(self):
@@ -804,10 +805,15 @@ class ArmController:
     
     def selectToolJogAxis(self,axis):
         self.V1 = axis
-        self.root.termianlPrint(f"Jog set to axis {axis}")
+        self.root.terminalPrint(f"Jog set to axis {axis}")
 
     def changeToolJogDirection(self):
         self.V2 ^= 1
+        if self.V2:
+            dir = "+"
+        else:
+            dir = "-"
+        self.root.toolJogDirection.config(text=f"Direction: {dir}")
 
     def stopToolJog(self):
         if self.checkIfAllBusy():
@@ -908,7 +914,9 @@ class ArmController:
     
     def moveOrigin(self):
         if self.origin.checkOriginSet():
-            self.sendMJ(Position(self.origin.x,self.origin.y,self.origin.z,0,90,0, None), self.defaultMoveParameters)
+            moveParameters = copy.deepcopy(self.defaultMoveParameters)
+            moveParameters.wrist = "N"#Make wrist condition J4 near 0
+            self.sendMJ(Position(self.origin.x,self.origin.y,self.origin.z,0,90,0, None), moveParameters=moveParameters)
 
 
     def updateDeltaFromOrigin(self):
@@ -1104,13 +1112,14 @@ class Origin:
         return pos
     
 class MoveParameters:
-    def __init__ (self,speed,acceleration,deceleration,ramp,loopMode,speedType):
+    def __init__ (self,speed,acceleration,deceleration,ramp,loopMode,speedType,wrist="A"):
         self.speed = speed
         self.acceleration = acceleration
         self.deceleration = deceleration
         self.ramp = ramp
         self.loopMode = loopMode
         self.speedType = speedType
+        self.wrist = wrist
     def setLoopMode(self,loopMode):
         self.loopMode = loopMode
     def getLoopMode(self):
@@ -1143,9 +1152,9 @@ class MoveCommand:
     def __str__(self):
         command = "Error"
         if self.type=="ML":
-            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
+            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="MJ":
-            command = f"MJX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0WFLm{self.moveParameters.loopMode*6}Q0\n"
+            command = f"MJX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="RJ":
             command = f"RJA{self.A}B{self.B}C{self.C}D{self.D}E{self.E}F{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}WNLm{self.moveParameters.loopMode*6}\n"
         return command

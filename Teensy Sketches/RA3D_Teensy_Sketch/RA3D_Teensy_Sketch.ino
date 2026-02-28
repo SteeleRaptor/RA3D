@@ -236,7 +236,7 @@ float J9steps;
 
 float lineDist;
 
-String WristCon;//Does nothing
+String WristCon;//Does something now
 int Quadrant; // Does nothing
 
 unsigned long J1DebounceTime = 0;
@@ -439,7 +439,7 @@ float DHparams[6][4] = {
 Matrix4x4 Robot_BaseFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 /// Custom robot tool (tool frame, end of arm tool or TCP)
-Matrix4x4 Robot_ToolFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+Matrix4x4 Robot_ToolFrame = { 0, 0, 1, 22.39, 0, 1, 0, 0, -1, 0, 0, 40, 0, 0, 0, 1 };
 
 /// Robot parameters
 /// All robot data is held in a large array
@@ -908,6 +908,8 @@ void SolveInverseKinematics() {
   KinematicError = 0;
 
   JointEstimate();
+
+  //transfer variables and convert to radians
   target[0] = xyzuvw_PreKin[0];
   target[1] = xyzuvw_PreKin[1];
   target[2] = xyzuvw_PreKin[2];
@@ -917,15 +919,18 @@ void SolveInverseKinematics() {
 
   // Serial.println("X : " + String(target[0]) + " Y : " + String(target[1]) + " Z : " + String(target[2]) + " rx : " + String(xyzuvw_PreKin[3]) + " ry : " + String(xyzuvw_PreKin[4]) + " rz : " + String(xyzuvw_PreKin[5]));
 
-
+  //for the 7 possible solutions
   for (int i = -3; i <= 3; i++) {
-    joints_estimate[4] = i * 30;
+    joints_estimate[4] = JointAnglePreKin[4] + i * 30;//increment to provide different solutions
+    //perform inverse kinematics
     int success = inverse_kinematics_robot_xyzuvw<float>(target, joints, joints_estimate);
     if (success) {
-      if (solbuffer[4] != joints[4]) {
+      //if solution buffer 5 does not equal J5
+      if (abs(solbuffer[4] - joints[4]) > 0.001) {
         if (robot_joints_valid(joints)) {
           for (int j = 0; j < ROBOT_nDOFs; j++) {
             solbuffer[j] = joints[j];
+            //Add to next row of valid solutions
             SolutionMatrix[j][NumberOfSol] = solbuffer[j];
           }
           if (NumberOfSol <= 6) {
@@ -937,22 +942,99 @@ void SolveInverseKinematics() {
       KinematicError = 1;
     }
   }
-
+  //add back in joint estimate of J5?
   joints_estimate[4] = JointAnglePreKin[4];
 
+  //find closest solution?
+  solVal = -1;
+ 
+  //*previously*
+  //it seems the solution will flip flop if the other one is bad, if they are both bad I thin its goes for solution 0
+  //notice it never uses more than 2
 
-  solVal = 0;
-  for (int i = 0; i < ROBOT_nDOFs; i++) {
-    if ((abs(joints_estimate[i] - SolutionMatrix[i][0]) > 20) and NumberOfSol > 1) {
-      solVal = 1;
-    } else if ((abs(joints_estimate[i] - SolutionMatrix[i][1]) > 20) and NumberOfSol > 1) {
-      solVal = 0;
+  //for degrees of freedom(each joint)
+  //will find a solution that has no more than 20 degree change but also has a good J4
+  //will not prioritize J4
+  //this is the "ideal" solution search
+  for (int j=0;j<NumberOfSol; j++){
+    int badSolution = 0;
+    //check if any angle change is bigger than 20 degrees
+    for (int i = 0; i < ROBOT_nDOFs; i++) {
+      if ((abs(joints_estimate[i] - SolutionMatrix[i][j]) > 20) and NumberOfSol > 1) {
+        badSolution = 1;
+      }
+      // Serial.println(String(i) + "  Joint estimate : " + String(joints_estimate[i]) + " // Joint sol 1 : " + String(SolutionMatrix[i][0]) + " // Joint sol 2 : " + String(SolutionMatrix[i][1]));
     }
-
-
-    // Serial.println(String(i) + "  Joint estimate : " + String(joints_estimate[i]) + " // Joint sol 1 : " + String(SolutionMatrix[i][0]) + " // Joint sol 2 : " + String(SolutionMatrix[i][1]));
+    //Chose solution where J4 is near 0 degrees
+    if (abs(SolutionMatrix[3][j])<20 && !badSolution){
+      solVal = j;
+      break;
+    } else if(!badSolution){
+      solVal = j;
+    }
   }
 
+  float performance[NumberOfSol] = {0};
+  int bestSolution = -1;
+  float bestPerformance = 360*6;//very high so every solution is less than this
+
+  // will only care if J4 is small based on command
+  if (WristCon == "F" || WristCon == "N")
+  {
+    for (int j = 0; j < NumberOfSol; j++)
+    {
+      for (int i = 0; i < ROBOT_nDOFs; i++)
+      {
+        //if normal
+        if (WristCon = "N")
+        {
+          performance[j] += abs(joints_estimate[i]);
+        }
+        //else is flipped
+        else
+        {
+          //if negative
+          if (joints_estimate[i] < 0)
+          {
+            performance[j] += abs(joints_estimate[i] + 180);
+          }
+          //if positive
+          else
+          {
+            performance[j] += abs(joints_estimate[i] - 180);
+          }
+        }
+      }
+      if (performance[j] < bestPeformance)
+      {
+        bestPerformance = performance[j];
+        bestSolution = j;
+      }
+    }
+    solVal = bestSolution;
+  }
+
+  //if no good solutions find least angle change even if it is not great
+  if (solVal<0){
+    float performance2[NumberOfSol] = {0};
+    bestPerformance = 360*6; //reset because changing performance metric
+    for (int j=0;j<NumberOfSol;j++){
+      for (int i = 0; i < ROBOT_nDOFs; i++){
+        performance2[j] += abs(joints_estimate[i] - SolutionMatrix[i][j]);
+      }
+      if (performance2[j] < bestPeformance){
+        bestPerformance = performance2[j];
+        bestSolution = j;
+      }
+    }
+    if (bestSolution>=0){
+      solVal = bestSolution; 
+    } else{
+      solVal = 0;//fall back to first solution
+    }
+  }
+  
+  //if no solution
   if (NumberOfSol == 0) {
     KinematicError = 1;
   }
@@ -960,6 +1042,7 @@ void SolveInverseKinematics() {
 
   // Serial.println("Sol : " + String(solVal) + " Nb sol : " + String(NumberOfSol));
 
+  //Return Joint Angles
   for (int i = 0; i < ROBOT_nDOFs; i++) {
     JointAnglePostKin[i] = SolutionMatrix[i][solVal];
   }
@@ -968,40 +1051,42 @@ void SolveInverseKinematics() {
 
 
 
-
+//Another presetup to attach the toolframe
 template<typename T>
 int inverse_kinematics_robot(const Matrix4x4 target, T joints[ROBOT_nDOFs], const T *joints_estimate) {
   Matrix4x4 invToolFrame;
   Matrix4x4 pose_arm;
   int nsol;
+  //Inverse tool frame matrix
   Matrix_Inv(invToolFrame, Robot_ToolFrame);  // invRobot_Tool could be precalculated, the tool does not change so often
   Matrix_Multiply(pose_arm, Robot_BaseFrame, target);
   Matrix_Multiply_Cumul(pose_arm, invToolFrame);
   if (joints_estimate != nullptr) {
     inverse_kinematics_raw(pose_arm, Robot_Data, joints_estimate, joints, &nsol);
+  //if missing join estimate
   } else {
     // Warning! This is dangerous if joints does not have a valid/reasonable result
     T joints_approx[6];
-    memcpy(joints_approx, joints, ROBOT_nDOFs * sizeof(T));
+    memcpy(joints_approx, joints, ROBOT_nDOFs * sizeof(T));//no idea
     inverse_kinematics_raw(pose_arm, Robot_Data, joints_approx, joints, &nsol);
   }
+  //if no solutions
   if (nsol == 0) {
     return 0;
   }
-
+  //if solutions
   return 1;
 }
 
-
+//very brief program to pose the matrix
 template<typename T>
 int inverse_kinematics_robot_xyzuvw(const T target_xyzuvw1[6], T joints[ROBOT_nDOFs], const T *joints_estimate) {
-
   Matrix4x4 pose;
-  xyzuvw_2_pose(target_xyzuvw1, pose);
+  xyzuvw_2_pose(target_xyzuvw1, pose); //tranforms a coordinate system xyzwpr into a 4x4 matrix using UR euler rules and return it as an argument.
   return inverse_kinematics_robot(pose, joints, joints_estimate);
 }
 
-
+//The actual inverse kinemeatics
 template<typename T>
 void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_approx_in[6], T joints[6], int *nsol) {
   int i0;
@@ -2048,7 +2133,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
   float DCCspd = inData.substring(DcStart + 2, RmStart).toFloat();
   float ACCramp = inData.substring(RmStart + 2, RndStart).toFloat();
   float Rounding = inData.substring(RndStart + 3, WristConStart).toFloat();
-  WristCon = inData.substring(WristConStart + 1, LoopModeStart);
+  WristCon = inData.substring(WristConStart + 1, LoopModeStart);//can be N(Normal), F(flipped), A(Any)
   String LoopMode = inData.substring(LoopModeStart + 2);
   LoopMode.trim();
   J1LoopMode = LoopMode.substring(0, 1).toInt();
@@ -3673,9 +3758,7 @@ void loop() {
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }
-
-
-
+ 
 
 
 
@@ -4154,7 +4237,21 @@ void loop() {
     }
 
 
-
+    /*Set tool Parameters
+    if (function == "ST")
+      int RKT0start = inData.indexOf('A');
+      int RKT1start = inData.indexOf('B');
+      int RKT2start = inData.indexOf('C');
+      int RKT3start = inData.indexOf('D');
+      int RKT4start = inData.indexOf('E');
+      int RKT5start= inData.indexOf('F');
+      Robot_Kin_Tool[0] = inData.substring(RKT0start + 1, RKT1start).toFloat();
+      Robot_Kin_Tool[1] = inData.substring(RKT1start + 1, RKT2start).toFloat();
+      Robot_Kin_Tool[2] = inData.substring(RKT2start + 1, RKT3start).toFloat();
+      Robot_Kin_Tool[3] = inData.substring(RKT3start + 1, RKT4start).toFloat() * M_PI / 180;
+      Robot_Kin_Tool[4] = inData.substring(RKT4start + 1, RKT5start).toFloat() * M_PI / 180;
+      Robot_Kin_Tool[5] = inData.substring(RKT5start + 1).toFloat() * M_PI / 180;
+    }*/
     //----- Jog T ---------------------------------------------------
     //-----------------------------------------------------------------------
     //This function seems like it changes the tool a set distance
@@ -4169,6 +4266,7 @@ void loop() {
       int J8dir;
       int J9dir;
 
+      //save values to set back to later
       float Xtool = Robot_Kin_Tool[0];
       float Ytool = Robot_Kin_Tool[1];
       float Ztool = Robot_Kin_Tool[2];
@@ -4233,7 +4331,6 @@ void loop() {
       } else if (Dir == "W1") {
         Robot_Kin_Tool[3] = Robot_Kin_Tool[3] - Dist * M_PI / 180;
       }
-
 
       JointAnglePreKin[0] = (J1StepM - J1zeroStep) / J1StepDeg;
       JointAnglePreKin[1] = (J2StepM - J2zeroStep) / J2StepDeg;
@@ -5003,7 +5100,7 @@ void loop() {
       //use drivemotorsJ
       moveJ(inData, true, false, false);
     }
-
+    
     //----- MOVE G ---------------------------------------------------
     //-----------------------------------------------------------------------
     if (function == "MG") {
@@ -5403,6 +5500,8 @@ void loop() {
       J4LoopMode = LoopMode.substring(3, 4).toInt();
       J5LoopMode = LoopMode.substring(4, 5).toInt();
       J6LoopMode = LoopMode.substring(5).toInt();
+
+
 
       //calc vector from start point of circle (mid) to center of circle (beg)
       Xvect = xMid - xBeg;

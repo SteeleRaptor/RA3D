@@ -64,7 +64,9 @@ class ArmController:
         #Tool jog variables
         self.V1 = 1 #axis 1
         self.V2 = 1 #positive
-    
+
+        #Extruder variables
+        self.extruder_deg_per_mm
     #endregion init
 
     #region ========|Calibration|==========
@@ -252,7 +254,11 @@ class ArmController:
         self.curPos.Rx = float(response[RxIdx+1:SpeedViolationIdx].strip())
         self.curPos.Ry = float(response[RyIdx+1:RxIdx].strip())
         self.curPos.Rz = float(response[RzIdx+1:RyIdx].strip())
+        self.curJ7 = float(response[J7Idx+1:J8Idx].strip())
 
+        #There are 2 displays in the program
+        self.root.currentJ7.config(text=str(self.cur7)+" mm")
+        self.root.currentJ72.config(text=str(self.cur7)+" mm")
         # Display values on UI
         # XYZ
         self.root.xCurCoord.config(text=self.curPos.x)
@@ -421,6 +427,7 @@ class ArmController:
         Rx = self.root.RxCoordEntry.get()
         Ry = self.root.RyCoordEntry.get()
         Rz = self.root.RzCoordEntry.get()
+        J7 = self.root.J7CoordEntry.get()
         # Check if any values are blank
         pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
         allValuesNumeric = True
@@ -442,12 +449,14 @@ class ArmController:
         if not re.match(pattern, Rz):
             self.root.terminalPrint("Rz is not a number")
             allValuesNumeric = False
-        
+        #Command will still send if J7 is empty
+        if not re.match(pattern, J7):
+            J7 = 0
         if allValuesNumeric:
             #self.root.terminalPrint("All values numeric, sending ML command")
             commandPos = Position(x,y,z,Rx,Ry,Rz,None)
             #Thread so that command doesn't interupt UI
-            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters])
+            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7})
             MLThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
@@ -487,12 +496,45 @@ class ArmController:
         
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending ML command")
+            
             #Thread so that command doesn't interupt UI
             commandPos = Position(float(x),float(y),float(z),float(Rx),float(Ry),float(Rz),None)
+            #TODO REMOVE TEST
+            Rz,Ry,Rx = self.root.printController.aer_to_euler_zyx(commandPos.Rx,commandPos.Ry,commandPos.Rz)
+            commandPos.Rz = Rz
+            commandPos.Ry = Ry
+            commandPos.Rx = Rx
             MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.defaultMoveParameters])
             MJThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
+    
+    #For testing extruder only
+    def extrude(self):
+        if self.checkIfAllBusy():
+            self.root.statusPrint("Cannot send extrude command. Arm is busy.")
+            return
+        # Read the values from each entry box
+        J7 = self.root.J7CoordEntry2.get()
+        # Check if any values are blank
+        pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
+        allValuesNumeric = True
+
+        if not re.match(pattern, J7):
+            self.root.terminalPrint("J7 is not a number")
+            allValuesNumeric = False
+        
+        if allValuesNumeric:
+            self.root.terminalPrint("All values numeric, sending ML command")
+            #self.requestPositionAndWait()
+            commandPos = self.curPos
+            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7})
+            MLThread.start()
+        else:
+            self.root.statusPrint("ML command not sent due to a value not being a number")
+    
+    def zeroJ7(self):
+        self.root.serialController.sendSerial("Z7\n")
 
     def getJointColors(self,J1,J2,J3,J4,J5,J6):
         if J1 == None:
@@ -536,7 +578,8 @@ class ArmController:
         if self.serialController.boardConnected is False or self.armCalibrated is False:
             self.root.statusPrint("Failed to move home")
             return
-        self.moveHome()
+        moveHomeThread = threading.Thread(target=self.moveHome)
+        moveHomeThread.start()
         
     def prepMoveSafe(self):
         if self.checkIfAllBusy():
@@ -545,7 +588,8 @@ class ArmController:
         if self.serialController.boardConnected is False or self.armCalibrated is False:
             self.root.statusPrint("Failed to move to safe positiion, Board not connected")
             return
-        self.moveSafe()
+        moveSafeThread = threading.Thread(target=self.moveSafe)
+        moveSafeThread.start()
 
     def setOpenLoop(self):
         self.defaultMoveParameters.setLoopMode(1)
@@ -599,8 +643,11 @@ class ArmController:
         #self.root.terminalPrint("Sending ML command...")
         # Taken from AR4.py, line XXXX
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
+        
+        #Convert extrudeRate to change in motor angle
+        J7 = extrudeRate*self.extruder_deg_per_mm
         # Create the command
-        command = MoveCommand("ML",pos, moveParameters, J7=extrudeRate)
+        command = MoveCommand("ML",pos, moveParameters, J7=J7)
         #self.root.terminalPrint(str(command)[0:-2])
         # Check if board is not connected or arm is not calibrated
         if self.serialController.boardConnected is False:
@@ -625,6 +672,7 @@ class ArmController:
         else:
             #stop print if timed out
             self.root.printController.flag = "timeout after: " + str(timeout) + "s"
+        
         self.awaitingMoveResponse = False
 
     def sendRJ(self, J1, J2, J3, J4, J5, J6, moveParameters, timeout=10):
@@ -655,7 +703,7 @@ class ArmController:
             self.root.terminalPrint(response)
             self.root.statusPrint("Move command executed successfully")
         self.awaitingMoveResponse = False
-
+    
     def moveCircle(self):
         pass
     def moveArc(self):
@@ -894,7 +942,7 @@ class ArmController:
         
         self.root.terminalPrint("Setting current position as origin...")
         #origin can be set by an origin or at current position
-        if origin.x is None:
+        if origin is None or origin.x is None:
             if self.checkIfBusy() is True:
                 self.root.statusPrint("Failed to set origin. Arm is busy.")
                 return

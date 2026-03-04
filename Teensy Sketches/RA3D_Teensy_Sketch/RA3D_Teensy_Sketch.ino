@@ -38,6 +38,7 @@
 typedef float Matrix4x4[16];
 typedef float tRobot[66];
 
+//Serial variables
 String cmdBuffer1;
 String cmdBuffer2;
 String cmdBuffer3;
@@ -47,6 +48,7 @@ String checkData;
 String function;
 volatile byte state = LOW;
 
+//-------------TEENSY PIN SETUP---------
 const int J1stepPin = 0;
 const int J1dirPin = 1;
 const int J2stepPin = 2;
@@ -79,16 +81,19 @@ const int J9calPin = 38;
 const int EstopPin = 39;
 
 //set encoder multiplier
-//all values were off by a factor of 2
+//all values were off by a factor of 2 :)
+//Thanks Chris Hansen
 float J1encMult = 5;
 float J2encMult = 5;
 float J3encMult = 5;
 float J4encMult = 5;
 float J5encMult = 2.5;
 float J6encMult = 5;
+
 //reduce offset for higher precision
 int encCollisionOffset = 50;
 int encoderCLTolerance = 2;
+
 //set encoder pins
 Encoder J1encPos(14, 15);
 Encoder J2encPos(17, 16);
@@ -108,7 +113,7 @@ float J3axisLimPos = 52;
 float J3axisLimNeg = 89;
 float J4axisLimPos = 180;
 float J4axisLimNeg = 180;
-float J5axisLimPos = 100;//changed from 105 to 100 because it is shorter
+float J5axisLimPos = 100;//changed from 105 to 100 because it is shorter than expected
 float J5axisLimNeg = 105;//This seems way too high, but the arm is moving itself into the wrong position
 float J6axisLimPos = 180;
 float J6axisLimNeg = 180;
@@ -118,6 +123,7 @@ float J8axisLimNeg = 0;
 float J9axisLimPos = 3450;
 float J9axisLimNeg = 0;
 
+//Important directions
 int J1MotDir = 0;
 int J2MotDir = 1;
 int J3MotDir = 1;
@@ -138,7 +144,7 @@ int J7CalDir = 0;
 int J8CalDir = 0;
 int J9CalDir = 0;
 
-//define total axis travel
+//define total axis travel possible
 float J1axisLim = J1axisLimPos + J1axisLimNeg;
 float J2axisLim = J2axisLimPos + J2axisLimNeg;
 float J3axisLim = J3axisLimPos + J3axisLimNeg;
@@ -167,11 +173,10 @@ int J4StepLim = J4axisLim * J4StepDeg;
 int J5StepLim = J5axisLim * J5StepDeg;
 int J6StepLim = J6axisLim * J6StepDeg;
 //Removed because J7 is continous
-//Removed because J7 is continous
 int J8StepLim = J8axisLim * J8StepDeg;
 int J9StepLim = J9axisLim * J9StepDeg;
 
-//step at axis zero
+//step when at negative limit, functions as a datum
 int J1zeroStep = J1axisLimNeg * J1StepDeg;
 int J2zeroStep = J2axisLimNeg * J2StepDeg;
 int J3zeroStep = J3axisLimNeg * J3StepDeg;
@@ -212,7 +217,7 @@ float J7calBaseOff = 0;
 float J8calBaseOff = 0;
 float J9calBaseOff = 0;
 
-//reset collision indicators
+//initialize collision indicators
 int J1collisionTrue = 0;
 int J2collisionTrue = 0;
 int J3collisionTrue = 0;
@@ -222,6 +227,9 @@ int J6collisionTrue = 0;
 int TotalCollision = 0;
 int KinematicError = 0;
 
+
+//Extra axis variables used for calibration
+//Currently unused because there is no zero for extruder
 float J7length;
 float J7rot;
 float J7steps;
@@ -247,11 +255,14 @@ unsigned long J5DebounceTime = 0;
 unsigned long J6DebounceTime = 0;
 unsigned long debounceDelay = 50;
 
+
 String Alarm = "0";
 String speedViolation = "0";
-float minSpeedDelay = 200;
+
+//----------IMPORTANT------------
+float minSpeedDelay = 200;//determines maximum motor speed
 float maxMMperSec = 192;
-float linWayDistSP = 1; //waypoints per distance?
+float linWayDistSP = 1; //determines
 String debug = "";
 String flag = "";
 const int TRACKrotdir = 0;
@@ -274,6 +285,7 @@ int J6LoopMode;
 //Variable for whether whole system is in closed loop
 int closedLoopTrue =1;
 
+//-----------Inverse Kinematic variables-----------
 #define ROBOT_nDOFs 6
 const int numJoints = 9;
 typedef float tRobotJoints[ROBOT_nDOFs];
@@ -439,7 +451,8 @@ float DHparams[6][4] = {
 Matrix4x4 Robot_BaseFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 /// Custom robot tool (tool frame, end of arm tool or TCP)
-Matrix4x4 Robot_ToolFrame = { 0, 0, 1, 22.39, 0, 1, 0, 0, -1, 0, 0, 40, 0, 0, 0, 1 };
+Matrix4x4 Robot_ToolFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+//Matrix4x4 Robot_ToolFrame = { 0, 0, 1, 22.39, 0, 1, 0, 0, -1, 0, 0, 40, 0, 0, 0, 1 };
 
 /// Robot parameters
 /// All robot data is held in a large array
@@ -1005,7 +1018,7 @@ void SolveInverseKinematics() {
           }
         }
       }
-      if (performance[j] < bestPeformance)
+      if (performance[j] < bestPerformance)
       {
         bestPerformance = performance[j];
         bestSolution = j;
@@ -1022,18 +1035,18 @@ void SolveInverseKinematics() {
       for (int i = 0; i < ROBOT_nDOFs; i++){
         performance2[j] += abs(joints_estimate[i] - SolutionMatrix[i][j]);
       }
-      if (performance2[j] < bestPeformance){
+      if (performance2[j] < bestPerformance){
         bestPerformance = performance2[j];
         bestSolution = j;
       }
     }
     if (bestSolution>=0){
       solVal = bestSolution; 
-    } else{
-      solVal = 0;//fall back to first solution
     }
   }
-  
+  if (solVal < 0){
+    solVal = 0;//fall back to first solution
+  }
   //if no solution
   if (NumberOfSol == 0) {
     KinematicError = 1;
@@ -2197,6 +2210,8 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     J8dir = (J8stepDif <= 0) ? 1 : 0;
     J9dir = (J9stepDif <= 0) ? 1 : 0;
 
+    J7stepDif = 0; //Assume MJ cannot extrude
+
     // Arrays for joint properties
     int dir[numJoints] = { J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir };
     int StepM[numJoints] = { J1StepM, J2StepM, J3StepM, J4StepM, J5StepM, J6StepM, J7StepM, J8StepM, J9StepM };
@@ -3003,11 +3018,11 @@ void loop() {
 
     //-----COMMAND ZERO J7---------------------------------------------------
     //-----------------------------------------------------------------------
-    /*if (function == "Z7") {
+    if (function == "Z7") {
       J7StepM = 0;
       sendRobotPos();
     }
-
+    /*
     //-----COMMAND ZERO J8---------------------------------------------------
     //-----------------------------------------------------------------------
     if (function == "Z8") {
@@ -3929,7 +3944,7 @@ void loop() {
         J7dir = (J7stepDif <= 0) ? 1 : 0;
         J8dir = (J8stepDif <= 0) ? 1 : 0;
         J9dir = (J9stepDif <= 0) ? 1 : 0;
-
+        J7stepDif = 0;
         //determine if requested position is within axis limits
         if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
           J1axisFault = 1;
@@ -4254,7 +4269,7 @@ void loop() {
     }*/
     //----- Jog T ---------------------------------------------------
     //-----------------------------------------------------------------------
-    //This function seems like it changes the tool a set distance
+    //This function seems like it moves the tool a set distance
     if (function == "JT") {
       int J1dir;
       int J2dir;
@@ -4533,7 +4548,7 @@ void loop() {
       int J4stepDif = J4StepM - J4futStepM;
       int J5stepDif = J5StepM - J5futStepM;
       int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = J7_In;
+      int J7stepDif = J7_In;//RJ may be used to extrude
       int J8stepDif = J8StepM - J8futStepM;
       int J9stepDif = J9StepM - J9futStepM;
 
@@ -4579,7 +4594,6 @@ void loop() {
       }
       TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
 
-
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
         //move to center positions except J5 to 45deg
@@ -4599,11 +4613,9 @@ void loop() {
         Serial.println(Alarm);
       }
 
-
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }
-
 
 
     //----- MOVE L ---------------------------------------------------
@@ -4796,7 +4808,9 @@ void loop() {
         rndData = "X" + String(rndArcMid[0]) + "Y" + String(rndArcMid[1]) + "Z" + String(rndArcMid[2]) + "Rz" + String(rndArcMid[3]) + "Ry" + String(rndArcMid[4]) + "Rx" + String(rndArcMid[5]) + "Ex" + String(rndArcEnd[0]) + "Ey" + String(rndArcEnd[1]) + "Ez" + String(rndArcEnd[2]) + "Tr" + String(xyzuvw_Temp[6]) + "S" + SpeedType + String(SpeedVal) + "Ac" + String(ACCspd) + "Dc" + String(DCCspd) + "Rm" + String(ACCramp) + "W" + WristCon;
         function = "MA";
         rndTrue = true;
-      } else {
+      } 
+      //for non spline mode, which we will mainly be using
+      else {
         //Updates xyzuvw_PostKin as the current position using forwardKinematics
         updatePos();
         //Set input to InverseKinematics as desired position
@@ -4808,7 +4822,8 @@ void loop() {
         xyzuvw_PreKin[5] = xyzuvw_Temp[5];
       }
 
-      //xyz vector
+      //xyz vector for change in position
+      //Pre kinematics is being used to store just the desired position which is dumb
       Xvect = xyzuvw_PreKin[0] - xyzuvw_PostKin[0];
       Yvect = xyzuvw_PreKin[1] - xyzuvw_PostKin[1];
       Zvect = xyzuvw_PreKin[2] - xyzuvw_PostKin[2];
@@ -4828,16 +4843,18 @@ void loop() {
 
       //line dist and determine way point gap
       //pythagorean theorem
-      //pythagorean theorem
+      //calculate norm of vector for line distance
       float lineDist = pow((pow((Xvect), 2) + pow((Yvect), 2) + pow((Zvect), 2) + pow((RZvect), 2) + pow((RYvect), 2) + pow((RXvect), 2)), .5);
+      //line distance shouldn't be 0
       if (lineDist > 0) {
         
         
-        float wayPts = lineDist / linWayDistSP;
+        float wayPts = lineDist / linWayDistSP;//currently 1 way point per mm, could change
         float waypointPercentage = 1 / wayPts; //inverse of # of waypoints
 
-        //pre calculate entire move and speeds
-        //Calculate JointAnglePostKin based on xyz_uvwIn
+        //----pre calculate entire move and speeds----
+
+        //Calculate JointAnglePostKin based on xyz_uvwIn of final destination
         SolveInverseKinematics();
         //calc destination motor steps for precalc
         int J1futStepM = (JointAnglePostKin[0] + J1axisLimNeg) * J1StepDeg;
@@ -4855,14 +4872,13 @@ void loop() {
         J6TargetStep = J6futStepM;
         //calc delta from current to destination fpr precalc
         //used to calculate curDelay, not drive motors
-        //used to calculate curDelay, not drive motors
         int J1stepDif = J1StepM - J1futStepM;
         int J2stepDif = J2StepM - J2futStepM;
         int J3stepDif = J3StepM - J3futStepM;
         int J4stepDif = J4StepM - J4futStepM;
         int J5stepDif = J5StepM - J5futStepM;
         int J6stepDif = J6StepM - J6futStepM;
-        //----------Some modified logics from driveMotorsJ()-------------
+
         //----------Some modified logics from driveMotorsJ()-------------
 
         //FIND HIGHEST STEP FOR PRECALC
@@ -4918,6 +4934,7 @@ void loop() {
 
         //calc step gap for percentage
         else if (SpeedType == "p") {
+          //min speed delay creates 100% speed
           calcStepGap = minSpeedDelay / (SpeedVal / 100);
         }
 
@@ -4926,7 +4943,6 @@ void loop() {
         float calcDCCstepInc = (calcStepGap * (100 / ACCramp)) / DCCStep;
         float calcACCstartDel = (calcACCstepInc * ACCStep) * 2;
         float calcDCCendDel = (calcDCCstepInc * DCCStep) * 2;
-
 
         //calc way pt speeds
         float ACCwayPts = wayPts * (ACCspd / 100);
@@ -4946,7 +4962,8 @@ void loop() {
 
 
         // calc external axis way pt moves
-        int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
+        //change J7 to be relative movement so no refrence to axis
+        int J7futStepM = (J7_In) * J7StepDeg;
         int J7stepDif = (J7_In) / (wayPts - 1);
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
         int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);
@@ -4973,7 +4990,8 @@ void loop() {
         }
 
 
-        resetEncoders();
+        resetEncoders();//reset collision flags
+        checkEncoders();//Get current encoder positions
         /////////////////////////////////////////////////
         //loop through waypoints
         for (int i = 0; i <= wayPts + 1; i++) {
@@ -5045,7 +5063,6 @@ void loop() {
             J6axisFault = 1;
           }
           //Removed because J7 is continous
-          //Removed because J7 is continous
           if ((J8dir == 1 and (J8StepM + J8stepDif > J8StepLim)) or (J8dir == 0 and (J8StepM - J8stepDif < 0))) {
             J8axisFault = 1;
           }
@@ -5053,7 +5070,10 @@ void loop() {
             J9axisFault = 1;
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
-          float turnTolerance = 220; //max degrees that can be moved to avoid hazards
+          
+          //IMPORTANT
+          float turnTolerance = 250; //max degrees that can be moved to avoid hazard turn
+          //This should only affect if one waypoint jumps angles not the entire move
           if (abs(J4stepDif) > turnTolerance || abs(J5stepDif) > turnTolerance || abs(J6stepDif) > turnTolerance){
             Alarm = "Turn Hazard: J4:" + String(J4stepDif) + " J5:" + String(J5stepDif) + " J6:" + String(J6stepDif);
             Serial.println(Alarm);

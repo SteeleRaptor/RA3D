@@ -128,6 +128,12 @@ class TkWindow(Tk):
         self.cancelPrintButton = Button(self.printControlFrame, text="Cancel", width=10, command=self.printController.cancelPrint, state="disabled")
         self.cancelPrintButton.grid(row=0, column=3, padx=5, pady=5, sticky=N+S)
         
+        # Might move this
+        self.currentJ7Label = Label(self.printControlFrame,text="Extruded:")
+        self.currentJ7Label.grid(row=1,column=0, padx=5, pady=5, sticky=N+S)
+        self.currentJ7 = Label(self.printControlFrame,text="0 mm")
+        self.currentJ7.grid(row=1,column=1, padx=5, pady=5, sticky=N+S)
+
         # ==========| Temperatures Frame |==========
         self.temperatureFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
         self.temperatureFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
@@ -443,10 +449,10 @@ class TkWindow(Tk):
         # ==========| Movement Frame |==========
         self.moveFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
         self.moveFrame.grid(row=1, column=2, padx=5, pady=5, sticky=W+E+N+S)
-        # ===| Linear Move |===
+        # ===| XYZ Move |===
         self.linearMoveFrame = Frame(self.moveFrame, highlightthickness=1, highlightbackground="#000000")
         self.linearMoveFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
-        self.linearMoveLabel = Label(self.linearMoveFrame, text="Linear Move:")
+        self.linearMoveLabel = Label(self.linearMoveFrame, text="XYZ Move:")
         self.linearMoveLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
         # Populate xyz button
         self.getXYZButton = Button(self.linearMoveFrame, text="Get XYZ", command = self.armController.populateMJ)
@@ -465,6 +471,8 @@ class TkWindow(Tk):
         self.yCoordEntry = Entry(self.linearMoveFrame, width=6)
         self.zCoordLabel = Label(self.linearMoveFrame, text="Z:")
         self.zCoordEntry = Entry(self.linearMoveFrame, width=6)
+        self.J7CoordLabel = Label(self.linearMoveFrame, text="J7:")
+        self.J7CoordEntry = Entry(self.linearMoveFrame, width=6)
         self.RxCoordLabel = Label(self.linearMoveFrame, text="Rx:")
         self.RxCoordEntry = Entry(self.linearMoveFrame, width=6)
         self.RyCoordLabel = Label(self.linearMoveFrame, text="Ry:")
@@ -478,6 +486,8 @@ class TkWindow(Tk):
         self.yCoordEntry.grid(row=1, column=3, padx=(0, 5), pady=5)
         self.zCoordLabel.grid(row=1, column=4, padx=(5, 0), pady=5)
         self.zCoordEntry.grid(row=1, column=5, padx=(0, 5), pady=5)
+        self.J7CoordLabel.grid(row=1, column=6, padx=(0, 5), pady=5)
+        self.J7CoordEntry.grid(row=1, column=7, padx=(0, 5), pady=5)
         self.RxCoordLabel.grid(row=2, column=0, padx=(5, 0), pady=5)
         self.RxCoordEntry.grid(row=2, column=1, padx=(0, 5), pady=5)
         self.RyCoordLabel.grid(row=2, column=2, padx=(5, 0), pady=5)
@@ -633,6 +643,24 @@ class TkWindow(Tk):
         self.toolJogSetRz.grid(row=2, column=0, padx=5, pady=5)
         self.toolJogSetRy.grid(row=2, column=1, padx=5, pady=5)
         self.toolJogSetRx.grid(row=2, column=2, padx=5, pady=5)
+        # ========= Extruder Frame ===========
+        self.extruderFrame = Frame(self.toolTab, highlightthickness=2, highlightbackground="#000000")
+        self.extruderFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+N+E+S)
+
+        self.extruderLabel = Label(self.extruderFrame, text="Extruder Control For Testing")
+        self.extruderLabel.grid(row=0,column=0, columnspan=2)
+        self.J7CoordLabel2 = Label(self.extruderFrame, text="J7:")
+        self.J7CoordEntry2 = Entry(self.extruderFrame, width=6)
+        self.J7CoordLabel2.grid(row=1, column=0, padx=(0, 5), pady=5)
+        self.J7CoordEntry2.grid(row=1, column=1, padx=(0, 5), pady=5)
+        self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrude)
+        self.extrudeButton.grid(row=2, column=0,padx=(0, 5), pady=5)
+        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
+        self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
+        self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")
+        self.currentJ7Label2.grid(row=3,column=0, padx=5, pady=5, sticky=N+S)
+        self.currentJ72 = Label(self.extruderFrame,text="0 mm")
+        self.currentJ72.grid(row=3,column=1, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):

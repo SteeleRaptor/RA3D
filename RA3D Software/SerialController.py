@@ -139,7 +139,7 @@ class SerialController:
         if not self.running:
             return
         #print("processing responses")
-        self.root.after(100, self.processResponses)
+        self.root.after(10, self.processResponses)
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
@@ -193,7 +193,7 @@ class SerialController:
         elif sortResponse[:11] == "Turn Hazard":
             self.root.statusPrint(f"Encountered Hazard Move Stopped: {sortResponse[2:]}")
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
-            #flag = "Turn Hazard"
+            flag = "Turn Hazard"
             AC.awaitingMoveResponse = False
         elif sortResponse[:3] == "POS" and AC.calibrationInProgress:
             self.root.statusPrint("Position received from arm during calibration")
@@ -244,9 +244,9 @@ class SerialController:
             return
         #self.board.reset_input_buffer()
         # If we aren't awaiting for a serial response, then send the command
-        #self.root.statusPrint(f"Sending Command: {command}")
+        self.root.statusPrint(f"Sending Command: {command}")
         self.board.write(command.encode())
-        #self.root.terminalPrint("Command sent")
+        self.root.terminalPrint("Command sent")
         # Reset the input buffer
         #self.board.reset_input_buffer()
     # stop waiting for response if something timedout

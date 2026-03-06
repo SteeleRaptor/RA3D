@@ -267,12 +267,12 @@ class TkWindow(Tk):
         self.yCurCoord.grid(row=0, column=3, padx=5, pady=5)
         self.zCurCoordLabel.grid(row=0, column=4, padx=5, pady=5)
         self.zCurCoord.grid(row=0, column=5, padx=5, pady=5)
-        self.RxCurCoordLabel.grid(row=1, column=0, padx=5, pady=5)
-        self.RxCurCoord.grid(row=1, column=1, padx=5, pady=5)
+        self.RxCurCoordLabel.grid(row=1, column=4, padx=5, pady=5)
+        self.RxCurCoord.grid(row=1, column=5, padx=5, pady=5)
         self.RyCurCoordLabel.grid(row=1, column=2, padx=5, pady=5)
         self.RyCurCoord.grid(row=1, column=3, padx=5, pady=5)
-        self.RzCurCoordLabel.grid(row=1, column=4, padx=5, pady=5)
-        self.RzCurCoord.grid(row=1, column=5, padx=5, pady=5)
+        self.RzCurCoordLabel.grid(row=1, column=0, padx=5, pady=5)
+        self.RzCurCoord.grid(row=1, column=1, padx=5, pady=5)
         
         # Angles
         self.jointPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground="#000000")
@@ -488,12 +488,13 @@ class TkWindow(Tk):
         self.zCoordEntry.grid(row=1, column=5, padx=(0, 5), pady=5)
         self.J7CoordLabel.grid(row=1, column=6, padx=(0, 5), pady=5)
         self.J7CoordEntry.grid(row=1, column=7, padx=(0, 5), pady=5)
-        self.RxCoordLabel.grid(row=2, column=0, padx=(5, 0), pady=5)
-        self.RxCoordEntry.grid(row=2, column=1, padx=(0, 5), pady=5)
+        self.RxCoordLabel.grid(row=2, column=4, padx=(5, 0), pady=5)
+        self.RxCoordEntry.grid(row=2, column=5, padx=(0, 5), pady=5)
         self.RyCoordLabel.grid(row=2, column=2, padx=(5, 0), pady=5)
         self.RyCoordEntry.grid(row=2, column=3, padx=(0, 5), pady=5)
-        self.RzCoordLabel.grid(row=2, column=4, padx=(5, 0), pady=5)
-        self.RzCoordEntry.grid(row=2, column=5, padx=(0, 5), pady=5) 
+        self.RzCoordLabel.grid(row=2, column=0, padx=(5, 0), pady=5)
+        self.RzCoordEntry.grid(row=2, column=1, padx=(0, 5), pady=5) 
+        #Rz should go first because it is yaw
 
         # ===| Joint move |===
         self.jointMoveFrame = Frame(self.moveFrame, highlightthickness=1, highlightbackground="#000000")

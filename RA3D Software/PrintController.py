@@ -59,8 +59,9 @@ class PrintController:
         self.feedRate = 0
         self.extrudeRate = 0
         self.currentInstruction = 0
-        self.axis5 = True
+        self.axis5 = False
         self.justMovedHome = False
+        self.relativeExtrusion = True
     
         
     #endregion init
@@ -86,7 +87,6 @@ class PrintController:
                 self.root.armController.moveHome()
                 self.root.printThreadStarted = False
                 return
-            
             lineToConvert = self.gcodeLines[self.currentInstruction] # Pull current line
             
             self.currentInstruction += 1 # Increment currentInstruction
@@ -112,7 +112,6 @@ class PrintController:
             #self.root.armController.moveOrigin() #Use normal wrist condition
             self.justMovedHome = True
             #move
-            return
         elif message == "Success":
             #TODO add method that on each layer or when turn hazard encountered,
             # printer moves home than to position with normal wrist condition
@@ -133,17 +132,17 @@ class PrintController:
                 if self.justMovedHome:
                     moveParameters.wrist = "N"
                     self.justMovedHome = False
-                    self.root.armController.sendMJ(pos=self.printPos, moveParameters=moveParameters, timeout=timeout)
+                    self.root.armController.sendMJ(self.printPos, moveParameters=moveParameters, timeout=timeout)
                 else:
                     # Send the command to the arm, will wait for a response
-                    self.root.armController.sendML(pos=self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout)
+                    self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
             
             #must be last thing to do, copy last position
             self.lastPos = copy.deepcopy(self.printPos)
         else:
             print("Unexpected message from gcodeToTeensy")
         #Signifies thread has ended to start next thread
-        self.root.printThreadStarted = False
+        self.root.printThreadStarted = False #Do NOT return anywhere else in this function
 
 
 
@@ -161,7 +160,7 @@ class PrintController:
             return "" # Don't convert
         elif lineToConvert == "M83":
             self.root.terminalPrint("Using relative Extrusion")
-            #self.relativeExtrusion = True
+            self.relativeExtrusion = True
             return ""
         elif lineToConvert == "M82":
             return "Error absolute extrusion not supported"
@@ -174,16 +173,16 @@ class PrintController:
         elif lineToConvert[0:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]
         elif lineToConvert[0:3] == "G90": # Absolute positioning
-            self.root.terminalPrint("Using absolute positing")
+            self.root.terminalPrint("Using absolute positioning")
             # TODO: This needs handling or removal
             return ""
         elif lineToConvert[0:3] == "G91":
             return "Error relative positioning not supported"
         elif lineToConvert == "G92 E0\n":
             self.root.armController.zeroJ7()
-
+        #wait
         elif lineToConvert[:2] == "G4":
-            
+            span = float(lineToConvert[3:])
             time.sleep(span/1000)
         elif lineToConvert[0:2] == "G0" or lineToConvert[0:2] == "G1": # Move (treating G0 & G1 as equal)
         
@@ -244,7 +243,7 @@ class PrintController:
             
             #TODO Add rotation transition in teensy if necessary
 
-            #if using 6 axis g code
+            #if using 5 axis g code
             if self.axis5:
                 self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
             else:
@@ -281,7 +280,8 @@ class PrintController:
                 self.root.warningPrint("Moving of bounds")
                 return "Error moving out of bounds"
         else:
-            return "Error unrecognized gcode line"
+            pass
+            #return "Error unrecognized gcode line"
     
         # TODO: Additional processing for F to control speed or something
         # Note that F is in units per minute (per LinuxCNC specifications)
@@ -516,7 +516,7 @@ class PrintController:
         self.root.cornerLabel.config(text=f"Current Corner: {self.bedCalStep}")
 
         #For better positioning move home than origin so J4 starts at 0 rather than 180
-        self.root.armController.moveHome()
+        #self.root.armController.moveHome()
         self.root.armController.moveOrigin()
 
         #Move above
@@ -534,9 +534,8 @@ class PrintController:
         self.bedCalStep += 1
 
         #End calibration
-        if self.bedCalStep == 5: #Is at 5 after 4 is completed so done
+        if self.bedCalStep == 6: #Is at 6 after 4 is completed so done
             self.endSweepOrCal()
-
 
     # Used to sweep the corners without lifting to ensure kinematics are level to bed
     def cornerSweep(self, height, full=False):
@@ -588,207 +587,3 @@ class PrintController:
             if self.flag is not None:
                 self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
                 self.endSweepOrCal()
-    
-    #endregion Calibration
-
-    def aer_to_euler_zyx(azimuth, elevation, roll):
-        """
-        Convert AER (Azimuth, Elevation, Roll)
-        to Euler ZYX (yaw, pitch, roll)
-        Input and output in degrees
-        All other angles in radians.
-        """
-        azimuth = math.radians(azimuth)
-        elevation = math.radians(elevation)
-        roll = math.radians(roll)
-        # ---- Step 1: Forward vector from spherical coordinates ----
-        fx = np.cos(elevation) * np.cos(azimuth)
-        fy = np.cos(elevation) * np.sin(azimuth)
-        fz = np.sin(elevation)
-
-        forward = np.array([fx, fy, fz])
-        forward = forward / np.linalg.norm(forward)
-
-        # ---- Step 2: Build orthonormal frame ----
-        world_up = np.array([0.0, 0.0, 1.0])
-
-        right = np.cross(world_up, forward)
-        right = right / np.linalg.norm(right)
-
-        up = np.cross(forward, right)
-
-        # ---- Step 3: Apply roll about forward axis ----
-        # Rodrigues rotation formula
-        K = np.array([
-            [0, -forward[2], forward[1]],
-            [forward[2], 0, -forward[0]],
-            [-forward[1], forward[0], 0]
-        ])
-
-        R_roll = np.eye(3) + np.sin(roll) * K + (1 - np.cos(roll)) * (K @ K)
-
-        R_no_roll = np.column_stack((forward, right, up))
-        R = R_no_roll @ R_roll
-
-        # ---- Step 4: Extract ZYX Euler angles ----
-        # R = Rz(yaw) * Ry(pitch) * Rx(roll)
-
-        if abs(R[2,0]) < 1.0:
-            pitch = -np.arcsin(R[2,0])
-            yaw = np.arctan2(R[1,0], R[0,0])
-            roll_zyx = np.arctan2(R[2,1], R[2,2])
-        else:
-            # Gimbal lock case
-            pitch = np.pi/2 if R[2,0] <= -1 else -np.pi/2
-            yaw = np.arctan2(-R[0,1], R[1,1])
-            roll_zyx = 0.0
-        
-        yaw = math.degrees(yaw)
-        pitch = math.degrees(pitch)
-        roll_zyx = math.degrees(roll_zyx)
-
-        return yaw, pitch, roll_zyx
-    
-    def aer_to_euler_zyx_with_comfort_roll(
-        azimuth, elevation,
-        tool_position,
-        comfort_point):
-        """
-        azimuth, elevation in radians
-        tool_position: np.array([x,y,z])
-        comfort_point: np.array([x,y,z])
-        """
-        azimuth = math.radians(azimuth)
-        elevation = math.radians(elevation)
-        # ---- Forward from AER ----
-        fx = np.cos(elevation) * np.cos(azimuth)
-        fy = np.cos(elevation) * np.sin(azimuth)
-        fz = np.sin(elevation)
-
-        forward = np.array([fx, fy, fz])
-        forward /= np.linalg.norm(forward)
-
-        # ---- Vector toward comfort point ----
-        v = comfort_point - tool_position
-
-        # ---- Remove component along forward (projection onto roll plane) ----
-        v_perp = v - np.dot(v, forward) * forward
-
-        if np.linalg.norm(v_perp) < 1e-8:
-            # Degenerate case: choose world up fallback
-            v_perp = np.array([0, 0, 1]) - np.dot([0,0,1], forward)*forward
-
-        up = v_perp / np.linalg.norm(v_perp)
-
-        # ---- Compute right vector ----
-        right = np.cross(up, forward)
-        right /= np.linalg.norm(right)
-
-        # Re-orthogonalize up
-        up = np.cross(forward, right)
-
-        # ---- Build rotation matrix ----
-        # Tool X = forward
-        # Tool Y = right
-        # Tool Z = up
-        R = np.column_stack((forward, right, up))
-
-        # ---- Extract ZYX Euler ----
-        if abs(R[2,0]) < 1:
-            pitch = -np.arcsin(R[2,0])
-            yaw = np.arctan2(R[1,0], R[0,0])
-            roll = np.arctan2(R[2,1], R[2,2])
-        else:
-            pitch = np.pi/2 if R[2,0] <= -1 else -np.pi/2
-            yaw = np.arctan2(-R[0,1], R[1,1])
-            roll = 0.0
-        yaw = math.degrees(yaw)
-        pitch = math.degrees(pitch)
-        roll_zyx = math.degrees(roll)
-        return yaw, pitch, roll_zyx
-
-class AEROrientationSolver:
-    def __init__(self,
-                 stiffness_weight=0.5,   # 0 → world up, 1 → comfort bias
-                 tau=0.1):               # smoothing time constant (seconds)
-
-        self.stiffness_weight = stiffness_weight
-        self.tau = tau
-        self.prev_roll = 0.0
-
-    def compute(self,
-                azimuth,
-                elevation,
-                tool_position,
-                comfort_point,
-                dt):
-        """
-        azimuth, elevation in radians
-        tool_position, comfort_point → np.array([x,y,z])
-        dt → timestep (seconds)
-        """
-        azimuth = math.radians(azimuth)
-        elevation = math.radians(elevation)
-        # ---- Forward vector from AER ----
-        forward = np.array([
-            np.cos(elevation) * np.cos(azimuth),
-            np.cos(elevation) * np.sin(azimuth),
-            np.sin(elevation)
-        ])
-        forward /= np.linalg.norm(forward)
-
-        # ---- World-up reference ----
-        world_up = np.array([0.0, 0.0, 1.0])
-        v_world = world_up - np.dot(world_up, forward) * forward
-
-        # ---- Comfort vector ----
-        v_comfort = comfort_point - tool_position
-        v_comfort = v_comfort - np.dot(v_comfort, forward) * forward
-
-        # ---- Normalize both ----
-        if np.linalg.norm(v_world) < 1e-8:
-            v_world = np.array([1.0, 0.0, 0.0])
-        else:
-            v_world /= np.linalg.norm(v_world)
-
-        if np.linalg.norm(v_comfort) < 1e-8:
-            v_comfort = v_world
-        else:
-            v_comfort /= np.linalg.norm(v_comfort)
-
-        # ---- Blend ----
-        alpha = self.stiffness_weight
-        v_blend = (1 - alpha) * v_world + alpha * v_comfort
-        v_blend /= np.linalg.norm(v_blend)
-
-        up = v_blend
-
-        # ---- Right vector ----
-        right = np.cross(up, forward)
-        right /= np.linalg.norm(right)
-
-        # Re-orthogonalize up
-        up = np.cross(forward, right)
-
-        # ---- Build rotation matrix ----
-        R = np.column_stack((forward, right, up))
-
-        # ---- Extract ZYX Euler ----
-        if abs(R[2,0]) < 1:
-            pitch = -np.arcsin(R[2,0])
-            yaw = np.arctan2(R[1,0], R[0,0])
-            roll_raw = np.arctan2(R[2,1], R[2,2])
-        else:
-            pitch = np.pi/2 if R[2,0] <= -1 else -np.pi/2
-            yaw = np.arctan2(-R[0,1], R[1,1])
-            roll_raw = 0.0
-
-        # ---- Low-pass filter roll ----
-        beta = dt / (self.tau + dt)
-        roll_filtered = self.prev_roll + beta * (roll_raw - self.prev_roll)
-
-        self.prev_roll = roll_filtered
-        yaw = math.degrees(yaw)
-        pitch = math.degrees(pitch)
-        roll_filtered= math.degrees(roll_filtered)
-        return yaw, pitch, roll_filtered

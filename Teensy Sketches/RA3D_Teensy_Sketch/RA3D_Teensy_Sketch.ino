@@ -4666,6 +4666,7 @@ void loop() {
       int ryStart = inData.indexOf("Ry");
       int rxStart = inData.indexOf("Rx");
       int J7Start = inData.indexOf("J7");
+      int RelStart = inData.indexOf("Rel");
       int J8Start = inData.indexOf("J8");
       int J9Start = inData.indexOf("J9");
       int SPstart = inData.indexOf("S");
@@ -4687,6 +4688,7 @@ void loop() {
 
 
       J7_In = inData.substring(J7Start + 2, J8Start).toFloat();
+      int J7_Rel = inData.substring(RelStart+3, J8Start).toInt();
       J8_In = inData.substring(J8Start + 2, J9Start).toFloat();
       J9_In = inData.substring(J9Start + 2, SPstart).toFloat();
 
@@ -4962,14 +4964,18 @@ void loop() {
 
 
         // calc external axis way pt moves
-        //change J7 to be relative movement so no refrence to axis
-        int J7futStepM = (J7_In) * J7StepDeg;
-        int J7stepDif = (J7_In) / (wayPts - 1);
+        int J7stepDif;
+        // if J7 is relative extrusion
+        if (J7_Rel){
+          J7stepDif = (J7_In*J7StepDeg) / (wayPts - 1);
+        } else{
+          int J7futStepM = (J7_In+J7axisLimNeg) * J7StepDeg;
+          J7stepDif = (J7StepM - J7futStepM) / (wayPts - 1);
+        }
         int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
         int J8stepDif = (J8StepM - J8futStepM) / (wayPts - 1);
         int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
         int J9stepDif = (J9StepM - J9futStepM) / (wayPts - 1);
-
 
         if (J7stepDif <= 0) {
           J7dir = 1;

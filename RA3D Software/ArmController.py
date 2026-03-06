@@ -66,7 +66,7 @@ class ArmController:
         self.V2 = 1 #positive
 
         #Extruder variables
-        self.extruder_deg_per_mm
+        self.extruder_deg_per_mm = 1
     #endregion init
 
     #region ========|Calibration|==========
@@ -216,6 +216,7 @@ class ArmController:
     #region ========|Position|=============
 
     def processPosition(self, response):
+        response = response[3:] # Remove POS from string
         # Collect all the indexes for finding values
         # General formatting of a response: A[val]B[val]C[val]D[val]E[val]F[val]G[val]H[val]I[val]J[val]K[val]L[val]M[val]N[val]O[val]P[val]Q[val]R[val]
         J1Idx = response.find('A') # A value is angle of J1
@@ -236,6 +237,7 @@ class ArmController:
         J7Idx = response.find('P') # P value is angle of J7
         J8Idx = response.find('Q') # Q value is angle of J8
         J9Idx = response.find('R') # R value is angle of J9
+
         # Extract the actual values from the response
         # Joint angles
         self.curJ1 = float(response[J1Idx+1:J2Idx].strip())
@@ -254,11 +256,12 @@ class ArmController:
         self.curPos.Rx = float(response[RxIdx+1:SpeedViolationIdx].strip())
         self.curPos.Ry = float(response[RyIdx+1:RxIdx].strip())
         self.curPos.Rz = float(response[RzIdx+1:RyIdx].strip())
-        self.curJ7 = float(response[J7Idx+1:J8Idx].strip())
+        #print("J7string",response[J7Idx+1:J8Idx].strip())
+        self.curJ7 = float(response[J7Idx+1:J8Idx].strip())/self.extruder_deg_per_mm
 
         #There are 2 displays in the program
-        self.root.currentJ7.config(text=str(self.cur7)+" mm")
-        self.root.currentJ72.config(text=str(self.cur7)+" mm")
+        self.root.currentJ7.config(text=str(self.curJ7)+" mm")
+        self.root.currentJ72.config(text=str(self.curJ7)+" mm")
         # Display values on UI
         # XYZ
         self.root.xCurCoord.config(text=self.curPos.x)
@@ -456,7 +459,7 @@ class ArmController:
             #self.root.terminalPrint("All values numeric, sending ML command")
             commandPos = Position(x,y,z,Rx,Ry,Rz,None)
             #Thread so that command doesn't interupt UI
-            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7})
+            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7,"RelativeExtrude":True})
             MLThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
@@ -528,7 +531,7 @@ class ArmController:
             self.root.terminalPrint("All values numeric, sending ML command")
             #self.requestPositionAndWait()
             commandPos = self.curPos
-            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7})
+            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7, "RelativeExtrude":True})
             MLThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
@@ -636,7 +639,7 @@ class ArmController:
         self.awaitingMoveResponse = False
 
     #Move linear, timeout default is 10
-    def sendML(self, pos, moveParameters, extrudeRate=None, timeout=10):
+    def sendML(self, pos, moveParameters, extrudeRate=None, RelativeExtrude=True,timeout=10):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
@@ -645,9 +648,11 @@ class ArmController:
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         
         #Convert extrudeRate to change in motor angle
-        J7 = extrudeRate*self.extruder_deg_per_mm
+        J7 = 0
+        if extrudeRate is not None:
+            J7 = extrudeRate*self.extruder_deg_per_mm
         # Create the command
-        command = MoveCommand("ML",pos, moveParameters, J7=J7)
+        command = MoveCommand("ML",pos, moveParameters, J7=J7, J7Rel=RelativeExtrude)
         #self.root.terminalPrint(str(command)[0:-2])
         # Check if board is not connected or arm is not calibrated
         if self.serialController.boardConnected is False:
@@ -1174,7 +1179,7 @@ class MoveParameters:
         return self.loopMode
 #move command information, does not send a move command
 class MoveCommand:
-    def __init__(self,type,jointsOrPosition, moveParameters, J7=0):
+    def __init__(self,type,jointsOrPosition, moveParameters, J7=0, J7Rel=False):
         self.jointsOrPosition = jointsOrPosition
         if isinstance(jointsOrPosition, Position):
             self.A = jointsOrPosition.x
@@ -1192,15 +1197,18 @@ class MoveCommand:
             self.F = jointsOrPosition[5]
         if J7 != None:
             self.J7 = J7
+            #convert to binary true/false
+            self.J7Rel = 1 if J7Rel else 0
         else:
             self.J7 = 0
+            self.J7Rel = 0
         self.moveParameters = moveParameters
         self.type = type
         #debugging print("type is: ",self.type, type)
     def __str__(self):
         command = "Error"
         if self.type=="ML":
-            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
+            command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}Rel{self.J7Rel}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="MJ":
             command = f"MJX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="RJ":

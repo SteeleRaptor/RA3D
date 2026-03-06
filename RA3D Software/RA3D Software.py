@@ -7,7 +7,7 @@ from datetime import datetime
 from SerialController import SerialController
 from ArmController import ArmController
 from PrintController import PrintController
-from TemperatureController import TemperatureController
+#from TemperatureController import TemperatureController
 
 class TkWindow(Tk):
     # region init
@@ -32,7 +32,7 @@ class TkWindow(Tk):
         self.serialController = SerialController(self.root)
         self.armController = ArmController(self.root, self.serialController)
         self.printController = PrintController(self.root)
-        self.temperatureController = TemperatureController(self.root)
+        #self.temperatureController = TemperatureController(self.root)
 
         # Create and draw widgets onto the window
         self.createTabs()
@@ -57,7 +57,7 @@ class TkWindow(Tk):
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
         # Call the temperatureController's shutdown function which releases its control on the GPIOs
-        self.temperatureController.shutdown()
+        # self.temperatureController.shutdown()
         # Close the window
         self.root.destroy()
     #endregion
@@ -145,7 +145,7 @@ class TkWindow(Tk):
         self.hotendTarget = Entry(self.temperatureFrame, width=5)
         self.hotendTarget.insert(0, "0")
         self.hotendTarget.grid(row=1, column=1, padx=5, pady=5)
-        self.hotendCtrlButton = Button(self.temperatureFrame, text="Control", width=10, command=lambda: self.temperatureController.toggleControl("hotend"))
+        self.hotendCtrlButton = Button(self.temperatureFrame, text="Control", width=10)
         self.hotendCtrlButton.grid(row=1, column=2, padx=5, pady=5)
         self.hotendActualLabel = Label(self.temperatureFrame, text="Actual:")
         self.hotendActualLabel.grid(row=2, column=0, padx=5, pady=5)
@@ -160,7 +160,7 @@ class TkWindow(Tk):
         self.bedTarget = Entry(self.temperatureFrame, width=5)
         self.bedTarget.insert(0, "0")
         self.bedTarget.grid(row=4, column=1, padx=5, pady=5)
-        self.bedCtrlButton = Button(self.temperatureFrame, text="Control", width=10, command=lambda: self.temperatureController.toggleControl("bed"))
+        self.bedCtrlButton = Button(self.temperatureFrame, text="Control", width=10)
         self.bedCtrlButton.grid(row=4, column=2, padx=5, pady=5)
         self.bedActualLabel = Label(self.temperatureFrame, text="Actual:")
         self.bedActualLabel.grid(row=5, column=0, padx=5, pady=5)
@@ -786,7 +786,7 @@ class TkWindow(Tk):
         
 
         # TODO: Temporary
-        self.temperatureController.updateTemp()
+        #self.temperatureController.updateTemp()
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)

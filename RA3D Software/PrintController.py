@@ -124,8 +124,9 @@ class PrintController:
             #estimate timeout
             timeout = self.root.armController.estimateMoveTime(self.lastPos,self.printPos,moveParameters.speed)
             timeout += 10 #extra time for communication
-            
-            if self.printPos.x is not None:
+
+            #if valid position and no flag
+            if self.printPos.x is not None and self.flag is None:
                 self.root.terminalPrint(f"Point: {self.printPos.GetAbsolute()}") # Print the returned point list
                 
                 #So that when coming from a home command it moves with optimal wrist condition

@@ -134,9 +134,11 @@ class SerialController:
         size = int(self.responseQueue.qsize())
         for i in range(size):
             if self.responseQueue.queue[i][:5] == "Estop":
-                self.root.printController.cancelPrint()
+                self.root.printController.pausePrint()
+                print("Estop found after peeking ahead")
                 self.cleanQueue("Estop")
-        print("response queue cleaned")
+                break
+       
     
     #Advances the response queue every .01 seconds    
     def processResponses(self):
@@ -144,7 +146,7 @@ class SerialController:
             if not self.waiting:
                 response = self.responseQueue.get()
                 self.sortResponse(response)
-            #This means the print will stop regardless if it is waiting for a response
+            #This means the print will estop regardless if it is waiting for a response
             else:
                 self.peekQueueForEstop()
         #exit this thread if serial is not connected

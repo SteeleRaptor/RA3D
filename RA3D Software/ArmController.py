@@ -3,7 +3,7 @@ import numpy as np
 import re, time, threading, math, copy
 from SerialController import SerialController
 from Kinematics import Kinematics
-
+from RotationSolver import RotationSolver
 class ArmController:
     #region init
     def __init__(self, root, serialController):
@@ -502,11 +502,12 @@ class ArmController:
             
             #Thread so that command doesn't interupt UI
             commandPos = Position(float(x),float(y),float(z),float(Rx),float(Ry),float(Rz),None)
+            rotationSolver = RotationSolver()
             #TODO REMOVE TEST
-            Rz,Ry,Rx = self.root.printController.aer_to_euler_zyx(commandPos.Rx,commandPos.Ry,commandPos.Rz)
-            commandPos.Rz = Rz
-            commandPos.Ry = Ry
-            commandPos.Rx = Rx
+            Rz,Ry,Rx = rotationSolver.convertZYX_Zup_to_Xup(commandPos.Rz,commandPos.Ry,commandPos.Rx)
+            commandPos.Rz = round(Rz,2)
+            commandPos.Ry = round(Ry,2)
+            commandPos.Rx = round(Rx,2)
             MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.defaultMoveParameters])
             MJThread.start()
         else:

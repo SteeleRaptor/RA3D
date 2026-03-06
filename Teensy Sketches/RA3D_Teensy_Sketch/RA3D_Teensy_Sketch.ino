@@ -452,6 +452,7 @@ Matrix4x4 Robot_BaseFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 /// Custom robot tool (tool frame, end of arm tool or TCP)
 Matrix4x4 Robot_ToolFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+
 //Matrix4x4 Robot_ToolFrame = { 0, 0, 1, 22.39, 0, 1, 0, 0, -1, 0, 0, 40, 0, 0, 0, 1 };
 
 /// Robot parameters
@@ -1134,6 +1135,7 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
 
   xyzwpr_2_pose(*(T(*)[6]) & DK[36], base);
   xyzwpr_2_pose(*(T(*)[6]) & DK[42], tool);
+
   for (i0 = 0; i0 < 4; i0++) {
     i = i0 << 2;
     Hout[i] = base[i0];
@@ -1249,27 +1251,64 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
       q1 = q13_idx_0 + DK[2];
       B = k2 + DK[8];
       C = q13_idx_2 + DK[14];
-      make_sqrt = B + C;
-      s31 = cos(make_sqrt);
+      //Modification
+      make_sqrt = sin(B + C);
+      s31 = cos(B+C);
       c31 = cos(q1);
+      
+      //Zright
       Hout[0] = s31 * c31;
       ai = sin(q1);
       Hout[4] = s31 * ai;
-      make_sqrt = sin(make_sqrt);
       Hout[8] = -make_sqrt;
+
       Hout[12] = (DK[3] * make_sqrt - DK[7] * s31) - DK[13] * cos(C);
+
       Hout[1] = -sin(B + C) * c31;
+      //Hout[1] = -ai;
       Hout[5] = -sin(B + C) * ai;
+      //Hout[5] = c31;
       Hout[9] = -s31;
+      //Hout[9] = 0.0;
       Hout[13] = (DK[3] * s31 + DK[7] * make_sqrt) + DK[13] * sin(C);
       Hout[2] = -ai;
+      //Hout[2] = make_sqrt*c31;
       Hout[6] = c31;
+      //Hout[6] = make_sqrt*ai;
       Hout[10] = 0.0;
+      //Hout[10] = s31;
       Hout[14] = 0.0;
       Hout[3] = 0.0;
       Hout[7] = 0.0;
       Hout[11] = 0.0;
       Hout[15] = 1.0;
+
+      /*
+
+      // c31 = cos(q1), ai = sin(q1)
+      // s31 = cos(Pitch), make_sqrt = sin(Pitch) -> where Pitch is (B + C)
+
+      // Column 1: World X (Forward)
+      Hout[0] = c31 * s31;    
+      Hout[1] = ai * s31;     
+      Hout[2] = -make_sqrt;   
+
+      // Column 2: World Y (Left)
+      Hout[4] = -ai;          
+      Hout[5] = c31;          
+      Hout[6] = 0.0;          
+
+      // Column 3: World Z (Up - The direction the arm points at home)
+      Hout[8] = c31 * make_sqrt; 
+      Hout[9] = ai * make_sqrt;  
+      Hout[10] = s31;            
+
+      // Set translations and homogeneous constants to zero/one
+      Hout[3] = 0.0; Hout[7] = 0.0; Hout[11] = 0.0; 
+      Hout[12] = 0.0; Hout[13] = 0.0; Hout[14] = 0.0; Hout[15] = 1.0;
+
+      */
+
       for (i0 = 0; i0 < 4; i0++) {
         for (i = 0; i < 4; i++) {
           i1 = i << 2;
@@ -1277,6 +1316,7 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
         }
       }
 
+      
       make_sqrt = 1.0 - base[9] * base[9];
       if (make_sqrt <= 0.0) {
         make_sqrt = 0.0;
@@ -1300,6 +1340,36 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
         make_sqrt = sin(C);
         make_sqrt = atan2(base[5] / make_sqrt, -base[1] / make_sqrt);
       }
+      
+      /*
+      // Joint 5 is the angle between the forearm (Z-axis) and the tool Z-axis.
+      // base[10] is the r33 component (cos of Joint 5).
+      make_sqrt = 1.0 - base[10] * base[10]; 
+      if (make_sqrt <= 0.0) {
+        make_sqrt = 0.0;
+      } else {
+        make_sqrt = sqrt(make_sqrt);
+      }
+
+      if (make_sqrt < 1.0E-6) {
+          // Singularity: Wrist is straight.
+          // Use the approximate Joint 4 to resolve Joint 6.
+          C = atan2(0.0, base[10]); 
+          T s_approx = sin(bb_div_cc);
+          T c_approx = cos(bb_div_cc);
+          make_sqrt = atan2(s_approx * base[0] + c_approx * base[1], c_approx * base[0] - s_approx * base[1]);
+      } else if (joints_approx[4] >= 0.0) {
+          // Wrist Up configuration
+          bb_div_cc = atan2(base[9], base[8]);            // Joint 4: atan2(r23, r13)
+          C = atan2(make_sqrt, base[10]);                 // Joint 5: atan2(sin, cos)
+          make_sqrt = atan2(base[6], -base[2]);           // Joint 6: atan2(r32, -r31)
+      } else {
+          // Wrist Down configuration (flips J4 and J6 by 180 degrees)
+          bb_div_cc = atan2(-base[9], -base[8]);
+          C = atan2(-make_sqrt, base[10]);
+          make_sqrt = atan2(-base[6], base[2]);
+      }
+      */
 
       joints[0] = q13_idx_0;
       joints[3] = bb_div_cc + -DK[20];

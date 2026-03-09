@@ -502,11 +502,6 @@ class ArmController:
             
             #Thread so that command doesn't interupt UI
             commandPos = Position(float(x),float(y),float(z),float(Rx),float(Ry),float(Rz),None)
-            #TODO REMOVE TEST
-            Rz,Ry,Rx = self.root.printController.aer_to_euler_zyx(commandPos.Rx,commandPos.Ry,commandPos.Rz)
-            commandPos.Rz = Rz
-            commandPos.Ry = Ry
-            commandPos.Rx = Rx
             MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.defaultMoveParameters])
             MJThread.start()
         else:

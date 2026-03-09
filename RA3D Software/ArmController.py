@@ -2,7 +2,6 @@ from asyncio import wait
 import numpy as np
 import re, time, threading, math, copy
 from SerialController import SerialController
-from Kinematics import Kinematics
 
 class ArmController:
     #region init
@@ -10,7 +9,6 @@ class ArmController:
         # Save references to the main window and the serial controller
         self.root = root
         self.serialController = serialController
-        self.kinematics = Kinematics
         #Default loop mode Closed
         # Arm calibration variables
         self.armCalibrated = False # Flag to signify if the arm has been calibrated
@@ -28,6 +26,7 @@ class ArmController:
 
         # Speed parameters used for movement commands
         self.defaultMoveParameters = MoveParameters(80,10,10,30,0,'p')
+        
         #J Limits:
         self.J1Limits = [-170,170]
         self.J2Limits = [-42,90]
@@ -42,9 +41,12 @@ class ArmController:
         self.curJ4 = None
         self.curJ5 = None
         self.curJ6 = None
-        #Orign variables
+        #Orign variable
         self.origin = Origin(None,None,None)
+
+        #Current position of the arm that is received from the Teensy
         self.curPos = Position(None,None,None,None,None,None,self.origin)
+        
         # Stores calibration offset values
         self.J1CalOffset = 0
         self.J2CalOffset = 0
@@ -57,7 +59,7 @@ class ArmController:
         self.awaitingMoveResponse = False # Flag for if the ArmController is awaiting a serial response after sending a move command
         self.testingLimitSwitches = False # Flag for if the limit switch test is being performed
         self.testingEncoders = False      # Flag for if the encoder test is being performed
-        self.awaitingTestResponse = False # Flag for if we are awaiting a response after sending a test command such as for the limit switches or encoders
+        #self.awaitingTestResponse = False # Flag for if we are awaiting a response after sending a test command such as for the limit switches or encoders
         self.finishTest = False           # Flag for signifying to the program that the user wants to stop a test
         self.awaitingPosResponse = False  # Flag for requesting current position
 
@@ -91,61 +93,83 @@ class ArmController:
         #On every calibration reset to recomended
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
         # Call the calibration update function
-        self.calibrateArmUpdate()
+        calibrationThread = threading.Thread(target=self.calibrateArmUpdate())
+        calibrationThread.start()
 
-    def calibrateArmUpdate(self,response=None):
+    def calibrateArmUpdate(self):
+        response = None
         # Exit the function if calibration is not in progress and exit if so
-        if self.calibrationInProgress is False:
-            return
-        # Check current state and perform associated tasks
-        if self.calibrationState == 1: # Send CalStage1
-            self.calibrateJoints(calJ1=self.calJStage1[0],
-                                 calJ2=self.calJStage1[1],
-                                 calJ3=self.calJStage1[2],
-                                 calJ4=self.calJStage1[3],
-                                 calJ5=self.calJStage1[4],
-                                 calJ6=self.calJStage1[5])
-            self.calibrationState = 2
+        while self.calibrationInProgress:
+            # Check current state and perform associated tasks
+            if self.calibrationState == 1: # Send CalStage1
+                self.calibrateJoints(calJ1=self.calJStage1[0],
+                                    calJ2=self.calJStage1[1],
+                                    calJ3=self.calJStage1[2],
+                                    calJ4=self.calJStage1[3],
+                                    calJ5=self.calJStage1[4],
+                                    calJ6=self.calJStage1[5])
+                self.calibrationState = 2
+                response = self.root.serialController.waitForResponse("POS",35)
+            elif self.calibrationState == 2: # Await CalStage1 Response & process when ready
+                # Check if the serial controller has a response ready
+                if response is not None:
+                    # Save the response
+                    # Check if the calibration was successful
+                    # Inform user of Stage 1 success
+                    self.root.statusPrint("Stage 1 Calibration Successful")
+                    # Process position response and dispaly
+                    self.processPosition(response)
+                    # Move to next state
+                    self.calibrationState = 3
+                    # Print out the response received
+                    self.root.terminalPrint(response)
+                    response = None #reset response for next response
+                else:
+                    # If not, inform user of Stage 1 Failure
+                    self.root.statusPrint(f"Stage 1 Calibration FAILED")
+                    self.root.terminalPrint("Calibration timed out")
+                    # Exit calibration
+                    self.calibrationState = 0
+                    self.calibrationInProgress = False
+                    # Force arm calibration flag to False
+                    self.armCalibrated = False
+            elif self.calibrationState == 3: # Send CalStage2
+                self.calibrateJoints(calJ1=self.calJStage2[0],
+                                    calJ2=self.calJStage2[1],
+                                    calJ3=self.calJStage2[2],
+                                    calJ4=self.calJStage2[3],
+                                    calJ5=self.calJStage2[4],
+                                    calJ6=self.calJStage2[5])
+                self.calibrationState = 4
+                #Calibration will not continue until a response is received or timed out
+                response = self.root.serialController.waitForResponse("POS",35)
+            elif self.calibrationState == 4: # Await CalStage2 Response & process when ready
+                # Check if the serial controller has a response ready
+                if response is not None:
+                    # Check if the calibration was successful
+                    # Inform user of Stage 1 success
+                    self.root.statusPrint("Stage 2 Calibration Successful")
+                    # Process position response and dispaly
+                    self.processPosition(response)
 
-        elif self.calibrationState == 2: # Await CalStage1 Response & process when ready
-            # Check if the serial controller has a response ready
-            if response is not None:
-                # Save the response
-                # Check if the calibration was successful
-                # Inform user of Stage 1 success
-                self.root.statusPrint("Stage 1 Calibration Successful")
-                # Process position response and dispaly
-                self.processPosition(response)
-                # Move to next state
-                self.calibrationState = 3
-                # Print out the response received
-                self.root.terminalPrint(response)
-        elif self.calibrationState == 3: # Send CalStage2
-            self.calibrateJoints(calJ1=self.calJStage2[0],
-                                 calJ2=self.calJStage2[1],
-                                 calJ3=self.calJStage2[2],
-                                 calJ4=self.calJStage2[3],
-                                 calJ5=self.calJStage2[4],
-                                 calJ6=self.calJStage2[5])
-            self.calibrationState = 4
-        elif self.calibrationState == 4: # Await CalStage2 Response & process when ready
-            # Check if the serial controller has a response ready
-            if response is not None:
-                # Check if the calibration was successful
-                # Inform user of Stage 1 success
-                self.root.statusPrint("Stage 2 Calibration Successful")
-                # Process position response and dispaly
-                self.processPosition(response)
-
-                # Calibration complete
-                self.calibrationState = 0
-                # Calibration no longer in progress
-                self.calibrationInProgress = False
-                # Set arm calibration flag to True
-                self.armCalibrated = True
-                # Print out the response received
-                self.root.terminalPrint(response)
-                self.root.timeoutStartedCal = False
+                    # Calibration complete
+                    self.calibrationState = 0
+                    # Calibration no longer in progress
+                    self.calibrationInProgress = False
+                    # Set arm calibration flag to True
+                    self.armCalibrated = True
+                    # Print out the response received
+                    self.root.terminalPrint(response)
+                    self.root.timeoutStartedCal = False
+                else:
+                    # If not, inform user of Stage 2 Failure
+                    self.root.statusPrint("Stage 2 Calibration FAILED")
+                    self.root.terminalPrint("Calibration timed out")
+                    # Exit calibration
+                    self.calibrationState = 0
+                    self.calibrationInProgress = False
+                    # Force arm calibration flag to False
+                    self.armCalibrated = False
                 
 
     #for debugging
@@ -153,7 +177,7 @@ class ArmController:
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
         self.armCalibrated = True
         
-
+    #calibrate indvidual joints
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
         self.getCalOffsets() # Update calibration offsets from entry fields
         command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
@@ -165,6 +189,7 @@ class ArmController:
         # Tell the serial controller to send the serial
         self.serialController.sendSerial(command)
 
+    #Post calibrate individual joints
     def postCalibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
         if self.checkIfAllBusy():
             self.root.terminalPrint("Cannot post calibrate arm is busy")
@@ -215,6 +240,7 @@ class ArmController:
 
     #region ========|Position|=============
 
+    #Process position response to update UI
     def processPosition(self, response):
         response = response[3:] # Remove POS from string
         # Collect all the indexes for finding values
@@ -280,24 +306,24 @@ class ArmController:
         self.root.J6CurCoord.config(text=self.curJ6, fg=jointColors[5])
         self.updateDeltaFromOrigin()
 
+    #Position is updated without any arm movement
     def requestPositionManual(self):
         # Check if a board is connected
         # Check if the arm is busy with anything else
         if self.nominalCheck():
             self.root.statusPrint("Failed to request position update.")
             return
+        positionThread = threading.Thread(target=self.requestPositionAndWait)
+        positionThread.start()
+    
+
+    def requestPositionAndWait(self):
         self.root.statusPrint("Requesting position update...")
         self.serialController.sendSerial("RP\n") # Send instruction
         self.awaitingPosResponse = True # Set the flag
-        positionThread = threading.Thread(target=self.requestPositionAndWait)
-        positionThread.start()
-                
-
-    def requestPositionAndWait(self):
         # Return if we aren't awaiting a position response
         if self.awaitingPosResponse is False:
             return
-        
         response = self.root.serialController.waitForResponse("POS",3)
         # Check if the serial controller has a response ready
         self.root.terminalPrint("response is " + response)
@@ -718,14 +744,6 @@ class ArmController:
         print("Time:", estimateTime, " distance:", distance, " speed:", speed)
         return estimateTime
     
-    #custom move linear command that calculates inverse kinematics before sending and uses RJ
-    #This function may not be much different but InverseKinematics is needed for printing
-    def moveLinearCustom(self, X, Y, Z, Rx, Ry, Rz):
-        
-        outgoingJointAngles = self.kinematics.solveInverseKinematics([X, Y, Z, Rx, Ry, Rz])
-        # TODO Configure a way to use driveMotorsL instead driveMotorsJ
-        self.sendRJ(outgoingJointAngles[0], outgoingJointAngles[1], outgoingJointAngles[2], outgoingJointAngles[3], outgoingJointAngles[4], outgoingJointAngles[5])
-    
     # Moves the robot to a safe position to be turned off
     def moveSafe(self):
         self.sendRJ(0, -40, 60, 0, 45, 0, self.defaultMoveParameters)
@@ -771,7 +789,6 @@ class ArmController:
                 self.root.J4LimState.config(text=response[response.find('J4')+5:response.find("   J5")].strip())
                 self.root.J5LimState.config(text=response[response.find('J5')+5:response.find("   J6")].strip())
                 self.root.J6LimState.config(text=response[response.find('J6')+5:].strip())
-                self.awaitingTestResponse = False # Reset the flag
                 # Check if the user wants to stop the test
                 # This is done in here to prevent the program eternally waiting on a response
         self.testingLimitSwitches = False # Reset the test flag
@@ -799,36 +816,31 @@ class ArmController:
             # The "Set Encoder" instruction returns a "Done" except it is done with a print instead of println
             # which makes it so the serial can only be read by a "read" instead of "readline".
             # Therefore, we forcibly tell the serialController that it isn't waiting for a response
-            self.serialController.waitingForResponse = False
+            encoderTestThread = threading.Thread(target=self.encoderTestUpdate)
+            encoderTestThread.start()
 
     def encoderTestUpdate(self):
-        if self.awaitingTestResponse is False:
+        #while test has not finished
+        #If has reponse is not recieved another command will be sent after 2 seconds
+        while not self.finishTest:
+            #Send the command
             self.serialController.sendSerial("RE\n") # Send instruction
-            self.awaitingTestResponse = True # Set the flag
-            return
-        # Check if serial controller has a response ready
-        if self.serialController.responseReady:
-            # If so, read it in
-            response = self.serialController.getLastResponse()
-            self.root.terminalPrint(response)
-            # The "SE" instruction returns 'Done' so we need to watch out for it
-            if response == "Done":
-                self.awaitingTestResponse = False
-                return
-            # Encoder test will never return an error so we can always directly process
-            self.root.J1EncState.config(text=response[response.find('J1')+5:response.find("   J2")].strip())
-            self.root.J2EncState.config(text=response[response.find('J2')+5:response.find("   J3")].strip())
-            self.root.J3EncState.config(text=response[response.find('J3')+5:response.find("   J4")].strip())
-            self.root.J4EncState.config(text=response[response.find('J4')+5:response.find("   J5")].strip())
-            self.root.J5EncState.config(text=response[response.find('J5')+5:response.find("   J6")].strip())
-            self.root.J6EncState.config(text=response[response.find('J6')+5:].strip())
-            self.awaitingTestResponse = False # Reset the flag
-            # Check if the user wants to stop the test
-            # This is done in here to prevent the program eternally waiting on a response
-            if self.finishTest is True:
-                self.testingEncoders = False # Reset the test flag
-                self.finishTest = False # Reset the finish testing flag
-                self.root.statusPrint("Stopping encoder test")
+            #wait 2 seconds for a response
+            #send and recieve commands are RE
+            response = self.waitForResponse("RE",2)
+            if response is not None:
+                self.root.terminalPrint(response)
+                # Encoder test will never return an error so we can always directly process
+                self.root.J1EncState.config(text=response[response.find('J1')+5:response.find("   J2")].strip())
+                self.root.J2EncState.config(text=response[response.find('J2')+5:response.find("   J3")].strip())
+                self.root.J3EncState.config(text=response[response.find('J3')+5:response.find("   J4")].strip())
+                self.root.J4EncState.config(text=response[response.find('J4')+5:response.find("   J5")].strip())
+                self.root.J5EncState.config(text=response[response.find('J5')+5:response.find("   J6")].strip())
+                self.root.J6EncState.config(text=response[response.find('J6')+5:].strip())
+        self.testingEncoders = False # Reset the test flag
+        self.finishTest = False # Reset the finish testing flag
+        self.root.statusPrint("Stopping encoder test")
+
     #endregion testing
     
     #region Jogs
@@ -847,9 +859,6 @@ class ArmController:
         self.root.serialController.sendSerial(command)
         #self.root.serialController.sendSerial("start") #Don't know why it needs another command to start
 
-    #will send parameters back
-    def requestToolParameters(self):
-        pass
     
     def selectToolJogAxis(self,axis):
         self.V1 = axis
@@ -881,6 +890,7 @@ class ArmController:
         if self.checkIfAllBusy():
             self.root.terminalPrint("Arm busy")
         pass
+    #This is the other type of tool jog, not sure what it does
     def offsetTool(self):
         if self.checkIfAllBusy():
             self.root.terminalPrint("Arm busy")
@@ -890,38 +900,39 @@ class ArmController:
     #region Other Functions
   
     # Checks if any of the flags relating to the arm performing a task are True and if so, return True
+    # A message is optional to streamline error messages
     def checkIfBusy(self, message = None):
-        value = self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingTestResponse or self.awaitingPosResponse
+        value = self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingPosResponse
         if value:
             if message:
-                self.root.terminalPrint("Cannot" + message + " Arm busy")
+                self.root.terminalPrint("Cannot" + message + ", Arm busy")
             else:
                 self.root.terminalPrint("Arm busy")
         return value
     
     # meant to add calibration check without printing check
     # so move commands can execute while printing
-    def nominalCheck(self):
-        value = self.checkIfBusy()
+    def nominalCheck(self, message = None):
+        value = self.checkIfBusy(message=message)
         if self.root.serialController.boardConnected is False:
             self.root.warningPrint("No board connected")
             value = True
-        if self.armCalibrated is False:
+        elif self.armCalibrated is False:
             self.root.warningPrint("Arm not calibrated cannot proceed")
             value = True
         return value
     
     #Do not use this command on calibrate and it is assumed that these check do not need to be done to start calibration
-    def checkIfAllBusy(self):
+    def checkIfAllBusy(self,message=None):
         value = False
-        if self.nominalCheck():
+        if self.nominalCheck(message=message):
             value = True
         #check printer for printing processes
-        if self.root.printController.checkIfPrinterBusy():
+        if self.root.printController.checkIfPrinterBusy(message=message):
             value = True
         return value
     
-    #This should reset everything in check if busy
+    #This should reset everything in check if all busy
     def reset(self):
         self.awaitingMoveResponse = False
         #self.serialController.waitingForResponse = False
@@ -929,22 +940,19 @@ class ArmController:
         self.awaitingPosResponse = False
         self.testingLimitSwitches = False
         self.testingEncoders = False
-        self.awaitingTestResponse = False
+        self.root.printController.pausePrint() #should reset flag.
+        self.root.printController.bedCalibration = False
+        self.root.printController.cornerSweeping = False
+        self.root.serialController.serialQueue.clear()
     
     #endregion other functions
     #region ========|Origin|==================
-    #TODO Update this function to work with the origin class
     #TODO improve request position to wait
     def setOrigin(self,origin=None):
-        if self.serialController.boardConnected is False:
-            self.root.statusPrint("Failed to set origin. No board is connected")
-            return
-        
-        self.root.terminalPrint("Setting current position as origin...")
+       
         #origin can be set by an origin or at current position
         if origin is None or origin.x is None:
-            if self.checkIfBusy() is True:
-                self.root.statusPrint("Failed to set origin. Arm is busy.")
+            if not self.nominalCheck(message="set origin"):
                 return
             self.requestPositionAndWait #requests and waits
             self.origin.setOrigin(self.curPos)
@@ -952,6 +960,7 @@ class ArmController:
             self.root.xCurCoordOrigin.config(text=self.curPos.x)
             self.root.yCurCoordOrigin.config(text=self.curPos.y)
             self.root.zCurCoordOrigin.config(text=self.curPos.z)
+        #if origin is not none, no checks because the arm is setting the origin itself
         else:
             self.origin=copy.deepcopy(origin)
             self.curPos.origin = self.origin
@@ -963,10 +972,11 @@ class ArmController:
     def moveOrigin(self):
         if self.origin.checkOriginSet():
             moveParameters = copy.deepcopy(self.defaultMoveParameters)
-            moveParameters.wrist = "N"#Make wrist condition J4 near 0
+            moveParameters.wrist = "N" #Make wrist condition J4 near 0
             self.sendMJ(Position(self.origin.x,self.origin.y,self.origin.z,0,90,0, None), moveParameters=moveParameters)
 
 
+    #Updates UI display of UI from origin, called whenever a position is received
     def updateDeltaFromOrigin(self):
         if not self.origin.checkOriginSet():
             self.root.statusPrint("Origin not set")
@@ -985,31 +995,10 @@ class ArmController:
         self.sendMJ(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters)
 
     #endregion origin
-    #region ========|Test Movements WIP|======
-    def lineTest(self):
-        uBound = [90,90]
-        vBound = [0,90]
-        wBound = [0,90]
-        x=[-30,-20,-10,0,10,20,30,40]
-        y=[0,0,0,0,0,0,0,0]
-        z=[0,0,0,0,0,0,0,0]
-        xyz = self.relativeToAbsolute(x,y,z)
-        for i in range(len(x)):
-            outgoingJointAngles = self.kinematics.solveInverseKinematicsFreeUVW(xyz[:][i], uBound, vBound, wBound)
-            self.sendRJ(outgoingJointAngles[0], outgoingJointAngles[1], outgoingJointAngles[2], outgoingJointAngles[3], outgoingJointAngles[4], outgoingJointAngles[5])
-            wait(2000) #wait 2 seconds between moves
-   
-    def SquareTest(self):
-        #Linear sequencing needs to be implemented for this to work properl
-        pass
-    
-    def dynamicgcodeTest(self, gcodeList):
-        pass
-    #endregion
 
     #region ========|Timeouts|===============            
     #if no calibrate response
-    def calibrateTimeout(self):
+    '''def calibrateTimeout(self):
         timeout = 35
         timeInc = 0.1
         timeElapsed = 0
@@ -1051,8 +1040,8 @@ class ArmController:
             self.calibrationInProgress = False
             # Force arm calibration flag to False
             self.armCalibrated = False
-        self.root.timeoutStartedCal = False
-    def processPositionTimeout(self):
+        self.root.timeoutStartedCal = False'''
+    '''def processPositionTimeout(self):
         timeout = 5
         timeInc = 0.1
         timeElapsed = 0
@@ -1066,9 +1055,9 @@ class ArmController:
             self.awaitingPosResponse = False
             #
             # self.root.serialController.stopWaitingForReponse()
-        self.root.timeoutStartedPos = False
+        self.root.timeoutStartedPos = False'''
 
-    def moveTimeout(self):
+    '''def moveTimeout(self):
         timeout = 15
         timeInc = 0.1
         timeElapsed = 0
@@ -1084,12 +1073,12 @@ class ArmController:
             self.root.printController.flag = "Move Timeout"
             #self.root.serialController.stopWaitingForReponse()
             return
-        self.root.timeoutStartedMove = False
+        self.root.timeoutStartedMove = False'''
 
     #Could be used for encoder test but could be removed
-    def testTimeout(self):
+    '''def testTimeout(self):
         response = self.serialController.waitForResponse("TL",2)
-        self.armController.limitTestUpdate(response)
+        self.armController.limitTestUpdate(response)'''
     #endregion Timeouts
 
 #region--- Other Classes ---

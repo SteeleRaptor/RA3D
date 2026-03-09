@@ -409,9 +409,12 @@ class PrintController:
 
     
     #TODO Improve this function and make it work well with armcontroller check if busy
-    def checkIfPrinterBusy(self):
+    def checkIfPrinterBusy(self,message = None):
         if self.printing or self.cornerSweeping or self.bedCalibration:
-            self.root.terminalPrint("Printer busy")
+            if message:
+                self.root.terminalPrint("Cannot" + message + ", Printer busy")
+            else:
+                self.root.terminalPrint("Printer busy")
             return True
         return False
 
@@ -431,12 +434,21 @@ class PrintController:
 
     def startPrintBedCalibration(self):
         self.flag = None #set flag to none only on start
+
+        #If anything is busy cannot start arm
         if self.root.armController.checkIfAllBusy():
             self.root.statusPrint("Printer is busy, cannot start bed calibration")
             return
-        self.bedCalibration = True
-        self.bedCalStep = 1
-        self.syncOrigin()
+        
+        self.bedCalibration = True #flag to signal calibration
+        self.bedCalStep = 1 #Start at 1st corner
+
+        self.syncOrigin() #Sync origin with arm controller
+        #Update the corner z so that match a new origin
+        #The x and y stay fixed so origin can be offset from center.
+        for corner in self.calibrationCorners:
+            corner.z = self.origin.z
+        
         self.root.armController.moveHome()
         self.nextBedCalibration()
 

@@ -120,7 +120,7 @@ class SerialController:
             #self.checkResponseQueue()
             #Debugging
             if not self.responseQueue.empty():
-                #print("Response Queue:",list(self.responseQueue.queue))
+                print("Response Queue:",list(self.responseQueue.queue))
                 pass
 
     def cleanQueue(self, item):
@@ -139,7 +139,6 @@ class SerialController:
                 self.cleanQueue("Estop")
                 break
        
-    
     #Advances the response queue every .01 seconds    
     def processResponses(self):
         while not self.responseQueue.empty():
@@ -147,8 +146,8 @@ class SerialController:
                 response = self.responseQueue.get()
                 self.sortResponse(response)
             #This means the print will estop regardless if it is waiting for a response
-            else:
-                self.peekQueueForEstop()
+            self.peekQueueForEstop()
+
         #exit this thread if serial is not connected
         if not self.running:
             return
@@ -174,16 +173,19 @@ class SerialController:
             PC.cancelPrint()
             R.warningPrint("Estop pushed, stopping print")
             self.cleanQueue("Estop")
+
         if sortResponse[:2]== "ER":
             R.statusPrint(f"Kinematic Error: {sortResponse[2:]}")
             flag = "Kinematic Error"
             AC.awaitingMoveResponse = False
             #Have to clean queue because the arm sends a thousand ERs for some reason
             self.cleanQueue("ER")
+
         elif sortResponse[:2] == "EL":
             R.statusPrint(f"Error Axis Fault, Out of Reach: {sortResponse[2:]}")
             flag = "Axis Fault"
             AC.awaitingMoveResponse = False
+            
         elif sortResponse[:2] == "TL":
             if AC.testingLimitSwitches:
                 #Limit switch test

@@ -32,6 +32,7 @@ class TkWindow(Tk):
         self.serialController = SerialController(self.root)
         self.armController = ArmController(self.root, self.serialController)
         self.printController = PrintController(self.root)
+        
         #self.temperatureController = TemperatureController(self.root)
 
         # Create and draw widgets onto the window
@@ -44,12 +45,13 @@ class TkWindow(Tk):
         
         #TODO remove these eventually
         self.timeoutStartedCal = False
-        self.timeoutStartedMove = False
-        self.timeoutStartedPos = False
+        #self.timeoutStartedMove = False
 
         self.root.protocol("WM_DELETE_WINDOW", self.shutdownProgram)
 
         self.printThreadStarted = False
+        #Set origin last so everything is in place
+        self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
 
     #endregion init
 
@@ -731,6 +733,7 @@ class TkWindow(Tk):
         Label(self.settingsTab, text="Nothing to see here at the moment (WIP)").pack(fill="both", expand=True)
         # TODO Add settings for print control speed, acceleration...
     #endregion Tabs
+    
     #region main update function
     def update(self):
         self.updateDebugVars() # Update the debug tab variables
@@ -739,9 +742,8 @@ class TkWindow(Tk):
 
         # ===========| ArmController |============
         # If arm calibration is in progress, call the calibration update function
-        # TODO Add calibration thread
 
-        if self.armController.calibrationInProgress:
+        '''if self.armController.calibrationInProgress:
             #could timeout per stage or for whole calibration
             
             if self.timeoutStartedCal==False:
@@ -753,9 +755,9 @@ class TkWindow(Tk):
                     self.serialController.sortResponse(response)
             else:
                 self.armController.calibrateArmUpdate()
-            #sort serial
+            #sort serial'''
 
-        if self.armController.awaitingMoveResponse:
+        '''if self.armController.awaitingMoveResponse:
             if self.timeoutStartedMove==False:
                 self.timeoutStartedMove=True
                 moveTimeout = threading.Thread(target=self.armController.moveTimeout)
@@ -765,26 +767,25 @@ class TkWindow(Tk):
             if response:
                 self.serialController.sortResponse(response)
             #self.armController.moveUpdate()
-            #sort serial
+            #sort serial'''
 
         
                 
-        #TODO turn whole process into a thread
+        '''#TODO turn whole process into a thread
         if self.armController.testingEncoders:
             if self.serialController.responseReady:
                 response = self.serialController.getResponse()
                 self.serialController.sortResponse(response)
-                #sort serial
+                #sort serial'''
         
         # ==========| PrintController |==========
-
-        #TODO make print loop a thread so that the user can still use the software if the print is waiting
+        #Each print loop runs in the thread so that it can "wait" and not halt the UI
         if self.printController.printing and not self.printThreadStarted:
             printThread = threading.Thread(target=self.printController.printLoop)
             printThread.start()
+            #Variable to signal when the thread finishes
             self.printThreadStarted = True
         
-
         # TODO: Temporary
         #self.temperatureController.updateTemp()
 

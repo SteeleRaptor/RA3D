@@ -19,10 +19,11 @@ class PrintController:
         self.cornerSweeping = False
         self.bedCalibration = False
         self.bedCalStep = 0
-        self.plateHeight = 300
+        self.plateHeight = 300 #Change bed height relitive to pen
         YEdge = 80
         XEdge = [250,400]#for corner calibration
         self.bedCalibrateHeight = 50 #Height moved up for calibration
+        # Calibration corners
         FLCorner = Position(XEdge[1],-YEdge,self.plateHeight,0,90,0,None)
         FRCorner = Position(XEdge[1],YEdge,self.plateHeight,0,90,0,None)
         BLCorner = Position(XEdge[0],-YEdge,self.plateHeight,0,90,0,None)
@@ -46,6 +47,7 @@ class PrintController:
         #self.origin = Origin(None,None,None)
         #corners are absolute, may change to relative to origin
         self.calibrationCorners = [FRCorner,BRCorner,BLCorner,FLCorner]
+        
         # Parameters for printing coordinates
         #self.xBounds = [300, 500] # X Min & X Max
         #self.yBounds = [-100, 100] # Y Min & Y Max

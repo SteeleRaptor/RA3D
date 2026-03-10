@@ -179,7 +179,7 @@ class SerialController:
         if sortResponse[:5]== "Estop":
             PC.printing = False
             flag = "Estop"
-            PC.cancelPrint()
+            PC.pauseAll() #This will pause the program regardless if ignore flags is on
             R.warningPrint("Estop pushed, stopping print")
             self.cleanQueue("Estop")
 

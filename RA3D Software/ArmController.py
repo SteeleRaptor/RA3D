@@ -452,7 +452,7 @@ class ArmController:
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending RJ command")
             #TODO start sendRJ as a thread so that 
-            RJThread = threading.Thread(target=self.sendRJ, args=[J1, J2, J3, J4, J5, J6, self.defaultMoveParameters])
+            RJThread = threading.Thread(target=self.sendRJ, args=[[J1, J2, J3, J4, J5, J6], self.defaultMoveParameters])
             RJThread.start()
         else:
             self.root.terminalPrint("RJ command not sent due to a value not being a number")
@@ -626,9 +626,6 @@ class ArmController:
         #Pause print so everything stops moving
         #It is assume the user will want the print paused if pressing this button
         self.root.printController.pausePrint()
-        #This is temporaily removed so move safe overrides everything
-        #if self.checkIfBusy(message="Move Safe"):
-        #    return
         #This is important because move safe will not move safe if arm is not calibrated
         if self.serialController.boardConnected is False or self.armCalibrated is False:
             self.root.statusPrint("Failed to move to safe positiion, Board not connected")
@@ -721,11 +718,11 @@ class ArmController:
         
         self.awaitingMoveResponse = False
 
-    def sendRJ(self, J1, J2, J3, J4, J5, J6, moveParameters, timeout=10):
+    def sendRJ(self, Joints, moveParameters, timeout=10):
         #self.root.terminalPrint("Sending RJ command...")
         # Create the command
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
-        command = MoveCommand("RJ",[J1,J2,J3,J4,J5,J6], moveParameters)
+        command = MoveCommand("RJ",Joints, moveParameters)
         # Check if a board is connected or if the arm is not calibrated
         if self.notNominalCheck(message="send RJ"):
             return
@@ -766,11 +763,18 @@ class ArmController:
     
     # Moves the robot to a safe position to be turned off
     def moveSafe(self):
-        self.sendRJ(0, -40, 60, 0, 45, 0, self.defaultMoveParameters)
+        self.root.printController.pauseAll() #pause printing functions
+        self.cancelActions()#pause actions like calibration or testing
+        #wait until commands have finished
+        while self.root.armController.checkIfBusy(display=False):
+            time.sleep(1)
+            pass
+        SafePositionJoints = (0, -40, 60, 0, 45, 0)
+        self.sendRJ(SafePositionJoints, self.defaultMoveParameters)
     
     # Moves to the neutral position, all joints at zero degrees
     def moveHome(self):
-        self.sendRJ(0,0,0,0,0,0, self.defaultMoveParameters)
+        self.sendRJ([0,0,0,0,0,0], self.defaultMoveParameters)
     
     
     #endregion move commands
@@ -927,20 +931,20 @@ class ArmController:
     # Checks if any of the flags relating to the arm performing a task are True and if so, return True
     # This is the minimum check does not consider if board is connected or arm is calibrated
     # A message is optional to streamline error messages
-    def checkIfBusy(self, message = None):
+    def checkIfBusy(self, message = None, display = True):
         value = self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingPosResponse
         if value:
-            if message:
+            if message and display:
                 self.root.terminalPrint("Cannot" + message + ", Arm busy")
-            else:
+            elif display:
                 self.root.terminalPrint("Arm busy")
-        return value
+        return 
     
     # meant to add calibration check without printing check
     # so move commands can execute while printing
     # returns true if everything is not nominal ie. something is busy or not connected
-    def notNominalCheck(self, message = None):
-        value = self.checkIfBusy(message=message)
+    def notNominalCheck(self, message = None, display = True):
+        value = self.checkIfBusy(message=message,display=display)
         if self.root.serialController.boardConnected is False:
             self.root.warningPrint("No board connected")
             value = True
@@ -950,12 +954,12 @@ class ArmController:
         return value
     
     #Do not use this command on calibrate and it is assumed that these check do not need to be done to start calibration
-    def checkIfAllBusy(self,message=None):
+    def checkIfAllBusy(self,message=None, display=True):
         value = False
-        if self.notNominalCheck(message=message):
+        if self.notNominalCheck(message=message,display=display):
             value = True
         #check printer for printing processes
-        if self.root.printController.checkIfPrinterBusy(message=message):
+        if self.root.printController.checkIfPrinterBusy(message=message,display=display):
             value = True
         return value
     
@@ -967,11 +971,16 @@ class ArmController:
         self.awaitingPosResponse = False
         self.testingLimitSwitches = False
         self.testingEncoders = False
-        self.root.printController.pausePrint() #should reset flag.
+        self.root.printController.pausePrint()
         self.root.printController.bedCalibration = False
         self.root.printController.cornerSweeping = False
         self.root.serialController.clearQueue()
-    
+        self.root.printController.flag = None
+    #cancel all actions except moveresponse so moves can terminate properly
+    def cancelActions(self):
+        self.calibrationInProgress = False
+        self.testingLimitSwitches = False
+        self.testingEncoders = False
     #endregion other functions
     #region ========|Origin|==================
     #TODO improve request position to wait

@@ -123,6 +123,9 @@ class SerialController:
                 print("Response Queue:",list(self.responseQueue.queue))
                 pass
 
+    def clearQueue(self):
+        self.responseQueue.queue.clear()
+
     def cleanQueue(self, item):
         size = int(self.responseQueue.qsize())
         for i in range(size):

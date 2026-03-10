@@ -779,8 +779,8 @@ class TkWindow(Tk):
                 #sort serial'''
         
         # ==========| PrintController |==========
-        #Each print loop runs in the thread so that it can "wait" and not halt the UI
-        if self.printController.printing and not self.printThreadStarted:
+        #Each print loop runs in the thread sothat it can "wait" and not halt the UI
+        if self.printController.printing and not self.printThreadStarted and not self.printController.printPaused:
             printThread = threading.Thread(target=self.printController.printLoop)
             printThread.start()
             #Variable to signal when the thread finishes

@@ -1,9 +1,7 @@
 import serial
 import serial.tools.list_ports
 from serial import SerialException
-import time
-import threading
-import queue
+import time, threading, queue, random
 
 # TODO: Interesting bug that occurs but when connecting, disconnecting, then reconnecting, the entire serial buffer gets messed up resulting in everything being read in as junk. Not sure how it is happening nor how to fix.
 
@@ -24,7 +22,8 @@ class SerialController:
         self.responseReady = False # Used as a flag to check if a response is ready to be read
         self.lastResponse = None # Stores whatever the last response was from serial until requested
         
-        self.waiting = False
+        self.waiting_responses = set()
+        self.sendingSerial = False#Keep track to send serial so a response is not sorted while sending
 
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
@@ -135,19 +134,26 @@ class SerialController:
 
     def peekQueueForEstop(self):
         size = int(self.responseQueue.qsize())
-        for i in range(size):
-            if self.responseQueue.queue[i][:5] == "Estop":
-                self.root.printController.pausePrint()
-                print("Estop found after peeking ahead")
-                self.cleanQueue("Estop")
-                break
+        try:
+            for i in range(size):
+                if self.responseQueue.queue[i][:5] == "Estop":
+                    self.root.printController.pausePrint()
+                    print("Estop found after peeking ahead")
+                    self.cleanQueue("Estop")
+                    break
+        except IndexError:
+            pass
        
     #Advances the response queue every .01 seconds    
     def processResponses(self):
         while not self.responseQueue.empty():
-            if not self.waiting:
-                response = self.responseQueue.get()
-                self.sortResponse(response)
+            if not self.waiting_responses and not self.sendingSerial:
+                #this seems to a little janky but I want the waiting_responses to be clear for a moment before it
+                #sorts a response, and gives things a moment to send then wait for a response
+                time.sleep(.5)
+                if not self.waiting_responses and not self.sendingSerial:
+                    response = self.responseQueue.get()
+                    self.sortResponse(response)
             #This means the print will estop regardless if it is waiting for a response
             self.peekQueueForEstop()
 
@@ -243,21 +249,31 @@ class SerialController:
     #wait for a specific response but timeout if not recieved, standard timeout is 2 seconds
     def waitForResponse(self, prefix, timeout=2):
         start = time.time()
-        self.waiting = True #so response is not taken from processReponses
+        #so response is not taken from processReponses
+        #TODO this isn't perfect I know there is a one in a billion chance 2 codes are identical
+        #The unique code ensures that no other response can cancel another
+        uniqueCode = prefix + str(random.randint(1, int(1e9)))
+        #Avoid any possible errors where timeout is negative
+        if timeout <= 0:
+            print("timeout is negative")
+            timeout = 2
+        self.waiting_responses.add(uniqueCode) #TODO may need arm to return specific POS responses
         while time.time() - start < timeout:
             try:
-                response = self.responseQueue.get(timeout=0.1)
+                response = self.responseQueue.queue[0]#peek queue
                 if response.startswith(prefix):
                     #self.root.terminalPrint("response processed after waiting")
-                    self.waiting = False
+                    response = self.responseQueue.get(timeout=.1)
+                    self.waiting_responses.discard(uniqueCode)
                     return response
-            except queue.Empty:
+            except queue.Empty, IndexError:
                 pass
-        self.waiting = False
+        self.waiting_responses.discard(uniqueCode)
         return None
     
     # Sends a string over serial to the connected port
     def sendSerial(self, command):
+        self.sendingSerial = True
         # Check if a board is connected
         if self.boardConnected == False:
             self.root.statusPrint("Failed to send command: No board connected")
@@ -269,6 +285,7 @@ class SerialController:
         self.root.terminalPrint("Command sent")
         # Reset the input buffer
         #self.board.reset_input_buffer()
+        self.sendingSerial = False
     # stop waiting for response if something timedout
   
     def refreshCOMPorts(self):

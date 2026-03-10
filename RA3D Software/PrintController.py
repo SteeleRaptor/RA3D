@@ -8,8 +8,62 @@ class PrintController:
     #region init
     def __init__(self, root):
         self.root = root
+
+        #------Important variables-------
+        #MoveParameters(speed,acceleration,deceleratio,ramp,loopmode,speedtype)
+        self.defaultPrintParameters = MoveParameters(50,5,5,15,0,"m") #20mm/s print speed
+        
+        self.plateHeight = 300 #Change bed height relitive to pen
+        #boundarys for corner calibration/setting recommended origin
+        YEdge = [-80,80]
+        XEdge = [250,400]
+
+        self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
+        #TODO These might be changed to reflect xedge, yedge
+        #Boundaries to stop printing
         #Placeholder boundaries, should be adjusted
-        self.bufferBoundary = 10 # Warning pops up if this boundary is entered
+        self.maxBoundaryX = [200,500]
+        self.maxBoundaryY = [-130,130]
+        self.maxBoundaryZ = [290,800]
+        self.bufferBoundary = 10 # Warning pops up if this boundary is entered from the max boundaries
+        self.bedCalibrateHeight = 50 #Height moved up for calibration
+
+        #------End important variables-------
+
+        #recomended Origin for move set at middle of calibration corners
+        self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,90,0,None)
+        #extract position to origin
+        self.recommendedOrigin = self.recommendedOriginPosition.toOrigin()
+        
+        #Assume origin is at recommended origin
+        self.origin = self.recommendedOrigin
+
+        # Calibration corners
+        FLCorner = Position(XEdge[1],YEdge[0],self.plateHeight,0,90,0,None)
+        FRCorner = Position(XEdge[1],YEdge[1],self.plateHeight,0,90,0,None)
+        BLCorner = Position(XEdge[0],YEdge[0],self.plateHeight,0,90,0,None)
+        BRCorner = Position(XEdge[0],YEdge[1],self.plateHeight,0,90,0,None)
+
+        #corners are absolute relative to the physical structure
+        #but z values will update to be the same as origin if the origin is changed in the UI
+        self.calibrationCorners = [FRCorner,BRCorner,BLCorner,FLCorner]
+        
+        #---------- Setup variables---------------
+        # Variables that are just simply initialized
+
+        # Parameters used for saving the last used coordinate information
+        self.lastPos = Position(None,None,None,None,None,None,self.origin)
+        self.printPos = Position(None,None,None,None,None,None,self.origin)
+        
+        self.lastF = 0.0
+        self.lastE = 0.0
+        self.feedRate = 0
+        self.extrudeRate = 0
+        self.currentInstruction = 0
+        
+        self.justMovedHome = False
+        self.relativeExtrusion = True
+
         self.selectedFilepath = None
         self.gcodeLines = []
         self.teensyLines = []
@@ -19,51 +73,9 @@ class PrintController:
         self.cornerSweeping = False
         self.bedCalibration = False
         self.bedCalStep = 0
-        self.plateHeight = 300 #Change bed height relitive to pen
-        YEdge = 80
-        XEdge = [250,400]#for corner calibration
-        self.bedCalibrateHeight = 50 #Height moved up for calibration
-        # Calibration corners
-        FLCorner = Position(XEdge[1],-YEdge,self.plateHeight,0,90,0,None)
-        FRCorner = Position(XEdge[1],YEdge,self.plateHeight,0,90,0,None)
-        BLCorner = Position(XEdge[0],-YEdge,self.plateHeight,0,90,0,None)
-        BRCorner = Position(XEdge[0],YEdge,self.plateHeight,0,90,0,None)
-        #recomended Origin for move
-        self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,90,0,None)
-        #extract position to origin
-        self.recommendedOrigin = Origin(self.recommendedOriginPosition.x,self.recommendedOriginPosition.y,self.recommendedOriginPosition.z)
-        
-        #Assume origin is at recommended origin
-        self.origin = self.recommendedOrigin
 
-        #TODO These might be changed to reflect xedge, yedge
-        self.maxBoundaryX = [200,500]
-        self.maxBoundaryY = [-130,130]
-        self.maxBoundaryZ = [290,800]
-        
         #Flag variable for errors
         self.flag = None
-        
-        #self.origin = Origin(None,None,None)
-        #corners are absolute, may change to relative to origin
-        self.calibrationCorners = [FRCorner,BRCorner,BLCorner,FLCorner]
-        
-        # Parameters for printing coordinates
-        #self.xBounds = [300, 500] # X Min & X Max
-        #self.yBounds = [-100, 100] # Y Min & Y Max
-        #self.zBounds = [100, 300] # Z Min & Z Max
-        # Parameters used for saving the last used coordinate information
-        self.lastPos = Position(None,None,None,None,None,None,self.origin)
-        self.printPos = Position(None,None,None,None,None,None,self.origin)
-        self.defaultPrintParameters = MoveParameters(50,5,5,15,0,"m") #20mm/s print speed
-        self.lastF = 0.0
-        self.lastE = 0.0
-        self.feedRate = 0
-        self.extrudeRate = 0
-        self.currentInstruction = 0
-        self.axis5 = False
-        self.justMovedHome = False
-        self.relativeExtrusion = True
     
         
     #endregion init
@@ -74,6 +86,7 @@ class PrintController:
 
         self.checkFlag() #check flag to see if to continue printing
         
+        #If the flag stopped the print, exit
         if self.printing == False:
             self.root.printThreadStarted = False
             return
@@ -81,25 +94,30 @@ class PrintController:
         message = "comment"
         #G code lines will skip past comments
         while message == "comment":
+            #check if at end of file
             if self.currentInstruction > len(self.gcodeLines) - 1:
                 self.root.statusPrint("End of program reached")
                 self.currentInstruction = 0
                 self.printing = False
                 #Move Home when complete
                 self.root.armController.moveHome()
-                self.root.printThreadStarted = False
-                return
-            lineToConvert = self.gcodeLines[self.currentInstruction] # Pull current line
+                message = ""
+                break
             
+            # Pull current line
+            lineToConvert = self.gcodeLines[self.currentInstruction] 
+            
+            #Update progress bar
             self.currentInstruction += 1 # Increment currentInstruction
             self.root.progressBar["value"] = (self.currentInstruction / len(self.gcodeLines)) * 100 # Update progress bar to match
+            
+            #Read gcode line and convert, handle rare messages inside
             message = self.gcodeToTeensy(lineToConvert) # Convert line and updates printPos
             
         self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
         
-        # TODO turn this into a switchcase structure
+        #region -----------Message Processing--------
         #Common commands are handled here, rare commands handled inside gcodeToTeensy
-        #Message Processing
         if message == "":
             pass
         elif message[:5] == "Error": # If the point is blank, don't try to send a command
@@ -144,16 +162,16 @@ class PrintController:
             self.lastPos = copy.deepcopy(self.printPos)
         else:
             print("Unexpected message from gcodeToTeensy")
+        #endregion message handling
         #Signifies thread has ended to start next thread
         self.root.printThreadStarted = False #Do NOT return anywhere else in this function
-
-
 
     # Converts a GCode instruction to the instruction to send over serial
     def gcodeToTeensy(self, lineToConvert):
         #Assume feedrate and extruderate will not be set
         self.feedRate = 0
         self.extrudeRate = 0
+
         #NOTE some of these gcode commands are a work in progress
         if lineToConvert[0] == ';': # Line is comment
             return "comment" # Don't convert
@@ -187,17 +205,19 @@ class PrintController:
         elif lineToConvert[:2] == "G4":
             span = float(lineToConvert[3:])
             time.sleep(span/1000)
-        elif lineToConvert[0:2] == "G0" or lineToConvert[0:2] == "G1": # Move (treating G0 & G1 as equal)
+        elif lineToConvert[0:2] == "G0" or lineToConvert[0:2] == "G1": # Move (treating G0 & G1 as mostly equal)
         
-            xMatch = re.search(r"X(-?\d+\.?\d*)", lineToConvert)
-            yMatch = re.search(r"Y(-?\d+\.?\d*)", lineToConvert)
-            zMatch = re.search(r"Z(-?\d+\.?\d*)", lineToConvert)
-            fMatch = re.search(r"F(-?\d+\.?\d*)", lineToConvert)
-            eMatch = re.search(r"E(-?\d+\.?\d*)", lineToConvert)
+            #Search for values
+            xMatch = re.search(r"[xX](-?\d+\.?\d*)", lineToConvert)
+            yMatch = re.search(r"[yY](-?\d+\.?\d*)", lineToConvert)
+            zMatch = re.search(r"[zZ](-?\d+\.?\d*)", lineToConvert)
+            fMatch = re.search(r"[fF](-?\d+\.?\d*)", lineToConvert)
+            eMatch = re.search(r"[eE](-?\d+\.?\d*)", lineToConvert)
 
+            #For 5 axis printing
             if self.axis5:
-                uMatch = re.search(r"U(-?\d+\.?\d*)", lineToConvert)
-                vMatch = re.search(r"V(-?\d+\.?\d*)", lineToConvert)
+                uMatch = re.search(r"[uU](-?\d+\.?\d*)", lineToConvert)
+                vMatch = re.search(r"[vV](-?\d+\.?\d*)", lineToConvert)
                 u = float(uMatch.group(1)) if uMatch else None
                 v = float(vMatch.group(1)) if vMatch else None
             else:
@@ -211,48 +231,49 @@ class PrintController:
             #print("z read:", z)
             f = float(fMatch.group(1)) if fMatch else None
             e = float(eMatch.group(1)) if eMatch else None
-            # TODO: Temporary rotation information
 
             # If GCode instruction didn't contain a parameter, pull from last saved value
             # If instruction DID contain a parameter, offset the value to put it in the build volume
             if x == None:
-                x = self.lastPos.GetRelative()[0]
+                x = self.lastPos.GetRelativeX()
             if y == None:
-                y = self.lastPos.GetRelative()[1]
+                y = self.lastPos.GetRelativeY()
             if z == None:
-                z = self.lastPos.GetRelative()[2]
+                z = self.lastPos.GetRelativeZ()
            
             #get last feedrate if missing feedrate
             if f == None:
                 f = self.lastF
             else:
                 self.lastF = f
+            
             #Do not extrude if not told to
             if e == None:
                 e = 0
             else:
                 self.lastE = e
-            atBoundary = False
+            
+            #NOTE 5 axis g code is not fully implemented
             if self.axis5:
                 #For now both u and v are need for rotation
                 if u == None or v == None:
-                    Rx = self.lastPos.GetRelative()[3]
-                    Ry = self.lastPos.GetRelative()[4]
-                    Rz = self.lastPos.GetRelative()[5]
+                    Rx = self.lastPos.Rx
+                    Ry = self.lastPos.Ry
+                    Rz = self.lastPos.Rz
                 else:
                     u +=-90 #may add instead of subtract
                     #TODO I think u is elevation and v azimuth, need to check
                     Rz,Ry,Rx = self.aer_to_euler_zyx(v,u,0) # 3 options for transformation
             
             #TODO Add rotation transition in teensy if necessary
-
             #if using 5 axis g code
             if self.axis5:
                 self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
             else:
                 self.printPos.SetRelative(x,y,z,0,90,0)
 
-            #If values are within boundaries
+            atBoundary = False
+            #If values are part boundaries set to be at boundaries
             if self.printPos.y > self.maxBoundaryY[1]:
                 self.printPos.y = self.maxBoundaryY[1]-1
                 atBoundary = True
@@ -273,28 +294,26 @@ class PrintController:
                 self.feedRate = 5000#mm/min
             else:
                 self.feedRate = f
+
+            #Set extrude rate of printer
             self.extrudeRate = e
 
-            #Check if point is in boundary else pause print
+            #One last check if point is in boundary else pause print
             if self.checkBoundary(self.printPos):
                 return "Success"
             else:
+                #NOTE this is currently disabled
                 #self.pausePrint()
                 self.root.warningPrint("Moving of bounds")
                 return "Error moving out of bounds"
         else:
             pass
+            #This line should be working in final version
             #return "Error unrecognized gcode line"
     
-        # TODO: Additional processing for F to control speed or something
-        # Note that F is in units per minute (per LinuxCNC specifications)
-        # https://linuxcnc.org/docs/html/gcode/machining-center.html#sub:feed-rate
-        # TODO: Note that it is pointless to convert to strings because to send the instruction to the arm (through current methods) we give the coordinates
-        # TODO: Might make a custom datatype for storing position data that can be used
         #newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
         #return newLine
-        return ["",0,0]
-    
+        return ""
 
     #This may be redundant now if loop skips comments
     def findStartBlock(self):
@@ -365,28 +384,30 @@ class PrintController:
         if not self.origin.checkOriginSet():
             self.root.statusPrint("Origin not set, print cancelled")
             return
-        if self.root.armController.checkIfAllBusy():
-            self.root.statusPrint("Arm is busy, cannot start print")
+        if self.root.armController.checkIfAllBusy(message="start print"):
             return
-        if self.root.armController.armCalibrated is False:
-            self.root.warningPrint("Cannot start print arm is not calibrated")
-            return
+        
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
             return
+        
         #Zero extruder axis used for measuring total filament used
         self.root.armController.zeroJ7()
+
         #Reset flag
         self.flag = None
+
         # When starting print, reset the "last*" parameters
         print(self.origin.z, "test2")
         self.printPos.origin = self.origin
         self.printPos = self.origin.toPosition()
+        #Last position starts at origin
         self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,90,0,self.origin)
         print(self.lastPos.z)
         self.lastF = 0.0
         self.lastE = 0.0
+
         if not self.printPaused:
             self.findStartBlock()#Find where the gcode insturctions actually start
         self.printing = True
@@ -407,20 +428,20 @@ class PrintController:
             return self.flag
         return None
 
-    
-    #TODO Improve this function and make it work well with armcontroller check if busy
+    #Check if the printer is busy with printing, calibration or sweeping
     def checkIfPrinterBusy(self,message = None):
         if self.printing or self.cornerSweeping or self.bedCalibration:
+            #if there is a message to display
             if message:
                 self.root.terminalPrint("Cannot" + message + ", Printer busy")
             else:
                 self.root.terminalPrint("Printer busy")
             return True
+        
         return False
 
     def pausePrint(self):
         self.root.terminalPrint("Pausing Print")
-        self.printing = False
         self.printPaused = True
 
     def cancelPrint(self):
@@ -430,7 +451,7 @@ class PrintController:
         self.root.statusPrint("Print cancelled")
         pass
 
-    # Calibration and sweeps ==========================
+    # Bed Calibration and sweeps ==========================
 
     def startPrintBedCalibration(self):
         self.flag = None #set flag to none only on start
@@ -449,7 +470,6 @@ class PrintController:
         for corner in self.calibrationCorners:
             corner.z = self.origin.z
         
-        self.root.armController.moveHome()
         self.nextBedCalibration()
 
     #user controlled next button
@@ -463,6 +483,8 @@ class PrintController:
         if self.bedCalibration == True and self.flag == None:
             bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep)
             bedCalibrationThread.start()
+        if self.flag is not None:
+            self.root.statusPrint("Did not start calibration step because flag: ", self.flag)
 
     def startCornerSweep(self):
         self.flag = None
@@ -526,31 +548,38 @@ class PrintController:
 
     #Move to one corner and slowly descend on it
     def bedCalibrationStep(self):
+        #Move home on first step
+        if self.bedCalStep == 1:
+            self.root.armController.moveHome()
+        #End calibration
+        if self.bedCalStep == 6: #Is at 6 after 4 is completed so done
+            self.endSweepOrCal()
+            return
         #set label
         currentCornerPos = self.calibrationCorners[self.bedCalStep-1]
         self.root.cornerLabel.config(text=f"Current Corner: {self.bedCalStep}")
 
         #For better positioning move home than origin so J4 starts at 0 rather than 180
         #self.root.armController.moveHome()
-        self.root.armController.moveOrigin()
+        #self.root.armController.moveOrigin()
 
         #Move above
         posStep = copy.deepcopy(currentCornerPos)
         posStep.z += self.bedCalibrateHeight
-        self.root.armController.sendML(posStep,moveParameters=self.defaultPrintParameters)
+        moveParameters = copy.deepcopy(self.defaultPrintParameters)
+        moveParameters.wrist = "N"
+        self.root.armController.sendMJ(posStep,moveParameters=moveParameters)
         
         #Move halfway
-        self.root.armController.sendML(posStep,moveParameters=self.defaultPrintParameters)
+        self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters)
         posStep.z -= self.bedCalibrateHeight/2
 
         #Move to corner to touch plate
-        self.root.armController.sendML(currentCornerPos,moveParameters=self.defaultPrintParameters)
+        self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters)
         self.root.statusPrint(f"Corner {self.bedCalStep} calibration complete")
         self.bedCalStep += 1
 
-        #End calibration
-        if self.bedCalStep == 6: #Is at 6 after 4 is completed so done
-            self.endSweepOrCal()
+        
 
     # Used to sweep the corners without lifting to ensure kinematics are level to bed
     def cornerSweep(self, height, full=False):
@@ -559,8 +588,10 @@ class PrintController:
             self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
             self.endSweepOrCal()
             return
+        
         moveOrder = [1,2,3,4,1,3,2,4]
         moveOrder= [x-1 for x in moveOrder] #adjust to 0 base index
+
         for i in moveOrder:
             time.sleep(1)
             pos = copy.deepcopy(self.calibrationCorners[i])
@@ -573,16 +604,15 @@ class PrintController:
                 return
             if self.flag is not None:
                 self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
-                self.endSweepOrCal
+                self.endSweepOrCal()
                 return
-            #Move To position
-            #End calibration
+            
+        #End calibration
         #if not doing a fullSweep()
         if not full:
             self.endSweepOrCal()
     
-        
-    
+    #End any corner sweep or bed calibration
     def endSweepOrCal(self):
         self.cornerSweeping = False
         self.bedCalibration=False
@@ -590,15 +620,17 @@ class PrintController:
         self.root.cornerLabel.config(text=f"Current Corner: N/A")
         self.root.armController.moveHome()
 
+    #sweep multiple layers 20mm at a time
     def fullCornerSweep(self):
         self.root.armController.moveHome()
         self.root.armController.moveOrigin()
         heightDelta = 200
+        heightStep = 20
         currentHeight = self.plateHeight
         endHeight = currentHeight + heightDelta
         while currentHeight < endHeight and self.cornerSweeping:
             self.cornerSweep(currentHeight,full=True)
-            currentHeight += 20
+            currentHeight += heightStep
             if self.flag is not None:
                 self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
                 self.endSweepOrCal()

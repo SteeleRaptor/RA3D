@@ -836,6 +836,7 @@ class TkWindow(Tk):
         self.statusLabel.config(text=f"Status: {message}")
         # Also print the full message to the terminal
         self.terminalPrint(message)
+        
     def warningPrint(self, message):
         messagebox.showinfo("Warning! ", message+"\n\nPressing ok may resume movement")
         self.statusPrint(message)

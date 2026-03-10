@@ -13,7 +13,7 @@ class PrintController:
         #MoveParameters(speed,acceleration,deceleratio,ramp,loopmode,speedtype)
         self.defaultPrintParameters = MoveParameters(50,5,5,15,0,"m") #20mm/s print speed
         
-        self.ignoreflags = False #ignores flags and unrecognized gcode lines and boundary check
+        self.ignoreflags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
         self.plateHeight = 314 #Change bed height relitive to pen
@@ -74,7 +74,7 @@ class PrintController:
         self.printing = False
         self.printPaused = False
         self.cornerSweeping = False
-        self.bedCalibration = False
+        self.bedCalibrationInProgress = False
         self.bedCalStep = 0
 
         #Flag variable for errors
@@ -164,7 +164,7 @@ class PrintController:
             #must be last thing to do, copy last position
             self.lastPos = copy.deepcopy(self.printPos)
         else:
-            print("Unexpected message from gcodeToTeensy")
+            self.root.terminalPrint("Unexpected message from gcodeToTeensy")
         #endregion message handling
         #Signifies thread has ended to start next thread
         self.root.printThreadStarted = False #Do NOT return anywhere else in this function
@@ -392,7 +392,7 @@ class PrintController:
         if self.root.armController.checkIfAllBusy(message="start print"):
             return
         if self.ignoreflags:
-            self.root.warningPrint("Ignore flags is enabled\nflags will be ignored disable in print controller")
+            self.root.warningPrint("Ignore flags is enabled\nFlags will be ignored. Disable in print controller")
         if not self.checkBoundaryTrue:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
         #Resume print if paused
@@ -405,6 +405,7 @@ class PrintController:
 
         #Reset flag
         self.flag = None
+        self.root.serialController.clearQueue() #clear queue so it is not backed up
 
         # When starting print, reset the "last*" parameters
         print(self.origin.z, "test2")
@@ -428,21 +429,34 @@ class PrintController:
         #will perform one print loop only
         self.printLoop()
     
+    #All flag management should be done here besides raising a flag
     def checkFlag(self):
         #Assuming that pausing print is desired if there is a flag
-        if self.flag is not None and not self.ignoreflags:
-            self.pausePrint()
-            self.root.warningPrint(f"Print paused due to error: {self.flag}")
-            return self.flag
+        flag = self.flag
+        if flag is not None and not self.ignoreflags:
+            if self.printing:
+                self.pausePrint()
+                self.root.warningPrint(f"Print paused due to error: {self.flag}")
+                self.flag = None
+            if self.bedCalibrationInProgress or self.cornerSweeping:
+                self.endSweepOrCal()
+                self.root.warningPrint(f"Bed calibration/corner sweeping paused due to error: {self.flag}")
+                self.flag = None
+            return flag
+        elif self.flag is not None:
+            #display warning print instead of pausing when ignore flag is on
+            self.root.warningPrint("Flag: "+self.flag)
+            self.flag = None
+            return flag
         return None
 
     #Check if the printer is busy with printing, calibration or sweeping
-    def checkIfPrinterBusy(self,message = None):
-        if self.printing or self.cornerSweeping or self.bedCalibration:
+    def checkIfPrinterBusy(self,message = None,display=True):
+        if self.printing or self.cornerSweeping or self.bedCalibrationInProgress:
             #if there is a message to display
-            if message:
+            if message and display:
                 self.root.terminalPrint("Cannot" + message + ", Printer busy")
-            else:
+            elif display:
                 self.root.terminalPrint("Printer busy")
             return True
         
@@ -463,13 +477,12 @@ class PrintController:
 
     def startPrintBedCalibration(self):
         self.flag = None #set flag to none only on start
-
         #If anything is busy cannot start arm
         if self.root.armController.checkIfAllBusy():
             self.root.statusPrint("Printer is busy, cannot start bed calibration")
             return
-        
-        self.bedCalibration = True #flag to signal calibration
+        self.root.serialController.clearQueue() #clear queue so it is not backed up
+        self.bedCalibrationInProgress = True #flag to signal calibration
         self.bedCalStep = 1 #Start at 1st corner
 
         self.syncOrigin() #Sync origin with arm controller
@@ -487,47 +500,44 @@ class PrintController:
         if self.root.armController.checkIfBusy():
             self.root.statusPrint("Arm is busy cannot go to next step")
             return
-        if self.bedCalibration==False:
+        if self.bedCalibrationInProgress==False:
             self.root.statusPrint("Bed calibration not started")
-        #Pause calibration
-        if self.flag is not None:
-            self.root.statusPrint("paused calibration step because flag: "+self.flag)
-            self.root.warningPrint("Flag: "+self.flag)
-            self.flag = None
-        if self.bedCalibration == True:
+        self.checkFlag()
+        if self.bedCalibrationInProgress == True:
             bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep)
             bedCalibrationThread.start()
         
-
     def startCornerSweep(self):
-
         self.flag = None #reset flag
+        
         if self.root.armController.checkIfAllBusy():
             self.root.statusPrint("Arm is busy, cannot start corner sweep")
             return
         else:
             self.cornerSweeping = True
+        self.root.serialController.clearQueue() #clear queue so it is not backed up
         cornerSweepThread = threading.Thread(target=self.cornerSweep)
         cornerSweepThread.start()
 
     #corner sweep and move up one level at a time
     def startFullCornerSweep(self):
         self.flag = None
-        
         if self.root.armController.checkIfAllBusy():
             self.root.statusPrint("Arm is busy, cannot start corner sweep")
             return
         else:
             self.cornerSweeping = True
+        self.root.serialController.clearQueue() #clear queue so it is not backed up
         cornerSweepThread = threading.Thread(target=self.fullCornerSweep)
         cornerSweepThread.start()
 
     #will cancel any related printing setup functions
     def cancelAny(self):
-        threading.Thread(target=self.endSweepOrCal)
+        threading.Thread(target=self.endSweepOrCal) #On thread because move command is on there
         #just in case someone thinks this will cancel the print
         if self.printing:
             self.cancelPrint()
+        
     #endregion gui
 
     #region ===============| Other Functions |=================
@@ -564,6 +574,8 @@ class PrintController:
         #Move home on first step
         if self.bedCalStep == 1:
             self.root.armController.moveHome()
+            self.checkFlag()
+
         #End calibration
         if self.bedCalStep >= 5: #Is at 6 after 4 is completed so done
             self.endSweepOrCal()
@@ -582,27 +594,23 @@ class PrintController:
         moveParameters = copy.deepcopy(self.defaultPrintParameters)
         moveParameters.wrist = "N"
         self.root.armController.sendMJ(posStep,moveParameters=moveParameters)
-        
+        self.checkFlag()
         #Move halfway
         self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters)
         posStep.z -= self.bedCalibrateHeight/2
 
         #Move to corner to touch plate
         self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters)
+        self.checkFlag()
         self.root.statusPrint(f"Corner {self.bedCalStep} calibration complete")
         self.bedCalStep += 1
+        
 
         
 
     # Used to sweep the corners without lifting to ensure kinematics are level to bed
     def cornerSweep(self, height=None, full=False):
-       
-        if self.flag is not None:
-            self.root.terminalPrint("Corner sweep paused because of flag: "+ self.flag)
-            self.root.warningPrint("Encountered flag: "+self.flag)
-            #self.endSweepOrCal()
-            #return
-        
+        self.checkFlag 
         #Height is assumed to be the height of the calibration corners
         if height is None:
             height = self.calibrationCorners[0].z
@@ -619,12 +627,7 @@ class PrintController:
             #dont continue if no longer sweeping
             else:
                 return
-            if self.flag is not None:
-                self.root.terminalPrint("Corner sweep paused because of flag: "+ self.flag)
-                self.root.warningPrint("Encountered flag: "+self.flag)
-                self.flag = None
-                #self.endSweepOrCal()
-                #return
+            self.checkFlag()
             
         #End calibration
         #if not doing a fullSweep()
@@ -632,16 +635,27 @@ class PrintController:
             self.endSweepOrCal()
     
     #End any corner sweep or bed calibration
-    def endSweepOrCal(self):
+    def endSweepOrCal(self, move=True):
         
         self.cornerSweeping = False
-        self.bedCalibration=False
+        self.bedCalibrationInProgress=False
         self.bedCalStep == 0
         self.root.cornerLabel.config(text=f"Current Corner: N/A")
         #Wait until move finishes to send move home command
-        while self.root.armController.checkIfBusy():
-            pass
-        self.root.armController.moveHome()
+        
+        if move:
+            while self.root.armController.checkIfBusy():
+                pass
+            self.root.armController.moveHome()
+        self.root.terminalPrint("Ended sweep or cal")
+    
+    #use to pause everything going on
+    def pauseAll(self):
+        if self.cornerSweeping or self.bedCalibrationInProgress:
+            self.endSweepOrCal(move=False) #end sweep without moving
+        if self.printing:
+            self.pausePrint()
+        
 
     #sweep multiple layers 20mm at a time
     def fullCornerSweep(self):
@@ -654,8 +668,4 @@ class PrintController:
         while currentHeight < endHeight and self.cornerSweeping:
             self.cornerSweep(height=currentHeight,full=True)
             currentHeight += heightStep
-            if self.flag is not None:
-                self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
-                self.root.warningPrint("Encountered flag: "+self.flag)
-                self.flag = None
-                #self.endSweepOrCal()
+            self.checkFlag()

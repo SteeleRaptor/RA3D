@@ -52,6 +52,8 @@ class TkWindow(Tk):
         #Set origin last so everything is in place
         self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
 
+        
+
     #endregion init
 
     #region Shutdown
@@ -835,7 +837,7 @@ class TkWindow(Tk):
         # Also print the full message to the terminal
         self.terminalPrint(message)
     def warningPrint(self, message):
-        messagebox.showinfo("Warning! ", message)
+        messagebox.showinfo("Warning! ", message+"\n\nPressing ok may resume movement")
         self.statusPrint(message)
     #endregion print functions
     #region popup

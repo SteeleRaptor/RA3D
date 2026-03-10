@@ -650,7 +650,7 @@ class ArmController:
     #endregion GUI
     
     #region Move Commands
-    def sendMJ(self,commandPos, moveParameters,timeout=10):
+    def sendMJ(self,commandPos, moveParameters,timeout=20):
         #Leaving this specific check for awaitingMoveResponse so user knows why
         #Even though nominal check handles this
         if self.awaitingMoveResponse:
@@ -681,10 +681,11 @@ class ArmController:
             #self.root.statusPrint("Move command executed successfully")
         else:
             self.root.printController.flag = "timeout after: " + str(timeout) + "s"
+            self.root.terminalPrint("Send MJ timed out after "+str(timeout))
         self.awaitingMoveResponse = False
 
     #Move linear, timeout default is 10
-    def sendML(self, pos, moveParameters, extrudeRate=None, RelativeExtrude=True,timeout=10):
+    def sendML(self, pos, moveParameters, extrudeRate=None, RelativeExtrude=True,timeout=15):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
@@ -716,6 +717,7 @@ class ArmController:
         else:
             #stop print if timed out
             self.root.printController.flag = "timeout after: " + str(timeout) + "s"
+            self.root.terminalPrint("Send ML timed out after "+str(timeout))
         
         self.awaitingMoveResponse = False
 
@@ -729,10 +731,11 @@ class ArmController:
             return
         #print("Command is ", str(command))
         # Send the serial command
-        self.serialController.sendSerial(str(command))
+       
         self.awaitingMoveResponse = True # Set the awaiting move response flag 
 
         #Timeout and feedback handling
+        self.serialController.sendSerial(str(command))
         response = self.serialController.waitForResponse("POS",timeout)
         
         if response is not None:
@@ -741,6 +744,7 @@ class ArmController:
             self.root.statusPrint("Move command executed successfully")
         else:
             self.root.printController.flag = "timeout after: " + str(timeout) + "s"
+            self.root.terminalPrint("Send ML timed out after "+str(timeout))
         
         self.awaitingMoveResponse = False
     

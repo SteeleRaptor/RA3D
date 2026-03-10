@@ -13,7 +13,10 @@ class PrintController:
         #MoveParameters(speed,acceleration,deceleratio,ramp,loopmode,speedtype)
         self.defaultPrintParameters = MoveParameters(50,5,5,15,0,"m") #20mm/s print speed
         
-        self.plateHeight = 300 #Change bed height relitive to pen
+        self.ignoreflags = False #ignores flags and unrecognized gcode lines and boundary check
+        self.checkBoundaryTrue = True #enables/disable boundary checks
+
+        self.plateHeight = 314 #Change bed height relitive to pen
         #boundarys for corner calibration/setting recommended origin
         YEdge = [-80,80]
         XEdge = [250,400]
@@ -274,20 +277,21 @@ class PrintController:
 
             atBoundary = False
             #If values are part boundaries set to be at boundaries
-            if self.printPos.y > self.maxBoundaryY[1]:
-                self.printPos.y = self.maxBoundaryY[1]-1
-                atBoundary = True
-            if self.printPos.y < self.maxBoundaryY[0]:
-                self.printPos.y = self.maxBoundaryY[0]+1
-                atBoundary = True
-            if self.printPos.x > self.maxBoundaryX[1]:
-                self.printPos.x = self.maxBoundaryX[1]-1
-                atBoundary = True
-            if self.printPos.x < self.maxBoundaryX[0]:
-                self.printPos.x = self.maxBoundaryX[0]+1
-                atBoundary = True
-            if atBoundary:
-                self.root.terminalPrint("Warning moving/printing at boundaries, print will continue")
+            if self.checkBoundaryTrue:
+                if self.printPos.y > self.maxBoundaryY[1]:
+                    self.printPos.y = self.maxBoundaryY[1]-1
+                    atBoundary = True
+                if self.printPos.y < self.maxBoundaryY[0]:
+                    self.printPos.y = self.maxBoundaryY[0]+1
+                    atBoundary = True
+                if self.printPos.x > self.maxBoundaryX[1]:
+                    self.printPos.x = self.maxBoundaryX[1]-1
+                    atBoundary = True
+                if self.printPos.x < self.maxBoundaryX[0]:
+                    self.printPos.x = self.maxBoundaryX[0]+1
+                    atBoundary = True
+                if atBoundary:
+                    self.root.terminalPrint("Warning moving/printing at boundaries, print will continue")
             
             #G0 moves printer at max speed
             if lineToConvert[0:2] == "G0":
@@ -302,14 +306,15 @@ class PrintController:
             if self.checkBoundary(self.printPos):
                 return "Success"
             else:
-                #NOTE this is currently disabled
-                #self.pausePrint()
+                #NOTE this disabled with ignore flags
+                if not self.checkBoundaryTrue:
+                    self.pausePrint()
                 self.root.warningPrint("Moving of bounds")
                 return "Error moving out of bounds"
         else:
             pass
-            #This line should be working in final version
-            #return "Error unrecognized gcode line"
+            if not self.ignoreflags:
+                return "Error unrecognized gcode line"
     
         #newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
         #return newLine
@@ -386,7 +391,10 @@ class PrintController:
             return
         if self.root.armController.checkIfAllBusy(message="start print"):
             return
-        
+        if self.ignoreflags:
+            self.root.warningPrint("Ignore flags is enabled\nflags will be ignored disable in print controller")
+        if not self.checkBoundaryTrue:
+            self.root.warningPrint("Boundary check disabled, arm may move dangerously")
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
@@ -422,7 +430,7 @@ class PrintController:
     
     def checkFlag(self):
         #Assuming that pausing print is desired if there is a flag
-        if self.flag is not None:
+        if self.flag is not None and not self.ignoreflags:
             self.pausePrint()
             self.root.warningPrint(f"Print paused due to error: {self.flag}")
             return self.flag
@@ -467,6 +475,7 @@ class PrintController:
         self.syncOrigin() #Sync origin with arm controller
         #Update the corner z so that match a new origin
         #The x and y stay fixed so origin can be offset from center.
+        self.plateHeight = self.origin.z
         for corner in self.calibrationCorners:
             corner.z = self.origin.z
         
@@ -480,21 +489,25 @@ class PrintController:
             return
         if self.bedCalibration==False:
             self.root.statusPrint("Bed calibration not started")
-        if self.bedCalibration == True and self.flag == None:
+        #Pause calibration
+        if self.flag is not None:
+            self.root.statusPrint("paused calibration step because flag: "+self.flag)
+            self.root.warningPrint("Flag: "+self.flag)
+            self.flag = None
+        if self.bedCalibration == True:
             bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep)
             bedCalibrationThread.start()
-        if self.flag is not None:
-            self.root.statusPrint("Did not start calibration step because flag: ", self.flag)
+        
 
     def startCornerSweep(self):
-        self.flag = None
-       
+
+        self.flag = None #reset flag
         if self.root.armController.checkIfAllBusy():
             self.root.statusPrint("Arm is busy, cannot start corner sweep")
             return
         else:
             self.cornerSweeping = True
-        cornerSweepThread = threading.Thread(target=self.cornerSweep, args=self.plateHeight)
+        cornerSweepThread = threading.Thread(target=self.cornerSweep)
         cornerSweepThread.start()
 
     #corner sweep and move up one level at a time
@@ -511,7 +524,7 @@ class PrintController:
 
     #will cancel any related printing setup functions
     def cancelAny(self):
-        self.endSweepOrCal()
+        threading.Thread(target=self.endSweepOrCal)
         #just in case someone thinks this will cancel the print
         if self.printing:
             self.cancelPrint()
@@ -552,7 +565,7 @@ class PrintController:
         if self.bedCalStep == 1:
             self.root.armController.moveHome()
         #End calibration
-        if self.bedCalStep == 6: #Is at 6 after 4 is completed so done
+        if self.bedCalStep >= 5: #Is at 6 after 4 is completed so done
             self.endSweepOrCal()
             return
         #set label
@@ -582,13 +595,17 @@ class PrintController:
         
 
     # Used to sweep the corners without lifting to ensure kinematics are level to bed
-    def cornerSweep(self, height, full=False):
+    def cornerSweep(self, height=None, full=False):
        
         if self.flag is not None:
-            self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
-            self.endSweepOrCal()
-            return
+            self.root.terminalPrint("Corner sweep paused because of flag: "+ self.flag)
+            self.root.warningPrint("Encountered flag: "+self.flag)
+            #self.endSweepOrCal()
+            #return
         
+        #Height is assumed to be the height of the calibration corners
+        if height is None:
+            height = self.calibrationCorners[0].z
         moveOrder = [1,2,3,4,1,3,2,4]
         moveOrder= [x-1 for x in moveOrder] #adjust to 0 base index
 
@@ -603,9 +620,11 @@ class PrintController:
             else:
                 return
             if self.flag is not None:
-                self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
-                self.endSweepOrCal()
-                return
+                self.root.terminalPrint("Corner sweep paused because of flag: "+ self.flag)
+                self.root.warningPrint("Encountered flag: "+self.flag)
+                self.flag = None
+                #self.endSweepOrCal()
+                #return
             
         #End calibration
         #if not doing a fullSweep()
@@ -614,10 +633,14 @@ class PrintController:
     
     #End any corner sweep or bed calibration
     def endSweepOrCal(self):
+        
         self.cornerSweeping = False
         self.bedCalibration=False
         self.bedCalStep == 0
         self.root.cornerLabel.config(text=f"Current Corner: N/A")
+        #Wait until move finishes to send move home command
+        while self.root.armController.checkIfBusy():
+            pass
         self.root.armController.moveHome()
 
     #sweep multiple layers 20mm at a time
@@ -629,8 +652,10 @@ class PrintController:
         currentHeight = self.plateHeight
         endHeight = currentHeight + heightDelta
         while currentHeight < endHeight and self.cornerSweeping:
-            self.cornerSweep(currentHeight,full=True)
+            self.cornerSweep(height=currentHeight,full=True)
             currentHeight += heightStep
             if self.flag is not None:
                 self.root.terminalPrint("Corner sweep cancelled because of flag: "+ self.flag)
-                self.endSweepOrCal()
+                self.root.warningPrint("Encountered flag: "+self.flag)
+                self.flag = None
+                #self.endSweepOrCal()

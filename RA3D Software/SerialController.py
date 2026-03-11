@@ -1,7 +1,7 @@
 import serial
 import serial.tools.list_ports
 from serial import SerialException
-import time, threading, queue, random
+import time, threading, queue, uuid
 
 # TODO: Interesting bug that occurs but when connecting, disconnecting, then reconnecting, the entire serial buffer gets messed up resulting in everything being read in as junk. Not sure how it is happening nor how to fix.
 
@@ -24,6 +24,8 @@ class SerialController:
         
         self.waiting_responses = set()
         self.sendingSerial = False#Keep track to send serial so a response is not sorted while sending
+        self.Errors = ["Estop", "ER","EL"] #Error codes
+        self.WaitToProcess = ["POS"] #Everything that will not be processed if immediately received
 
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
@@ -72,11 +74,10 @@ class SerialController:
             self.responseQueue = queue.Queue()
 
             self.serialThread = threading.Thread(target=self.serialReader, daemon=True)
-            #self.sortThread = threading.Thread(target=self.sortResponseThread, daemon=True)
+            self.sortThread = threading.Thread(target=self.processResponses, daemon=True)
             self.running = True #Keeps threads running, must be true before starting serialthread
             self.serialThread.start()
-            #self.sortThread.start()
-            self.processResponses() #start sorting resposnes
+            self.sortThread.start()
             
             
         except SerialException:
@@ -99,7 +100,7 @@ class SerialController:
 
     # Repeatedly checks the serial port for new responses
     def serialReader(self):
-        while True:#self.running:
+        while self.running:
             # Check if a board is connected
             #print("serial thread running")
             if self.boardConnected:
@@ -118,50 +119,78 @@ class SerialController:
                 time.sleep(0.05)
             #self.checkResponseQueue()
             #Debugging
+            time.sleep(.01)
+            self.peekQueue()#Should remove all queue elements that should process immediately
+            #self.peekQueueForErrors() #If an error enters the queue is should be processed immediately
             if not self.responseQueue.empty():
-                print("Response Queue:",list(self.responseQueue.queue))
+                #print("Response Queue:", list(self.responseQueue.queue))
                 pass
+            if self.waiting_responses:
+                #print("Waiting response", str(self.waiting_responses))
+                pass
+
+    def printQueue(self):
+        if not self.responseQueue.empty():
+            self.root.terminalPrint("Response Queue:"+ list(self.responseQueue.queue))
+        else:
+            self.root.terminalPrint("Queue is empty")
 
     def clearQueue(self):
         self.responseQueue.queue.clear()
 
+    #queue is cleaned of a specified item by rebuilding the queue
     def cleanQueue(self, item):
-        size = int(self.responseQueue.qsize())
-        for i in range(size):
-            if self.responseQueue.queue[i] == item:
-                del queue[i]
+        new_items = []
+
+        while not self.responseQueue.empty():
+            val = self.responseQueue.get()
+            if val != item:
+                new_items.append(val)
+
+        for val in new_items:
+            self.responseQueue.put(val)
         print("response queue cleaned")
 
-    def peekQueueForEstop(self):
-        size = int(self.responseQueue.qsize())
-        try:
-            for i in range(size):
-                if self.responseQueue.queue[i][:5] == "Estop":
+    def peekQueue(self):
+        with self.responseQueue.mutex:
+            for item in list(self.responseQueue.queue):
+                if item in self.Errors:
                     self.root.printController.pausePrint()
-                    print("Estop found after peeking ahead")
-                    self.cleanQueue("Estop")
-                    break
-        except IndexError:
-            pass
+                    print(f"Error {item} found after peeking ahead")
+                    self.responseQueue.queue.remove(item)
+                    return
+                if item[:3] not in self.WaitToProcess:
+                    print(item, "not in wait to process")
+                    self.responseQueue.queue.remove(item)
+                    self.sortResponse(item)
        
     #Advances the response queue every .01 seconds    
     def processResponses(self):
-        while not self.responseQueue.empty():
-            if not self.waiting_responses and not self.sendingSerial:
-                #this seems to a little janky but I want the waiting_responses to be clear for a moment before it
-                #sorts a response, and gives things a moment to send then wait for a response
-                time.sleep(.5)
-                if not self.waiting_responses and not self.sendingSerial:
-                    response = self.responseQueue.get()
-                    self.sortResponse(response)
-            #This means the print will estop regardless if it is waiting for a response
-            self.peekQueueForEstop()
-
         #exit this thread if serial is not connected
-        if not self.running:
-            return
-        #print("processing responses")
-        self.root.after(10, self.processResponses)
+        while self.running:
+            try:
+                while not self.responseQueue.empty():
+                    #Only wait on certain responses
+                    if self.responseQueue.queue[0] in self.WaitToProcess:
+                        responseToWaitFor = self.responseQueue.queue[0]
+                        #this seems to a little janky but I want the waiting_responses to be clear for a moment before it
+                        #sorts a response, and gives things a moment to send then wait for a response
+                        accTime = 0
+                        endTime = 10
+                        #Will stop waiting if the queue has moved on
+                        while self.responseQueue.queue[0] == responseToWaitFor and accTime < endTime:
+                            time.sleep(1)
+                            accTime += 1
+                        #See if wait was triggered by same response
+                        if self.responseQueue.queue[0] == responseToWaitFor:
+                            #if not self.waiting_responses and not self.sendingSerial:
+                            response = self.responseQueue.get()
+                            self.sortResponse(response)
+                    #This means the print will estop regardless if it is waiting for a response
+                #print("processing responses")
+            except IndexError:
+                pass
+            time.sleep(.01)
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
@@ -175,7 +204,7 @@ class SerialController:
         # TODO I will change this so that only unexpected responses or errors are processed here
         
         #self.root.terminalPrint(f"Received Response: {sortResponse}")
-        self.root.terminalPrint("Sorting response...")
+        
         if sortResponse[:5]== "Estop":
             PC.printing = False
             flag = "Estop"
@@ -194,46 +223,54 @@ class SerialController:
             R.statusPrint(f"Error Axis Fault, Out of Reach: {sortResponse[2:]}")
             flag = "Axis Fault"
             AC.awaitingMoveResponse = False
-            
-        elif sortResponse[:2] == "TL":
-            if AC.testingLimitSwitches:
-                #Limit switch test
-                R.terminalPrint(f"Received TL Response: {sortResponse}")
-                AC.limitTestUpdate(response=sortResponse)
-            else:
-                R.terminalPrint(f"Received Unexpected Response: {sortResponse}")
-        elif sortResponse[:2] == "RE":
-            #read encoders
-            pass
-        elif sortResponse[:4] == "Done":
-            #Home position finished
-            #Command set output on/off finished
-            #send position to arm
-            pass
-        elif sortResponse[:6] == "WTDone":
-            R.statusPrint("Wait command finished")
-        elif sortResponse[:4] == "echo":
-            R.statusPrint(f"Echo: {sortResponse[4:]}")
-        elif sortResponse == "\n":
-            pass
+            self.cleanQueue("EL")
         elif sortResponse[:11] == "Turn Hazard":
             self.root.statusPrint(f"Encountered Hazard Move Stopped: {sortResponse[2:]}")
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             flag = "Turn Hazard"
             AC.awaitingMoveResponse = False
-        elif sortResponse[:3] == "POS" and AC.calibrationInProgress:
-            self.root.statusPrint("Position received from arm during calibration")
-            AC.calibrateArmUpdate(response=sortResponse)
-        elif sortResponse[:3] == "POS" and AC.awaitingMoveResponse:
-            self.root.statusPrint("Position received from arm after move command")
-            #AC.moveUpdate(response=sortResponse)
-        elif sortResponse[:3] == "POS" and AC.awaitingPosResponse:
-            self.root.statusPrint("Position received from arm after position request")
-            AC.requestPositionUpdate(response=sortResponse)
-        elif sortResponse[:3] == "POS":
-            AC.processPosition(sortResponse)
+        elif sortResponse[:9] == "Step Difs":
+            pass
+        #NOTE IF these responses are handled here that means they missed the timeout window or something else is wrong
         else:
-            R.statusPrint(f"Received Unrecognized Response: {sortResponse}")
+            R.terminalPrint(f"Received Unexpected Response: {sortResponse} maybe timeout window missed")
+            if sortResponse[:2] == "TL":
+                #Limit switch test
+                R.terminalPrint(f"Received TL Response: {sortResponse}")
+                AC.limitTestUpdate(response=sortResponse)
+            elif sortResponse[:2] == "RE":
+                R.terminalPrint(f"Received TL Response: {sortResponse}")
+                AC.limitTestUpdate(response=sortResponse)
+            elif sortResponse[:4] == "Done":
+                #Home position finished
+                #Command set output on/off finished
+                #send position to arm
+                pass
+            elif sortResponse[:6] == "WTDone":
+                R.statusPrint("Wait command finished")
+            elif sortResponse[:4] == "echo":
+                R.statusPrint(f"Echo: {sortResponse[4:]}")
+            elif sortResponse == "\n":
+                pass
+            
+            elif sortResponse[:3] == "POS" and AC.calibrationInProgress:
+                self.root.statusPrint("Position received from arm during calibration")
+                AC.calibrateArmUpdate(response=sortResponse)
+                self.root.terminalPrint("Sorting response...")
+            elif sortResponse[:3] == "POS" and AC.awaitingMoveResponse:
+                self.root.statusPrint("Position received from arm after move command")
+                #AC.moveUpdate(response=sortResponse)
+                self.root.terminalPrint("Sorting response...")
+            elif sortResponse[:3] == "POS" and AC.awaitingPosResponse:
+                self.root.statusPrint("Position received from arm after position request")
+                AC.requestPositionUpdate(response=sortResponse)
+                self.root.terminalPrint("Sorting response...")
+            elif sortResponse[:3] == "POS":
+                AC.processPosition(sortResponse)
+                self.root.terminalPrint("Sorting response...")
+            else:
+                self.root.terminalPrint("Sorting response...")
+                R.statusPrint(f"Received Unrecognized Response: {sortResponse}")
         if flag is not None:
             PC.flag = flag
     
@@ -250,9 +287,8 @@ class SerialController:
     def waitForResponse(self, prefix, timeout=2):
         start = time.time()
         #so response is not taken from processReponses
-        #TODO this isn't perfect I know there is a one in a billion chance 2 codes are identical
         #The unique code ensures that no other response can cancel another
-        uniqueCode = prefix + str(random.randint(1, int(1e9)))
+        uniqueCode = prefix + str(uuid.uuid4())
         #Avoid any possible errors where timeout is negative
         if timeout <= 0:
             print("timeout is negative")

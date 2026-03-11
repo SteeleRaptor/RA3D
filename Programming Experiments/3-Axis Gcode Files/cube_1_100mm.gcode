@@ -112,9 +112,6 @@ G1 Z2.0 F3000 ;Move Z Axis up
 G1 X10.1 Y20 Z0.28 F5000.0 ;Move to start position 
 M190 S55 ;Wait for bed temp to stabilize
 M109 S220 ;Wait for nozzle temp to stabilize
-G1 X10.1 Y145.0 Z0.28 F1500.0 E15 ;Draw the first line 
-G1 X10.4 Y145.0 Z0.28 F5000.0 ;Move to side a little 
-G1 X10.4 Y20 Z0.28 F1500.0 E30 ;Draw the second line 
 G92 E0 ;Reset extruder 
 G1 E-1.0000 F1800 ;Retract a bit 
 G1 Z2.0 F3000 ;Move Z Axis up 

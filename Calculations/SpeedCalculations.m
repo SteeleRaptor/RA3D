@@ -1,6 +1,12 @@
 %Near replica of Teensy sketch driveMotorsJ function
+%Acceleration/decelertaion is just a percentage of the move it takes to
+%acceralte. Ramp > 10 is needed for any acceleration otherwise it is
+%instaneous
+%ramp is a ratio of the minimum speed /10
+%For example 40 ramp will just make the velocity start at 1/4 speed then it
+%will accelerate up to desired speed
 clear;clc;close all
-[t,x] = driveMotorsJ(1000,1000,100,100,100,100,"s",5,10,10,15);
+[t,x] = driveMotorsJ(1000,1000,100,100,100,100,"p",5,10,10,5);
 stairs(t,x)
 ylabel("HighSteps")
 xlabel("t (seconds)")

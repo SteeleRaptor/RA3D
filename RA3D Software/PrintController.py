@@ -11,12 +11,13 @@ class PrintController:
 
         #------Important variables-------
         #MoveParameters(speed,acceleration,deceleratio,ramp,loopmode,speedtype)
-        self.defaultPrintParameters = MoveParameters(50,5,5,15,0,"m") #20mm/s print speed
+        #0=closed loop
+        self.defaultPrintParameters = MoveParameters(50,15,15,40,0,"m") #50mm/s print speed
         
         self.ignoreflags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 314 #Change bed height relitive to pen
+        self.plateHeight = 316 #Change bed height relitive to pen
         #boundarys for corner calibration/setting recommended origin
         YEdge = [-80,80]
         XEdge = [250,400]
@@ -157,22 +158,38 @@ class PrintController:
                     moveParameters.wrist = "N"
                     self.justMovedHome = False
                     self.root.armController.sendMJ(self.printPos, moveParameters=moveParameters, timeout=timeout)
+                #if there is not extrusion, movement doesn't have to be a straight line
+                elif self.extrudeRate == 0:
+                    moveParameters.wrist = "N"
+                    #self.root.armController.moveHome()#NOTE this line is for drawing tests only
+                    self.root.armController.sendMJ(self.printPos, moveParameters=moveParameters, timeout=timeout)
                 else:
                     # Send the command to the arm, will wait for a response
                     self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
             
             #must be last thing to do, copy last position
             self.lastPos = copy.deepcopy(self.printPos)
+        elif message == "Extrusion Only":
+            self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
+            timeout = 20
+            moveParameters = copy.deepcopy(self.defaultPrintParameters)
+            if self.feedRate != None and self.feedRate != 0:
+                #moveParameters.speedType = "m"
+                #Conver to mm/s from mm/min
+                moveParameters.speed = self.feedRate / 60
+            if self.printPos.x is not None and self.flag is None:
+                self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
         else:
+
             self.root.terminalPrint("Unexpected message from gcodeToTeensy")
         #endregion message handling
+        
         #Signifies thread has ended to start next thread
         self.root.printThreadStarted = False #Do NOT return anywhere else in this function
 
     # Converts a GCode instruction to the instruction to send over serial
     def gcodeToTeensy(self, lineToConvert):
-        #Assume feedrate and extruderate will not be set
-        self.feedRate = 0
+        #Assume extruderate will not be set
         self.extrudeRate = 0
 
         #NOTE some of these gcode commands are a work in progress
@@ -211,16 +228,16 @@ class PrintController:
         elif lineToConvert[0:2] == "G0" or lineToConvert[0:2] == "G1": # Move (treating G0 & G1 as mostly equal)
         
             #Search for values
-            xMatch = re.search(r"[xX](-?\d+\.?\d*)", lineToConvert)
-            yMatch = re.search(r"[yY](-?\d+\.?\d*)", lineToConvert)
-            zMatch = re.search(r"[zZ](-?\d+\.?\d*)", lineToConvert)
-            fMatch = re.search(r"[fF](-?\d+\.?\d*)", lineToConvert)
-            eMatch = re.search(r"[eE](-?\d+\.?\d*)", lineToConvert)
+            xMatch = re.search(r"[xX](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+            yMatch = re.search(r"[yY](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+            zMatch = re.search(r"[zZ](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+            fMatch = re.search(r"[fF](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+            eMatch = re.search(r"[eE](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
 
             #For 5 axis printing
             if self.axis5:
-                uMatch = re.search(r"[uU](-?\d+\.?\d*)", lineToConvert)
-                vMatch = re.search(r"[vV](-?\d+\.?\d*)", lineToConvert)
+                uMatch = re.search(r"[uU](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+                vMatch = re.search(r"[vV](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
                 u = float(uMatch.group(1)) if uMatch else None
                 v = float(vMatch.group(1)) if vMatch else None
             else:
@@ -235,27 +252,7 @@ class PrintController:
             f = float(fMatch.group(1)) if fMatch else None
             e = float(eMatch.group(1)) if eMatch else None
 
-            # If GCode instruction didn't contain a parameter, pull from last saved value
-            # If instruction DID contain a parameter, offset the value to put it in the build volume
-            if x == None:
-                x = self.lastPos.GetRelativeX()
-            if y == None:
-                y = self.lastPos.GetRelativeY()
-            if z == None:
-                z = self.lastPos.GetRelativeZ()
            
-            #get last feedrate if missing feedrate
-            if f == None:
-                f = self.lastF
-            else:
-                self.lastF = f
-            
-            #Do not extrude if not told to
-            if e == None:
-                e = 0
-            else:
-                self.lastE = e
-            
             #NOTE 5 axis g code is not fully implemented
             if self.axis5:
                 #For now both u and v are need for rotation
@@ -267,13 +264,43 @@ class PrintController:
                     u +=-90 #may add instead of subtract
                     #TODO I think u is elevation and v azimuth, need to check
                     Rz,Ry,Rx = self.aer_to_euler_zyx(v,u,0) # 3 options for transformation
-            
-            #TODO Add rotation transition in teensy if necessary
-            #if using 5 axis g code
-            if self.axis5:
-                self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
+            NoMove = False #For some commands they only specify E
+            if x == None and y==None and z==None:
+                NoMove = True
+                self.printPos=copy.deepcopy(self.lastPos)
             else:
-                self.printPos.SetRelative(x,y,z,0,90,0)
+                # If GCode instruction didn't contain a parameter, pull from last saved value
+                # If instruction DID contain a parameter, offset the value to put it in the build volume    
+                if x == None:
+                    x = self.lastPos.GetRelativeX()
+                if y == None:
+                    y = self.lastPos.GetRelativeY()
+                if z == None:
+                    z = self.lastPos.GetRelativeZ()
+                #if using 5 axis g code
+                if self.axis5:
+                    self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
+                else:
+                    self.printPos.SetRelative(x,y,z,0,90,0)
+           
+            
+            
+            #Do not extrude if not told to
+            if not NoMove:
+                if e == None:
+                    e = 0
+                else:
+                    self.lastE = e
+            elif e == None and f==None:
+                #extrusion has to be specified for extrusion only
+                return "Error no movement specified"
+            elif e == None:
+                self.feedRate = f
+                return ""
+            elif f == None:
+                self.extrudeRate = e
+                return "Extrusion only"
+        
 
             atBoundary = False
             #If values are part boundaries set to be at boundaries
@@ -297,7 +324,8 @@ class PrintController:
             if lineToConvert[0:2] == "G0":
                 self.feedRate = 5000#mm/min
             else:
-                self.feedRate = f
+                if f is not None:
+                    self.feedRate = f
 
             #Set extrude rate of printer
             self.extrudeRate = e
@@ -420,6 +448,7 @@ class PrintController:
         if not self.printPaused:
             self.findStartBlock()#Find where the gcode insturctions actually start
         self.printing = True
+        self.root.statusPrint("Starting print...")
 
     def stepPrint(self):
         if self.checkIfPrinterBusy():

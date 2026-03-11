@@ -94,6 +94,10 @@ class ArmController:
         # Check if arm is busy with something else
         if self.checkIfBusy(message="calibrate arm"):
             return
+        #Cannot calibrate while print is paused
+        if self.root.printController.checkIfPrinterBusy("calibrate arm"):
+            return
+        #Note here we did not do a nominal check because that checks if the arm is calibrated
         self.root.statusPrint("Beginning arm calibration")
         # Set flag for calibration in progress
         self.calibrationInProgress = True
@@ -124,7 +128,7 @@ class ArmController:
                                     calJ5=self.calJStage1[4],
                                     calJ6=self.calJStage1[5])
                 self.calibrationState = 2
-                response = self.serialController.waitForResponse("POS",35)
+                response = self.serialController.waitForResponse("POSLL",35)
                 #reevalute if calibration is in progress
             elif self.calibrationState == 2: # Await CalStage1 Response & process when ready
                 # Check if the serial controller has a response ready
@@ -158,7 +162,7 @@ class ArmController:
                                     calJ6=self.calJStage2[5])
                 self.calibrationState = 4
                 #Calibration will not continue until a response is received or timed out
-                response = self.serialController.waitForResponse("POS",35)
+                response = self.serialController.waitForResponse("POSLL",35)
                 #reevaluate calibration in progress
             elif self.calibrationState == 4: # Await CalStage2 Response & process when ready
                 # Check if the serial controller has a response ready
@@ -259,7 +263,8 @@ class ArmController:
 
     #Process position response to update UI
     def processPosition(self, response):
-        response = response[3:] # Remove POS from string
+        AIdx = response.find('A') # A value is angle of J1
+        response = response[AIdx:] # Remove POS from string
         # Collect all the indexes for finding values
         # General formatting of a response: A[val]B[val]C[val]D[val]E[val]F[val]G[val]H[val]I[val]J[val]K[val]L[val]M[val]N[val]O[val]P[val]Q[val]R[val]
         J1Idx = response.find('A') # A value is angle of J1
@@ -338,7 +343,7 @@ class ArmController:
         self.root.statusPrint("Requesting position update...")
         self.serialController.sendSerial("RP\n") # Send instruction
         self.awaitingPosResponse = True # Set the flag
-        response = self.serialController.waitForResponse("POS",3)
+        response = self.serialController.waitForResponse("POSRP",3)
         # Check if the serial controller has a response ready
         self.root.terminalPrint("response is " + response)
         # Inform user and process the position response
@@ -576,6 +581,19 @@ class ArmController:
     
     def zeroJ7(self):
         self.root.serialController.sendSerial("Z7\n")
+        self.waitForResponseAndProcess("POSZ7",5,message="Zero J7",setFlag=False)
+    
+    def waitForResponseAndProcess(self,prefix,timeout=2,message=None, setFlag = True):
+        response = self.root.serialController.waitForResponse(prefix)
+        if response is not None:
+            self.processPosition(response)
+            self.root.terminalPrint(response)
+            #self.root.statusPrint("Move command executed successfully")
+        else:
+            #Set flag used whether the timeout should send a flag to the printer
+            if setFlag:
+                self.root.printController.flag = "timeout after: " + str(timeout) + "s"
+            self.root.terminalPrint(message + " timed out after "+str(timeout))
 
     def getJointColors(self,J1,J2,J3,J4,J5,J6):
         if J1 == None:
@@ -647,7 +665,7 @@ class ArmController:
     #endregion GUI
     
     #region Move Commands
-    def sendMJ(self,commandPos, moveParameters,timeout=20):
+    def sendMJ(self,commandPos, moveParameters,timeout=5):
         #Leaving this specific check for awaitingMoveResponse so user knows why
         #Even though nominal check handles this
         if self.awaitingMoveResponse:
@@ -670,7 +688,7 @@ class ArmController:
         self.serialController.sendSerial(str(command))
 
         #Timeout and feedback handling
-        response = self.serialController.waitForResponse("POS",timeout)
+        response = self.serialController.waitForResponse("POSMJ",timeout)
         
         if response is not None:
             self.processPosition(response)
@@ -682,7 +700,7 @@ class ArmController:
         self.awaitingMoveResponse = False
 
     #Move linear, timeout default is 10
-    def sendML(self, pos, moveParameters, extrudeRate=None, RelativeExtrude=True,timeout=15):
+    def sendML(self, pos, moveParameters, extrudeRate=None, RelativeExtrude=True,timeout=5):
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
@@ -705,7 +723,7 @@ class ArmController:
         self.serialController.sendSerial(str(command))
 
         #Timeout and feedback handling
-        response = self.serialController.waitForResponse("POS",timeout)
+        response = self.serialController.waitForResponse("POSML",timeout)
         
         if response is not None:
             self.processPosition(response)
@@ -720,6 +738,9 @@ class ArmController:
 
     def sendRJ(self, Joints, moveParameters, timeout=10):
         #self.root.terminalPrint("Sending RJ command...")
+        if self.awaitingMoveResponse:
+            self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
+            return
         # Create the command
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
         command = MoveCommand("RJ",Joints, moveParameters)
@@ -733,7 +754,7 @@ class ArmController:
 
         #Timeout and feedback handling
         self.serialController.sendSerial(str(command))
-        response = self.serialController.waitForResponse("POS",timeout)
+        response = self.serialController.waitForResponse("POSRJ",timeout)
         
         if response is not None:
             self.processPosition(response)
@@ -741,7 +762,7 @@ class ArmController:
             self.root.statusPrint("Move command executed successfully")
         else:
             self.root.printController.flag = "timeout after: " + str(timeout) + "s"
-            self.root.terminalPrint("Send ML timed out after "+str(timeout))
+            self.root.terminalPrint("Send RJ timed out after "+str(timeout))
         
         self.awaitingMoveResponse = False
     
@@ -762,15 +783,28 @@ class ArmController:
         return estimateTime
     
     # Moves the robot to a safe position to be turned off
-    def moveSafe(self):
+    # Cancels everything, ignore flags, and just sends the serial command
+    # timeout is large because movesafe can be in the teensy queue
+    def moveSafe(self,timeout=30):
         self.root.printController.pauseAll() #pause printing functions
         self.cancelActions()#pause actions like calibration or testing
         #wait until commands have finished
-        while self.root.armController.checkIfBusy(display=False):
-            time.sleep(1)
-            pass
-        SafePositionJoints = (0, -40, 60, 0, 45, 0)
-        self.sendRJ(SafePositionJoints, self.defaultMoveParameters)
+        #while self.root.armController.checkIfBusy(display=False):
+            #time.sleep(.01)
+            #pass
+        SafePositionJoints = (0, -40, 60, 0, -45, 0)
+        command = MoveCommand("RJ",SafePositionJoints, self.defaultMoveParameters)
+        #Will send regardless if a move is in progress
+        self.serialController.sendSerial(str(command))
+        response = self.serialController.waitForResponse("POSRJ",timeout)
+        
+        if response is not None:
+            self.processPosition(response)
+            self.root.terminalPrint(response)
+            self.root.statusPrint("Move safe executed successfully")
+        else:
+            self.root.printController.flag = "timeout after: " + str(timeout) + "s"
+            self.root.terminalPrint("Move safe timed out after "+str(timeout))
     
     # Moves to the neutral position, all joints at zero degrees
     def moveHome(self):
@@ -800,7 +834,7 @@ class ArmController:
 
     def limitTestUpdate(self):
         #Will send command if response is not given in 2 seconds
-        while not self.finishTest:
+        while not self.finishTest and self.testingLimitSwitches:
             self.serialController.sendSerial("TL\n") # Send instruction
             response = self.root.seriatlController.waitForResponse("TL",2)
             # Check if serial controller has a response ready
@@ -847,7 +881,7 @@ class ArmController:
     def encoderTestUpdate(self):
         #while test has not finished
         #If has reponse is not recieved another command will be sent after 2 seconds
-        while not self.finishTest:
+        while not self.finishTest and self.testingEncoders:
             #Send the command
             self.serialController.sendSerial("RE\n") # Send instruction
             #wait 2 seconds for a response
@@ -935,10 +969,10 @@ class ArmController:
         value = self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingPosResponse
         if value:
             if message and display:
-                self.root.terminalPrint("Cannot" + message + ", Arm busy")
+                self.root.terminalPrint("Cannot " + message + ", Arm busy")
             elif display:
                 self.root.terminalPrint("Arm busy")
-        return 
+        return value
     
     # meant to add calibration check without printing check
     # so move commands can execute while printing
@@ -971,11 +1005,14 @@ class ArmController:
         self.awaitingPosResponse = False
         self.testingLimitSwitches = False
         self.testingEncoders = False
-        self.root.printController.pausePrint()
+        if self.root.printController.printing:
+            self.root.printController.pausePrint()
         self.root.printController.bedCalibration = False
         self.root.printController.cornerSweeping = False
         self.root.serialController.clearQueue()
         self.root.printController.flag = None
+        self.root.warningPrint("if threads have not finished, reset may break things")
+
     #cancel all actions except moveresponse so moves can terminate properly
     def cancelActions(self):
         self.calibrationInProgress = False
@@ -988,7 +1025,7 @@ class ArmController:
        
         #origin can be set by an origin or at current position
         if origin is None or origin.x is None:
-            if self.notNominalCheck(message="set origin"):
+            if self.checkIfAllBusy(message="set origin"):
                 return
             self.requestPositionAndWait #requests and waits
             self.origin.setOrigin(self.curPos)
@@ -1031,91 +1068,6 @@ class ArmController:
         self.sendMJ(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters)
 
     #endregion origin
-
-    #region ========|Timeouts|===============            
-    #if no calibrate response
-    '''def calibrateTimeout(self):
-        timeout = 35
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and (self.calibrationState == 2 or self.calibrationState == 1):
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        #if no longer calibrating, exit function
-        if self.calibrationState == 0 or self.calibrationInProgress == False:
-            return
-        #if response for stage 1 hasn't come back yet
-        if self.calibrationState == 1 or self.calibrationState == 2:
-            # If not, inform user of Stage 1 Failure
-            self.root.statusPrint(f"Stage 1 Calibration FAILED")
-            self.root.terminalPrint("Calibration timed out")
-            # Exit calibration
-            self.calibrationState = 0
-            self.calibrationInProgress = False
-            # Force arm calibration flag to False
-            self.armCalibrated = False
-            return
-        timeout = 35
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and (self.calibrationState == 3 or self.calibrationState == 4):
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        #special case if stage 2 hasn't been sent yet
-        if self.calibrationState == 3:
-            time.sleep(2)
-        #if response for stage 2 hasn't come back yet
-        if self.calibrationState == 4:
-            # If not, inform user of Stage 2 Failure
-            self.root.statusPrint("Stage 2 Calibration FAILED")
-            self.root.terminalPrint("Calibration timed out")
-            # Exit calibration
-            self.calibrationState = 0
-            self.calibrationInProgress = False
-            # Force arm calibration flag to False
-            self.armCalibrated = False
-        self.root.timeoutStartedCal = False'''
-    '''def processPositionTimeout(self):
-        timeout = 5
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and self.awaitingPosResponse:
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        if self.awaitingPosResponse is True:
-            self.root.terminalPrint("Position response timed out")
-            self.root.statusPrint("Position response timed out")
-            self.awaitingPosResponse = False
-            #
-            # self.root.serialController.stopWaitingForReponse()
-        self.root.timeoutStartedPos = False'''
-
-    '''def moveTimeout(self):
-        timeout = 15
-        timeInc = 0.1
-        timeElapsed = 0
-        #while timeout is not reached and still waiting for position response, keep waiting
-        while timeElapsed < timeout and self.awaitingMoveResponse:
-            time.sleep(timeInc)
-            timeElapsed += timeInc
-        #If awiating move response is still true, then we know we timed out so inform the user
-        if self.awaitingMoveResponse is True:
-            self.root.statusPrint("Move response timed out")
-            self.awaitingMoveResponse = False
-            self.root.timeoutStartedMove = False
-            self.root.printController.flag = "Move Timeout"
-            #self.root.serialController.stopWaitingForReponse()
-            return
-        self.root.timeoutStartedMove = False'''
-
-    #Could be used for encoder test but could be removed
-    '''def testTimeout(self):
-        response = self.serialController.waitForResponse("TL",2)
-        self.armController.limitTestUpdate(response)'''
-    #endregion Timeouts
 
 #region--- Other Classes ---
 class Position:

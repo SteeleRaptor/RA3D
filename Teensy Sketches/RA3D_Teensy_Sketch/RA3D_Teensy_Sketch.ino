@@ -94,6 +94,8 @@ float J6encMult = 5;
 int encCollisionOffset = 50;
 int encoderCLTolerance = 2;
 
+
+
 //set encoder pins
 Encoder J1encPos(14, 15);
 Encoder J2encPos(17, 16);
@@ -161,9 +163,14 @@ float J3StepDeg = 111.111;
 float J4StepDeg = 99.555;
 float J5StepDeg = 43.720;
 float J6StepDeg = 44.444;
-float J7StepDeg = 14.2857;
+float J7StepDeg = 11.111;
 float J8StepDeg = 14.2857;
 float J9StepDeg = 14.2857;
+
+
+//Backlash fix variables
+int LastJ4dir = -1;
+float BacklashFixDeg = 5*J4StepDeg;//5 degrees
 
 //steps full movement of each axis
 int J1StepLim = J1axisLim * J1StepDeg;
@@ -177,6 +184,7 @@ int J8StepLim = J8axisLim * J8StepDeg;
 int J9StepLim = J9axisLim * J9StepDeg;
 
 //step when at negative limit, functions as a datum
+//These numbers are actually positive, the negative is just the joint angle
 int J1zeroStep = J1axisLimNeg * J1StepDeg;
 int J2zeroStep = J2axisLimNeg * J2StepDeg;
 int J3zeroStep = J3axisLimNeg * J3StepDeg;
@@ -1341,11 +1349,11 @@ void inverse_kinematics_raw(const T pose[16], const tRobot DK, const T joints_ap
 //CALCULATE POSITIONS
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void sendRobotPos() {
-
+void sendRobotPos(String type) {
+  //type is used to tell arm what just finished moving
   updatePos();
 
-  String sendPos = "POSA" + String(JointAnglePreKin[0], 3) + "B" + String(JointAnglePreKin[1], 3) + "C" + String(JointAnglePreKin[2], 3) + "D" + String(JointAnglePreKin[3], 3) + "E" + String(JointAnglePreKin[4], 3) + "F" + String(JointAnglePreKin[5], 3) + "G" + String(xyzuvw_PostKin[0], 3) + "H" + String(xyzuvw_PostKin[1], 3) + "I" + String(xyzuvw_PostKin[2], 3) + "J" + String(xyzuvw_PostKin[3], 3) + "K" + String(xyzuvw_PostKin[4], 3) + "L" + String(xyzuvw_PostKin[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  String sendPos = "POS"+ type + "A" + String(JointAnglePreKin[0], 3) + "B" + String(JointAnglePreKin[1], 3) + "C" + String(JointAnglePreKin[2], 3) + "D" + String(JointAnglePreKin[3], 3) + "E" + String(JointAnglePreKin[4], 3) + "F" + String(JointAnglePreKin[5], 3) + "G" + String(xyzuvw_PostKin[0], 3) + "H" + String(xyzuvw_PostKin[1], 3) + "I" + String(xyzuvw_PostKin[2], 3) + "J" + String(xyzuvw_PostKin[3], 3) + "K" + String(xyzuvw_PostKin[4], 3) + "L" + String(xyzuvw_PostKin[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
   delay(5);
   Serial.println(sendPos);
   speedViolation = "0";
@@ -1356,7 +1364,7 @@ void sendRobotPosSpline() {
 
   updatePos();
 
-  String sendPos = "POSA" + String(JointAnglePreKin[0], 3) + "B" + String(JointAnglePreKin[1], 3) + "C" + String(JointAnglePreKin[2], 3) + "D" + String(JointAnglePreKin[3], 3) + "E" + String(JointAnglePreKin[4], 3) + "F" + String(JointAnglePreKin[5], 3) + "G" + String(xyzuvw_PostKin[0], 3) + "H" + String(xyzuvw_PostKin[1], 3) + "I" + String(xyzuvw_PostKin[2], 3) + "J" + String(xyzuvw_PostKin[3], 3) + "K" + String(xyzuvw_PostKin[4], 3) + "L" + String(xyzuvw_PostKin[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
+  String sendPos = "POSSA" + String(JointAnglePreKin[0], 3) + "B" + String(JointAnglePreKin[1], 3) + "C" + String(JointAnglePreKin[2], 3) + "D" + String(JointAnglePreKin[3], 3) + "E" + String(JointAnglePreKin[4], 3) + "F" + String(JointAnglePreKin[5], 3) + "G" + String(xyzuvw_PostKin[0], 3) + "H" + String(xyzuvw_PostKin[1], 3) + "I" + String(xyzuvw_PostKin[2], 3) + "J" + String(xyzuvw_PostKin[3], 3) + "K" + String(xyzuvw_PostKin[4], 3) + "L" + String(xyzuvw_PostKin[5], 3) + "M" + speedViolation + "N" + debug + "O" + flag + "P" + J7_pos + "Q" + J8_pos + "R" + J9_pos;
   delay(5);
   Serial.println(sendPos);
   speedViolation = "0";
@@ -1370,8 +1378,17 @@ void updatePos() {
   JointAnglePreKin[0] = (J1StepM - J1zeroStep) / J1StepDeg;
   JointAnglePreKin[1] = (J2StepM - J2zeroStep) / J2StepDeg;
   JointAnglePreKin[2] = (J3StepM - J3zeroStep) / J3StepDeg;
-  JointAnglePreKin[3] = (J4StepM - J4zeroStep) / J4StepDeg;
-  JointAnglePreKin[4] = (J5StepM - J5zeroStep) / J5StepDeg;
+  
+  float J4StepTemp = J4StepM-J4zeroStep;
+  //when the backlash adjustment has been used adjust back to get the true position
+  //backlash adjustment should change
+  if (LastJ4dir>=0){
+    //1 should represent positive
+    int dir = (LastJ4dir == 1) ? 1 : -1; //convert from 0,1 to -1,1
+    J4StepTemp = (J4StepM+BacklashFixDeg*dir)-J4zeroStep;
+  }
+  JointAnglePreKin[3] = (J4StepTemp) / J4StepDeg;
+  JointAnglePreKin[4] = (J5StepM-J5zeroStep) / J5StepDeg;
   JointAnglePreKin[5] = (J6StepM - J6zeroStep) / J6StepDeg;
 
   J7_pos = (J7StepM - J7zeroStep) / J7StepDeg;
@@ -2202,6 +2219,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     int J9stepDif = J9StepM - J9futStepM;
 
     //determine motor directions
+    //I think 1 is actually positive (toward positive axis limit)
     J1dir = (J1stepDif <= 0) ? 1 : 0;
     J2dir = (J2stepDif <= 0) ? 1 : 0;
     J3dir = (J3stepDif <= 0) ? 1 : 0;
@@ -2255,7 +2273,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
       }
       checkEncoders();
       if (response == true) {
-        sendRobotPos();
+        sendRobotPos("MJ");
       }
     } else if (KinematicError == 1) {
       Alarm = "ER";
@@ -2370,7 +2388,7 @@ void EstopProg() {
     estopActive = true;
     Serial.println("Estop");
     delay(100); //Give some time so that the estop function is received 
-    sendRobotPos();
+    sendRobotPos("Estop");
   }
 }
 
@@ -2485,37 +2503,38 @@ void closedLoop(){
   int J9stepDif = 0;
 
   //check if motors are at target position within a tolerance
-  /*if (abs(J1encPos.read()/J1encMult-J1TargetStep) > encoderCLTolerance) {
+  if (abs(J1stepDif) > encoderCLTolerance) {
     int J1Move = 1;
   } else {
     J1stepDif = 0;
   }
-  if (abs(J2encPos.read()/J2encMult-J2TargetStep) > encoderCLTolerance){
+  if (abs(J2stepDif) > encoderCLTolerance){
     int J2Move = 1;
   } else {
     J2stepDif = 0;
   }
-  if (abs(J3encPos.read()/J3encMult-J3TargetStep) > encoderCLTolerance){
+  if (abs(J3stepDif) > encoderCLTolerance){
     int J3Move = 1;
   } else {
     J3stepDif = 0;
   }
-  if (abs(J4encPos.read()/J4encMult-J4TargetStep) > encoderCLTolerance){
+  if (abs(J4stepDif) > encoderCLTolerance){
     int J4Move = 1;
   } else {
     J4stepDif = 0;
   }
-  if (abs(J5encPos.read()/J5encMult-J5TargetStep) > encoderCLTolerance){
+  if (abs(J5stepDif) > encoderCLTolerance){
     int J5Move = 1;
   } else {
     J5stepDif = 0;
   }
-  if (abs(J6encPos.read()/J6encMult-J6TargetStep) > encoderCLTolerance){
+  if (abs(J6stepDif) > encoderCLTolerance){
     int J6Move = 1;
   } else {
     J6stepDif = 0;
-  }*/
-  Serial.println("Step Difs: " + String(J1stepDif) + ", " + String(J2stepDif) + ", " + String(J3stepDif) + ", " + String(J4stepDif) + ", " + String(J5stepDif) + ", " + String(J6stepDif));
+  }
+  //Serial.println("Step Difs: " + String(J1stepDif) + ", " + String(J2stepDif) + ", " + String(J3stepDif) + ", " + String(J4stepDif) + ", " + String(J5stepDif) + ", " + String(J6stepDif));
+  
   //determine motor directions
   J1dir = (J1stepDif <= 0) ? 1 : 0;
   J2dir = (J2stepDif <= 0) ? 1 : 0;
@@ -2568,7 +2587,7 @@ void closedLoop(){
     //drive motors if any motor has to move
     if (J1Move || J2Move || J3Move || J4Move || J5Move || J6Move){
       driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), J7stepDif, J8stepDif, J9stepDif, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
-      sendRobotPos();//send robot position only if changed
+      //sendRobotPos("CL");//send robot position only if changed
     }
     checkEncoders();//check for collision
     
@@ -2621,7 +2640,7 @@ void loop() {
     //-----------------------------------------------------------------------
     if (function == "SS") {
       delay(5);
-      sendRobotPos();
+      sendRobotPos("");
       splineTrue = false;
       splineEndReceived = false;
     }
@@ -2701,7 +2720,7 @@ void loop() {
       //close serial so next command can be read in
       delay(5);
       if (Alarm == "0") {
-        sendRobotPos();
+        sendRobotPos("RP");
       } else {
         Serial.println(Alarm);
         Alarm = "0";
@@ -2779,7 +2798,7 @@ void loop() {
         driveMotorsG
       }*/
       checkEncoders();
-      sendRobotPos();
+      sendRobotPos("HM");
       delay(5);
       Serial.println("Done");
     }
@@ -3023,7 +3042,7 @@ void loop() {
     //-----------------------------------------------------------------------
     if (function == "Z7") {
       J7StepM = 0;
-      sendRobotPos();
+      sendRobotPos("Z7");
     }
     /*
     //-----COMMAND ZERO J8---------------------------------------------------
@@ -3366,7 +3385,7 @@ void loop() {
       J5TargetStep = J5stepCen;
       J6TargetStep = J6stepCen;*/
       driveMotorsJ(J1stepCen, J2stepCen, J3stepCen, J4stepCen, J5stepCen, J6stepCen, J7stepCen, J8stepCen, J9stepCen, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
-      sendRobotPos();
+      sendRobotPos("LL");
       inData = "";  // Clear recieved buffer
     }
 
@@ -3566,7 +3585,7 @@ void loop() {
       setEncoders();
       //Drive by amount changed
       driveMotorsJ(abs(J1callOffExtraDeg), abs(J2callOffExtraDeg), abs(J3callOffExtraDeg), abs(J4callOffExtraDeg), abs(J5callOffExtraDeg), abs(J6callOffExtraDeg), abs(J7callOffExtraDeg), abs(J8callOffExtraDeg), abs(J9callOffExtraDeg), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
-      sendRobotPos();
+      sendRobotPos("LE");
       inData = "";  // Clear recieved buffer
     }
 
@@ -3760,7 +3779,7 @@ void loop() {
 
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
-        sendRobotPos();
+        sendRobotPos("LC");
       } else if (KinematicError == 1) {
         Alarm = "ER";
         delay(5);
@@ -4001,7 +4020,7 @@ void loop() {
 
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
-        sendRobotPos();
+        sendRobotPos("LJ");
       } else if (KinematicError == 1) {
         Alarm = "ER";
         delay(5);
@@ -4237,7 +4256,7 @@ void loop() {
 
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
-        sendRobotPos();
+        sendRobotPos("LT");
       } else if (KinematicError == 1) {
         Alarm = "ER";
         delay(5);
@@ -4432,7 +4451,7 @@ void loop() {
         resetEncoders();
         driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
         checkEncoders();
-        sendRobotPos();
+        sendRobotPos("JT");
       } else if (KinematicError == 1) {
         Alarm = "ER";
         delay(5);
@@ -4551,7 +4570,7 @@ void loop() {
       int J4stepDif = J4StepM - J4futStepM;
       int J5stepDif = J5StepM - J5futStepM;
       int J6stepDif = J6StepM - J6futStepM;
-      int J7stepDif = J7_In;//RJ may be used to extrude
+      int J7stepDif = J7_In;//RJ may not be used to extrude
       int J8stepDif = J8StepM - J8futStepM;
       int J9stepDif = J9StepM - J9futStepM;
 
@@ -4567,6 +4586,13 @@ void loop() {
       J8dir = (J8stepDif <= 0) ? 1 : 0;
       J9dir = (J9stepDif <= 0) ? 1 : 0;
 
+      //Backlash fix
+      //If the direction has switched and a last direction exists
+      if (J4dir != LastJ4dir && LastJ4dir >=0){
+        
+        J4stepDif -= BacklashFixDeg*J4stepDif/abs(J4stepDif);
+        LastJ4dir = J4dir; //update for next move
+      }
 
       //determine if requested position is within axis limits
       if ((J1dir == 1 and (J1StepM + J1stepDif > J1StepLim)) or (J1dir == 0 and (J1StepM - J1stepDif < 0))) {
@@ -4605,7 +4631,7 @@ void loop() {
         if (closedLoopTrue){
           checkEncoders();
         }
-        sendRobotPos();
+        sendRobotPos("RJ");
       } else if (KinematicError == 1) {
         Alarm = "ER";
         delay(5);
@@ -4617,6 +4643,7 @@ void loop() {
       }
 
       inData = "";  // Clear recieved buffer
+      LastJ4dir = -1; // Reset
       ////////MOVE COMPLETE///////////
     }
 
@@ -5114,7 +5141,7 @@ void loop() {
 
       checkEncoders();
       if (splineTrue == false) {
-        sendRobotPos();
+        sendRobotPos("ML");
       }
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
@@ -5128,6 +5155,7 @@ void loop() {
     if (function == "MJ") {
       //use drivemotorsJ
       moveJ(inData, true, false, false);
+      LastJ4dir = -1;
     }
     
     //----- MOVE G ---------------------------------------------------
@@ -5173,7 +5201,7 @@ void loop() {
       String info = inData.substring(0, fileStart);
       writeSD(fn, info);
       //moveJ(info, false, true, false);
-      sendRobotPos();
+      sendRobotPos("WC");
     }
 
     //----- PLAY FILE ON SD CARD ---------------------------------------------------
@@ -5250,7 +5278,7 @@ void loop() {
         }
       }
       gcFile.close();
-      sendRobotPos();
+      sendRobotPos("PG");
     }
 
 
@@ -5408,7 +5436,7 @@ void loop() {
       if (TotalAxisFault == 0 && KinematicError == 0) {
         info = String(abs(J1stepDif)) + "," + String(abs(J2stepDif)) + "," + String(abs(J3stepDif)) + "," + String(abs(J4stepDif)) + "," + String(abs(J5stepDif)) + "," + String(abs(J6stepDif)) + "," + String(abs(J7stepDif)) + "," + String(abs(J8stepDif)) + "," + String(abs(J9stepDif)) + "," + String(J1dir) + "," + String(J2dir) + "," + String(J3dir) + "," + String(J4dir) + "," + String(J5dir) + "," + String(J6dir) + "," + String(J7dir) + "," + String(J8dir) + "," + String(J9dir) + "," + String(SpeedType) + "," + String(SpeedVal) + "," + String(ACCspd) + "," + String(DCCspd) + "," + String(ACCramp);
         writeSD(filename, info);
-        sendRobotPos();
+        sendRobotPos("WG");
       } else if (KinematicError == 1) {
         Alarm = "ER";
         delay(5);
@@ -5769,7 +5797,7 @@ void loop() {
       }
 
       checkEncoders();
-      sendRobotPos();
+      sendRobotPos("MC");
 
 
       inData = "";  // Clear recieved buffer
@@ -6159,7 +6187,7 @@ void loop() {
       rndTrue = false;
       inData = "";  // Clear recieved buffer
       if (splineTrue == false) {
-        sendRobotPos();
+        sendRobotPos("MX"); //cannot use A
       }
       ////////MOVE COMPLETE///////////
     }

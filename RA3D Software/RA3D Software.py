@@ -10,6 +10,7 @@ from PrintController import PrintController
 from TemperatureController import TemperatureController
 
 class TkWindow(Tk):
+
     # region init
     def __init__(self):
         Tk.__init__(self)
@@ -51,9 +52,6 @@ class TkWindow(Tk):
         self.printThreadStarted = False
         #Set origin last so everything is in place
         self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
-
-        
-
     #endregion init
 
     #region Shutdown
@@ -683,6 +681,9 @@ class TkWindow(Tk):
         # responseReady
         self.serDebugRespLabel = Label(self.serDebugFrame, text="responseReady = ")
         self.serDebugRespLabel.grid(row=3, column=0, padx=5, pady=5, sticky=W)
+        #Override calibration button
+        self.printQueueButton = Button(self.serDebugFrame,text="Print Serial Queue", command=self.serialController.printQueue)
+        self.printQueueButton.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky=W)
         #TODO add more debug variables
 
         # ===| ArmController Variables |===
@@ -699,11 +700,19 @@ class TkWindow(Tk):
         # calibrationState
         self.armDebugCalStateLabel = Label(self.armDebugFrame, text="calibrationState = ")
         self.armDebugCalStateLabel.grid(row=3, column=0, padx=5, pady=5, sticky=W)
+        #Override calibration button
         self.overrideCalibrationButton = Button(self.debugVarFrame,text="Override Calibration", command=self.armController.overrideCalibration)
         self.overrideCalibrationButton.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
     
         # ===| PrintController Variables |===
-        
+        self.printDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000")
+        self.printDebugFrame.grid(row=4, column=0, padx=5, pady=5, sticky=W)
+        self.printDebugLabel = Label(self.printDebugFrame, text="PrintController:")
+        self.printDebugLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
+        # armCalibrated
+        self.printDebugPrintLabel = Label(self.printDebugFrame, text="printing = ")
+        self.printDebugPrintLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
+    
         # ==========| Terminal Frame |==========
 
         self.termFrame = Frame(self.debugTab, bg="#00FFFF", highlightthickness=2, highlightbackground="#000000")
@@ -804,8 +813,10 @@ class TkWindow(Tk):
         self.armDebugCalLabel.config(text=f"armCalibrated = {self.armController.armCalibrated}")
         self.armDebugCalInProgLabel.config(text=f"calibrationInProgress = {self.armController.calibrationInProgress}")
         self.armDebugCalStateLabel.config(text=f"calibrationState = {self.armController.calibrationState}")
+        
 
         # PrintController vars
+        self.printDebugPrintLabel.config(text=f"printing = {self.printController.printing}")
 
     # Called whenever the selection in the port dropdown is changed
     def portSelectionChanged(self, *args):
@@ -836,10 +847,18 @@ class TkWindow(Tk):
         self.statusLabel.config(text=f"Status: {message}")
         # Also print the full message to the terminal
         self.terminalPrint(message)
-        
+
     def warningPrint(self, message):
-        messagebox.showinfo("Warning! ", message+"\n\nPressing ok may resume movement")
+        #Display a 2nd message based on ignoreflags
+        message2 = ""
+        if self.printController.ignoreflags:
+            message2 = "\nPressing ok will resume movement"
+        else:
+            message2 = "\nPrinting wil stop"
+        #show message
+        messagebox.showinfo("Warning! ", message+message2)
         self.statusPrint(message)
+
     #endregion print functions
     #region popup
     def createPostCalibration(self):

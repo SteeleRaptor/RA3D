@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 
 from SerialController import SerialController
-from ArmController import ArmController
+from ArmController import ArmController, MoveParameters
 from PrintController import PrintController
 #from TemperatureController import TemperatureController
 
@@ -13,6 +13,21 @@ class TkWindow(Tk):
 
     # region init
     def __init__(self):
+        #All Settings
+        #Maps each display setting to a variable
+        #Simply add to this dictionary to add a setting
+        # "Display Name":("VariableName","Object")
+        self.settingsDict = {
+            "Print speed (mm/s)": ("speed","PC"), #print controller
+            "Acceleration": ("acceleration","PC"),
+            "Decceleration": ("decceleration","PC"),
+            "Ramp": ("ramp","PC"),
+            "Plate Height" : ("plateHeight","PC"),
+            "Ignore Flags" : ("ignoreFlags","PC"),
+            "deg/mm": ("extruder_deg_per_mm","AC"),
+            "Sync Print Parameters": ("syncWithPrintParameters","AC")
+        }
+        self.DebugMode = True #Will display important debug prints but not all of them
         Tk.__init__(self)
         self.root = self
         # Set the window title
@@ -32,7 +47,7 @@ class TkWindow(Tk):
         # Instantiate objects for the various controller classes
         self.serialController = SerialController(self.root)
         self.armController = ArmController(self.root, self.serialController)
-        self.printController = PrintController(self.root)
+        self.printController = PrintController(self.root,self.armController)
         
         #self.temperatureController = TemperatureController(self.root)
 
@@ -656,7 +671,7 @@ class TkWindow(Tk):
         self.J7CoordEntry2 = Entry(self.extruderFrame, width=6)
         self.J7CoordLabel2.grid(row=1, column=0, padx=(0, 5), pady=5)
         self.J7CoordEntry2.grid(row=1, column=1, padx=(0, 5), pady=5)
-        self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrude)
+        self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrudeButton)
         self.extrudeButton.grid(row=2, column=0,padx=(0, 5), pady=5)
         self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
         self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
@@ -740,11 +755,116 @@ class TkWindow(Tk):
         self.terminal.pack(fill=BOTH)
 
     def fillSettingsTab(self):
+       
+
         # Temporary text to inform user that there is nothing here yet
-        Label(self.settingsTab, text="Nothing to see here at the moment (WIP)").pack(fill="both", expand=True)
-        # TODO Add settings for print control speed, acceleration...
+        #Label(self.settingsTab, text="Nothing to see here at the moment (WIP)").pack(fill="both", expand=True)
+        #NOTE these frames and labels don't need self if they're never accessed after setup
+        self.settingsFrame = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
+        self.settingsFrame.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
+
+        # Headers for all settings
+        header1 = Label(self.settingsFrame, text="Setting",padx=5)
+        header2 = Label(self.settingsFrame, text="Current",padx=5)
+        header3 = Label(self.settingsFrame, text="Change To",padx=5)
+        horizontalLine1 = ttk.Separator(self.settingsFrame,orient="horizontal")
+        verticalLine1 = ttk.Separator(self.settingsFrame,orient="vertical")
+        verticalLine2 = ttk.Separator(self.settingsFrame,orient="vertical")
+        horizontalLine2 = ttk.Separator(self.settingsFrame,orient="horizontal")
+        header1.grid(row=0, column=0,pady=(5,0))
+        header2.grid(row=0, column=2,pady=(5,0))
+        header3.grid(row=0, column=4,pady=(5,0))
+        horizontalLine1.grid(row=1,column=0,columnspan=5,sticky=EW)
+        horizontalLine2.grid(row=len(self.settingsDict)+2,column=0,columnspan=5,pady=5,sticky=EW)
+        verticalLine1.grid(row=0,column=1,rowspan=len(self.settingsDict)+3,sticky=NS,pady=(0,5))
+        verticalLine2.grid(row=0,column=3,rowspan=len(self.settingsDict)+3,sticky=NS,pady=(0,5))
+        
+        #Stores the label and entry objects
+        self.entries = {}
+        self.currents = {}
+        PC = self.printController
+        AC = self.armController
+        SC = self.serialController
+
+        row = 2 #start below headers
+        for item in self.settingsDict:
+             
+            attr, object = self.settingsDict[item]
+
+            match object:
+                case "PC":
+                    object = PC
+                case "AC":
+                    object = AC
+                case "SC":
+                    object = SC
+            currentValue = getattr(object,attr)
+
+            settingLabel = Label(self.settingsFrame, text=item)
+
+            self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
+            self.entries[item] = Entry(self.settingsFrame,width=10)
+            
+            #Place
+            settingLabel.grid(row=row, column=0)
+            self.currents[item].grid(row=row, column=2)
+            self.entries[item].grid(row=row, column=4,padx=5,pady=5)
+            row += 1
+
+        self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings)
+        self.setAllSettingsButton.grid(row=row+2,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
+
     #endregion Tabs
-    
+    #Set settings
+    def setAllSettings(self):
+
+        PC = self.printController
+        AC = self.armController
+        SC = self.serialController
+
+        for item in self.settingsDict:
+            valueToSet = self.entries[item].get().strip()
+           
+            attr, object = self.settingsDict[item]
+
+            match object:
+                case "PC":
+                    object = PC
+                case "AC":
+                    object = AC
+                case "SC":
+                    object = SC
+            
+            currentValue = getattr(object,attr)
+            #If there is a value to set
+            if valueToSet != "":
+                try:
+                    # Convert to the same type as the existing value
+                    correctType = type(currentValue)
+                    #Special case to handle bool because any non empty string is converted to True
+                    if correctType == bool:
+                        #Option for several true cases and false cases
+                        if valueToSet.lower() in ("true", "1", "yes", "y"):
+                            valueToSet = True
+                        elif valueToSet.lower() in ("false", "0", "no", "n"):
+                            valueToSet = False
+                        else:
+                            raise ValueError
+                    valueToSet = correctType(valueToSet)
+                    setattr(object, attr, valueToSet)
+
+                except ValueError:
+                    self.terminalPrint(f"Invalid value for {item}")
+
+            #Get current value to make sure the value was actually set and display
+            #Also update all values even if unchanged by user
+            currentValue = getattr(object,attr)
+            self.currents[item].config(text=str(currentValue))
+
+        #Recreate move parameters
+        self.printController.defaultPrintParameters = MoveParameters(PC.speed,PC.acceleration,PC.decceleration,PC.ramp,PC.printOpenLoopControl,"m")
+
+
     #region main update function
     def update(self):
         self.updateDebugVars() # Update the debug tab variables
@@ -752,42 +872,6 @@ class TkWindow(Tk):
         # ==========| SerialController |==========
 
         # ===========| ArmController |============
-        # If arm calibration is in progress, call the calibration update function
-
-        '''if self.armController.calibrationInProgress:
-            #could timeout per stage or for whole calibration
-            
-            if self.timeoutStartedCal==False:
-                self.timeoutStartedCal=True
-                calibrationTimeout = threading.Thread(target=self.armController.calibrateTimeout)
-                calibrationTimeout.start()
-                response = self.serialController.getNextResponse()
-                if response:
-                    self.serialController.sortResponse(response)
-            else:
-                self.armController.calibrateArmUpdate()
-            #sort serial'''
-
-        '''if self.armController.awaitingMoveResponse:
-            if self.timeoutStartedMove==False:
-                self.timeoutStartedMove=True
-                moveTimeout = threading.Thread(target=self.armController.moveTimeout)
-                moveTimeout.start()
-
-            response = self.serialController.getNextResponse()
-            if response:
-                self.serialController.sortResponse(response)
-            #self.armController.moveUpdate()
-            #sort serial'''
-
-        
-                
-        '''#TODO turn whole process into a thread
-        if self.armController.testingEncoders:
-            if self.serialController.responseReady:
-                response = self.serialController.getResponse()
-                self.serialController.sortResponse(response)
-                #sort serial'''
         
         # ==========| PrintController |==========
         #Each print loop runs in the thread sothat it can "wait" and not halt the UI
@@ -829,8 +913,6 @@ class TkWindow(Tk):
         else:
             # If not, enable the connect button
             self.connectButton.config(state="normal")
-    def setSettings(self):
-        pass
     #endregion other functions
     #region Print Functions
     # Used to print to the in window terminal
@@ -852,7 +934,7 @@ class TkWindow(Tk):
     def warningPrint(self, message):
         #Display a 2nd message based on ignoreflags
         message2 = ""
-        if self.printController.ignoreflags:
+        if self.printController.ignoreFlags:
             message2 = "\nPressing ok will resume movement"
         else:
             message2 = "\nPrinting wil stop"

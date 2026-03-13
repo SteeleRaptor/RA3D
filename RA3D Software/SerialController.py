@@ -25,7 +25,8 @@ class SerialController:
         self.waiting_responses = set()
         self.sendingSerial = False#Keep track to send serial so a response is not sorted while sending
         self.Errors = ["Estop", "ER","EL"] #Error codes
-        self.WaitToProcess = ["POS"] #Everything that will not be processed if immediately received
+        #Everything that will not be processed if immediately received
+        self.WaitToProcess = ["PO","TL","RE"] #currently these can only be 2 characters
 
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
@@ -85,10 +86,10 @@ class SerialController:
 
     def disconnectPort(self):
         if self.boardConnected == True:
-            self.running = False
+            self.running = False #serial is no longer running
             time.sleep(0.1)  # let threads exit cleanly
 
-            self.sendSerial("CL")
+            self.sendSerial("CL")#teensy command to close serial
             try:
                 self.board.reset_input_buffer()
                 self.board.reset_output_buffer()
@@ -129,9 +130,10 @@ class SerialController:
                 #print("Waiting response", str(self.waiting_responses))
                 pass
 
+    #used for debugging to display the response queue
     def printQueue(self):
         if not self.responseQueue.empty():
-            self.root.terminalPrint("Response Queue:"+ list(self.responseQueue.queue))
+            self.root.terminalPrint("Response Queue:"+ str(list(self.responseQueue.queue)))
         else:
             self.root.terminalPrint("Queue is empty")
 
@@ -139,6 +141,7 @@ class SerialController:
         self.responseQueue.queue.clear()
 
     #queue is cleaned of a specified item by rebuilding the queue
+    #This function might be obsolete now
     def cleanQueue(self, item):
         new_items = []
 
@@ -151,16 +154,22 @@ class SerialController:
             self.responseQueue.put(val)
         print("response queue cleaned")
 
+    #Peeks the queue for errors and response that shouldn't be waited for
     def peekQueue(self):
+        #This is a safe operation for iterating through a queue
         with self.responseQueue.mutex:
+            #for each item in queue
             for item in list(self.responseQueue.queue):
+                #if an error
                 if item in self.Errors:
-                    self.root.printController.pausePrint()
-                    print(f"Error {item} found after peeking ahead")
+                    #set flag of printer
+                    self.root.printController.flag = item
+                    self.root.terminalPrint(f"Error {item} found after peeking ahead")
+                    #remove item from queue
                     self.responseQueue.queue.remove(item)
                     return
-                if item[:3] not in self.WaitToProcess:
-                    print(item, "not in wait to process")
+                if item[:2] not in self.WaitToProcess:
+                    self.root.terminalPrint(item+ " not in wait to process")
                     self.responseQueue.queue.remove(item)
                     self.sortResponse(item)
        
@@ -171,16 +180,16 @@ class SerialController:
             try:
                 while not self.responseQueue.empty():
                     #Only wait on certain responses
-                    if self.responseQueue.queue[0] in self.WaitToProcess:
+                    if self.responseQueue.queue[0][:2] in self.WaitToProcess:
                         responseToWaitFor = self.responseQueue.queue[0]
                         #this seems to a little janky but I want the waiting_responses to be clear for a moment before it
                         #sorts a response, and gives things a moment to send then wait for a response
-                        accTime = 0
-                        endTime = 10
+                        accTime = 0 #acculmulated time
+                        endTime = 5 #how long to wait for
                         #Will stop waiting if the queue has moved on
                         while self.responseQueue.queue[0] == responseToWaitFor and accTime < endTime:
-                            time.sleep(1)
-                            accTime += 1
+                            time.sleep(.1)
+                            accTime += .1
                         #See if wait was triggered by same response
                         if self.responseQueue.queue[0] == responseToWaitFor:
                             #if not self.waiting_responses and not self.sendingSerial:
@@ -204,7 +213,7 @@ class SerialController:
         # TODO I will change this so that only unexpected responses or errors are processed here
         
         #self.root.terminalPrint(f"Received Response: {sortResponse}")
-        
+        self.root.terminalPrint("Warning! Sorting response\nReponses handled by sorting signfy a problem")
         if sortResponse[:5]== "Estop":
             PC.printing = False
             flag = "Estop"
@@ -224,16 +233,19 @@ class SerialController:
             flag = "Axis Fault"
             AC.awaitingMoveResponse = False
             self.cleanQueue("EL")
+
         elif sortResponse[:11] == "Turn Hazard":
             self.root.statusPrint(f"Encountered Hazard Move Stopped: {sortResponse[2:]}")
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             flag = "Turn Hazard"
             AC.awaitingMoveResponse = False
+
         elif sortResponse[:9] == "Step Difs":
             pass
+
         #NOTE IF these responses are handled here that means they missed the timeout window or something else is wrong
         else:
-            R.terminalPrint(f"Received Unexpected Response: {sortResponse} maybe timeout window missed")
+            R.warningPrint(f"Warning Received Unexpected Response: {sortResponse}\n Maybe timeout window missed")
             if sortResponse[:2] == "TL":
                 #Limit switch test
                 R.terminalPrint(f"Received TL Response: {sortResponse}")
@@ -263,7 +275,7 @@ class SerialController:
                 self.root.terminalPrint("Sorting response...")
             elif sortResponse[:3] == "POS" and AC.awaitingPosResponse:
                 self.root.statusPrint("Position received from arm after position request")
-                AC.requestPositionUpdate(response=sortResponse)
+                AC.processPosition(sortResponse)
                 self.root.terminalPrint("Sorting response...")
             elif sortResponse[:3] == "POS":
                 AC.processPosition(sortResponse)
@@ -271,6 +283,7 @@ class SerialController:
             else:
                 self.root.terminalPrint("Sorting response...")
                 R.statusPrint(f"Received Unrecognized Response: {sortResponse}")
+
         if flag is not None:
             PC.flag = flag
     
@@ -316,9 +329,12 @@ class SerialController:
             return
         #self.board.reset_input_buffer()
         # If we aren't awaiting for a serial response, then send the command
-        self.root.statusPrint(f"Sending Command: {command}")
+        
+        if self.root.DebugMode: #This is debug mode because thousands of commands will be sent while printing
+            self.root.statusPrint(f"Sending Command: {command}")
         self.board.write(command.encode())
-        self.root.terminalPrint("Command sent")
+        if self.root.DebugMode:
+            self.root.terminalPrint("Command sent")
         # Reset the input buffer
         #self.board.reset_input_buffer()
         self.sendingSerial = False

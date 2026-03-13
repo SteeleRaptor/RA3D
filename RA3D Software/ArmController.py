@@ -26,7 +26,10 @@ class ArmController:
 
         # Speed parameters used for movement commands
         self.defaultMoveParameters = MoveParameters(80,10,10,30,0,'p')
-        
+        self.moveParameters = copy.deepcopy(self.defaultMoveParameters)
+        self.syncWithPrintParameters = False #Sync basic movements(not all) with the print parameters
+        #Movements not affected include move safe move home move origin and jogs
+
         #J Limits:
         #These are used to determine how red a joint is in the UII
         self.J1Limits = [-170,170]
@@ -74,7 +77,7 @@ class ArmController:
         self.V2 = 1 #positive
 
         #Extruder variables
-        self.extruder_deg_per_mm = 1
+        self.extruder_deg_per_mm = 10.90909
 
     #endregion init
 
@@ -107,6 +110,7 @@ class ArmController:
         self.root.serialController.clearQueue()
         #On every calibration reset to recomended
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
+
         # Call the calibration update function
         calibrationThread = threading.Thread(target=self.calibrateArm())
         calibrationThread.start()
@@ -305,7 +309,7 @@ class ArmController:
         self.curPos.Ry = float(response[RyIdx+1:RxIdx].strip())
         self.curPos.Rz = float(response[RzIdx+1:RyIdx].strip())
         #print("J7string",response[J7Idx+1:J8Idx].strip())
-        self.curJ7 = float(response[J7Idx+1:J8Idx].strip())/self.extruder_deg_per_mm
+        self.curJ7 = round(float(response[J7Idx+1:J8Idx].strip())/self.extruder_deg_per_mm,2)
 
         #There are 2 displays in the program
         self.root.currentJ7.config(text=str(self.curJ7)+" mm")
@@ -332,7 +336,7 @@ class ArmController:
     #Position is updated without any arm movement
     def requestPositionManual(self):
         # nominal check
-        if self.notNominalCheck(message="request position"):
+        if self.checkIfBusy(message="request position"):
             return
         positionThread = threading.Thread(target=self.requestPositionAndWait)
         positionThread.start()
@@ -345,7 +349,7 @@ class ArmController:
         self.awaitingPosResponse = True # Set the flag
         response = self.serialController.waitForResponse("POSRP",3)
         # Check if the serial controller has a response ready
-        self.root.terminalPrint("response is " + response)
+        #self.root.terminalPrint("response is " + str(response))
         # Inform user and process the position response
         if response is not None:
             self.root.statusPrint("Position request fulfilled")
@@ -424,6 +428,7 @@ class ArmController:
         if self.checkIfAllBusy():
             self.root.statusPrint("Cannot send RJ command. Arm is busy.")
             return
+        self.sync() #check if to sync with printer
         # Read the values from each entry box
         J1 = self.root.J1CoordEntry.get()
         J2 = self.root.J2CoordEntry.get()
@@ -457,7 +462,7 @@ class ArmController:
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending RJ command")
             #TODO start sendRJ as a thread so that 
-            RJThread = threading.Thread(target=self.sendRJ, args=[[J1, J2, J3, J4, J5, J6], self.defaultMoveParameters])
+            RJThread = threading.Thread(target=self.sendRJ, args=[[J1, J2, J3, J4, J5, J6], self.moveParameters])
             RJThread.start()
         else:
             self.root.terminalPrint("RJ command not sent due to a value not being a number")
@@ -470,7 +475,7 @@ class ArmController:
         #In general internal commands should not be blocked by printing states but user commands should
         if self.checkIfAllBusy(message="Send ML"):
             return
-        
+        self.sync() #check if to sync with printer
         # Read the values from each entry box
         x  = self.root.xCoordEntry.get()
         y  = self.root.yCoordEntry.get()
@@ -503,11 +508,14 @@ class ArmController:
         #Command will still send if J7 is empty
         if not re.match(pattern, J7):
             J7 = 0
+        else:
+            J7 = float(J7)
         if allValuesNumeric:
             #self.root.terminalPrint("All values numeric, sending ML command")
             commandPos = Position(x,y,z,Rx,Ry,Rz,None)
+            self.root.statusPrint("Sending ML command")
             #Thread so that command doesn't interupt UI
-            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7,"RelativeExtrude":True})
+            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.moveParameters], kwargs={"extrudeRate":J7,"RelativeExtrude":True})
             MLThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
@@ -516,6 +524,7 @@ class ArmController:
         if self.checkIfAllBusy():
             self.root.statusPrint("Cannot send RJ command. Arm is busy.")
             return
+        self.sync() #check if to sync with printer
         # Read the values from each entry box
         x  = self.root.xCoordEntry.get()
         y  = self.root.yCoordEntry.get()
@@ -548,52 +557,70 @@ class ArmController:
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending ML command")
             
-            #Thread so that command doesn't interupt UI
             commandPos = Position(float(x),float(y),float(z),float(Rx),float(Ry),float(Rz),None)
-            MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.defaultMoveParameters])
+            self.root.statusPrint("Sending ML command")
+            #Thread so that command doesn't interupt UI
+            MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.moveParameters])
             MJThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
     
-    #For testing extruder only
-    def extrude(self):
-        if self.checkIfAllBusy():
-            self.root.statusPrint("Cannot send extrude command. Arm is busy.")
+    #syncs moveparameters with print parameters if enabled
+    def sync(self):
+        if self.syncWithPrintParameters:
+            if self.root.DebugMode:
+                self.root.statusPrint("Parameters synced with print parameters")
+            self.moveParameters = self.root.printController.defaultPrintParameters
+        
+    #For extrusion without movement
+    #timeoutMultiplier is how much extra time per expected second is needed
+    def extrude(self,extrudeRate,moveParameters=None,relative=True,timeoutMultiplier=3):
+        timeoutMin = 8 #minimum timeout
+        if moveParameters is None:
+            moveParameters = self.moveParameters
+        J7 = extrudeRate*self.extruder_deg_per_mm
+        timeout = timeoutMultiplier*extrudeRate/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
+        if self.checkIfBusy(message="E7 extrude"):
             return
+        command = MoveCommand("E7",None,moveParameters=moveParameters,J7=J7,J7Rel=relative)
+        self.root.serialController.sendSerial(str(command))#convert command to string before sending
+        self.waitForResponseAndProcess("POSE7",timeout=timeout, message="E7 extrude")
+    
+    def extrudeButton(self):
         # Read the values from each entry box
-        J7 = self.root.J7CoordEntry2.get()
+        extrudeRate = self.root.J7CoordEntry2.get()
         # Check if any values are blank
         pattern = r"^-?(\d+(?:\.\d+)?)"  # Regular expression for a valid float
         allValuesNumeric = True
 
-        if not re.match(pattern, J7):
+        if not re.match(pattern, extrudeRate):
             self.root.terminalPrint("J7 is not a number")
             allValuesNumeric = False
         
         if allValuesNumeric:
-            self.root.terminalPrint("All values numeric, sending ML command")
-            #self.requestPositionAndWait()
-            commandPos = self.curPos
-            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.defaultMoveParameters], kwargs={"extrudeRate":J7, "RelativeExtrude":True})
-            MLThread.start()
+            self.root.terminalPrint("All values numeric, sending extrude command")
+            extrudeThread = threading.Thread(target=self.extrude, args=[float(extrudeRate)])
+            extrudeThread.start()
+
         else:
-            self.root.statusPrint("ML command not sent due to a value not being a number")
-    
+            self.root.statusPrint("Extrude command not sent due to a value not being a number")
+                
     def zeroJ7(self):
         self.root.serialController.sendSerial("Z7\n")
-        self.waitForResponseAndProcess("POSZ7",5,message="Zero J7",setFlag=False)
+        self.waitForResponseAndProcess("POSZ7",15,message="Zero J7",setFlag=False)
     
-    def waitForResponseAndProcess(self,prefix,timeout=2,message=None, setFlag = True):
-        response = self.root.serialController.waitForResponse(prefix)
+    def waitForResponseAndProcess(self,prefix,timeout=2,message="", setFlag = True):
+        response = self.root.serialController.waitForResponse(prefix,timeout)
         if response is not None:
             self.processPosition(response)
             self.root.terminalPrint(response)
-            #self.root.statusPrint("Move command executed successfully")
+            if self.root.DebugMode:
+                self.root.statusPrint("Move command executed successfully")
         else:
             #Set flag used whether the timeout should send a flag to the printer
             if setFlag:
                 self.root.printController.flag = "timeout after: " + str(timeout) + "s"
-            self.root.terminalPrint(message + " timed out after "+str(timeout))
+            self.root.terminalPrint(message + " timed out after "+str(timeout)+ "s")
 
     def getJointColors(self,J1,J2,J3,J4,J5,J6):
         if J1 == None:
@@ -631,10 +658,8 @@ class ArmController:
     
     #Move to the neutral position where all joints are at 0 degrees
     def prepMoveHome(self):
-
         if self.checkIfAllBusy(message="Home"):
             return
-        
         #start thread
         moveHomeThread = threading.Thread(target=self.moveHome)
         moveHomeThread.start()
@@ -654,30 +679,37 @@ class ArmController:
 
     #set move parameters to open loop
     def setOpenLoop(self):
-        self.defaultMoveParameters.setLoopMode(1)
+        self.moveParameters.setLoopMode(1)
         self.root.loopStatus.config(text="Open Loop")
 
     #set move parameters to closed loop
     def setClosedLoop(self):
-        self.defaultMoveParameters.setLoopMode(0)
+        self.moveParameters.setLoopMode(0)
         self.root.loopStatus.config(text="Closed Loop")
     
     #endregion GUI
     
-    #region Move Commands
-    def sendMJ(self,commandPos, moveParameters,timeout=5):
-        #Leaving this specific check for awaitingMoveResponse so user knows why
+    #region Move Commands =================================
+
+    #Move to a xyz coordinate in best path, nonlinear path
+    #MJ cannot control extruder
+    def sendMJ(self,commandPos, moveParameters,timeout=20):
+
+        #Leaving this specific check for awaitingMoveResponse so user knows why move failed
         #Even though nominal check handles this
         if self.awaitingMoveResponse:
+            self.root.printController.flag = "Already moving"
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
         #self.root.terminalPrint("Sending MJ command...")
-        # Taken from AR4.py, line XXXX
-        # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
-      
+       
         #Nominal check
         if self.notNominalCheck(message="Send MJ"):
+            self.root.printController.flag = "Arm busy"
             return
+        
+        # Taken from AR4.py
+        # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         # Create the command
         command = MoveCommand("MJ",commandPos, moveParameters)
         #self.root.terminalPrint("Command to send:")
@@ -688,20 +720,19 @@ class ArmController:
         self.serialController.sendSerial(str(command))
 
         #Timeout and feedback handling
-        response = self.serialController.waitForResponse("POSMJ",timeout)
-        
-        if response is not None:
-            self.processPosition(response)
-            self.root.terminalPrint(response)
-            #self.root.statusPrint("Move command executed successfully")
-        else:
-            self.root.printController.flag = "timeout after: " + str(timeout) + "s"
-            self.root.terminalPrint("Send MJ timed out after "+str(timeout))
+        self.waitForResponseAndProcess("POSMJ",timeout=timeout,message="Send MJ")
         self.awaitingMoveResponse = False
 
-    #Move linear, timeout default is 10
-    def sendML(self, pos, moveParameters, extrudeRate=None, RelativeExtrude=True,timeout=5):
+    #Move linear to a xyz coordinater, timeout default is 5
+    def sendML(self, pos, moveParameters, extrudeRate=0, RelativeExtrude=True,timeout=30):
+        
+        if moveParameters.speedType == "m" and timeout == 30:
+            #assume a move length of 50
+            timeout2 = 50/moveParameters.speed
+            if timeout2 > timeout:
+                timeout = timeout2
         if self.awaitingMoveResponse:
+            self.root.printController.flag = "Already moving"
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
             return
         #self.root.terminalPrint("Sending ML command...")
@@ -709,11 +740,12 @@ class ArmController:
         # command = "ML"+"X"+RUN['xVal']+"Y"+RUN['yVal']+"Z"+RUN['zVal']+"Rz"+rzVal+"Ry"+ryVal+"Rx"+rxVal+"J7"+J7Val+"J8"+J8Val+"J9"+J9Val+speedPrefix+Speed+"Ac"+ACCspd+"Dc"+DECspd+"Rm"+ACCramp+"Rnd"+Rounding+"W"+RUN['WC']+"Lm"+LoopMode+"Q"+DisWrist+"\n"
         # Check if board is not connected or arm is not calibrated
         if self.notNominalCheck(message="send ML"):
+            self.root.printController.flag = "Arm busy"
             return
+        
         #Convert extrudeRate to change in motor angle
-        J7 = 0 #if extrude rate is none then J7 0
-        if extrudeRate is not None:
-            J7 = extrudeRate*self.extruder_deg_per_mm
+        J7 = extrudeRate*self.extruder_deg_per_mm
+        
         # Create the command
         command = MoveCommand("ML",pos, moveParameters, J7=J7, J7Rel=RelativeExtrude)
         #self.root.terminalPrint(str(command)[0:-2])
@@ -723,29 +755,22 @@ class ArmController:
         self.serialController.sendSerial(str(command))
 
         #Timeout and feedback handling
-        response = self.serialController.waitForResponse("POSML",timeout)
-        
-        if response is not None:
-            self.processPosition(response)
-            #self.root.terminalPrint(response)
-            #self.root.statusPrint("Move command executed successfully")
-        else:
-            #stop print if timed out
-            self.root.printController.flag = "timeout after: " + str(timeout) + "s"
-            self.root.terminalPrint("Send ML timed out after "+str(timeout))
-        
+        self.waitForResponseAndProcess("POSML",timeout=timeout,message="Send ML")
         self.awaitingMoveResponse = False
 
-    def sendRJ(self, Joints, moveParameters, timeout=10):
+    #Move arm joint angles
+    def sendRJ(self, Joints, moveParameters, timeout=20):
         #self.root.terminalPrint("Sending RJ command...")
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
+            self.root.printController.flag = "Already moving"
             return
         # Create the command
         # RJA0B0C0D0E0F0J70J80J90Sp25Ac10Dc10Rm80WNLm000000
         command = MoveCommand("RJ",Joints, moveParameters)
         # Check if a board is connected or if the arm is not calibrated
         if self.notNominalCheck(message="send RJ"):
+            self.root.printController.flag = "Arm busy"
             return
         #print("Command is ", str(command))
         # Send the serial command
@@ -759,7 +784,8 @@ class ArmController:
         if response is not None:
             self.processPosition(response)
             self.root.terminalPrint(response)
-            self.root.statusPrint("Move command executed successfully")
+            if self.root.DebugMode:
+                self.root.statusPrint("Move command executed successfully")
         else:
             self.root.printController.flag = "timeout after: " + str(timeout) + "s"
             self.root.terminalPrint("Send RJ timed out after "+str(timeout))
@@ -784,31 +810,25 @@ class ArmController:
     
     # Moves the robot to a safe position to be turned off
     # Cancels everything, ignore flags, and just sends the serial command
-    # timeout is large because movesafe can be in the teensy queue
+    # timeout is large because movesafe can be held in the teensy queue
     def moveSafe(self,timeout=30):
         self.root.printController.pauseAll() #pause printing functions
         self.cancelActions()#pause actions like calibration or testing
         #wait until commands have finished
-        #while self.root.armController.checkIfBusy(display=False):
-            #time.sleep(.01)
-            #pass
+
+        #J1-J6 joints that put the arm in a safe position
         SafePositionJoints = (0, -40, 60, 0, -45, 0)
+
+        #Build RJ command
         command = MoveCommand("RJ",SafePositionJoints, self.defaultMoveParameters)
+
         #Will send regardless if a move is in progress
         self.serialController.sendSerial(str(command))
-        response = self.serialController.waitForResponse("POSRJ",timeout)
-        
-        if response is not None:
-            self.processPosition(response)
-            self.root.terminalPrint(response)
-            self.root.statusPrint("Move safe executed successfully")
-        else:
-            self.root.printController.flag = "timeout after: " + str(timeout) + "s"
-            self.root.terminalPrint("Move safe timed out after "+str(timeout))
+        self.waitForResponseAndProcess("POSRJ",timeout=timeout)
     
     # Moves to the neutral position, all joints at zero degrees
     def moveHome(self):
-        self.sendRJ([0,0,0,0,0,0], self.defaultMoveParameters)
+        self.sendRJ([0,0,0,0,0,0], self.defaultMoveParameters,timeout=15)
     
     
     #endregion move commands
@@ -829,18 +849,18 @@ class ArmController:
             self.testingLimitSwitches = True # set the flag
             self.root.limitTestButton.configure(relief="ridge") # Make the button look toggled
             self.root.statusPrint("Starting limit switch test")
-            limitSwitchThread = threading.Thread(target = self.limitTestUpdate)
+            limitSwitchThread = threading.Thread(target = self.limitTest)
             limitSwitchThread.start()
 
-    def limitTestUpdate(self):
+    def limitTest(self):
         #Will send command if response is not given in 2 seconds
         while not self.finishTest and self.testingLimitSwitches:
             self.serialController.sendSerial("TL\n") # Send instruction
-            response = self.root.seriatlController.waitForResponse("TL",2)
+            response = self.root.serialController.waitForResponse("TL",2)
             # Check if serial controller has a response ready
             if response is not None:
                 # If so, read it in
-                self.root.terminalPrint("testing limit switch "+response)
+                #self.root.terminalPrint("testing limit switch "+response)
                 # Limit switch test will never return an error so we can always directly process
                 self.root.J1LimState.config(text=response[response.find('J1')+5:response.find("   J2")].strip())
                 self.root.J2LimState.config(text=response[response.find('J2')+5:response.find("   J3")].strip())
@@ -875,10 +895,10 @@ class ArmController:
             # The "Set Encoder" instruction returns a "Done" except it is done with a print instead of println
             # which makes it so the serial can only be read by a "read" instead of "readline".
             # Therefore, we forcibly tell the serialController that it isn't waiting for a response
-            encoderTestThread = threading.Thread(target=self.encoderTestUpdate)
+            encoderTestThread = threading.Thread(target=self.encoderTest)
             encoderTestThread.start()
 
-    def encoderTestUpdate(self):
+    def encoderTest(self):
         #while test has not finished
         #If has reponse is not recieved another command will be sent after 2 seconds
         while not self.finishTest and self.testingEncoders:
@@ -886,7 +906,7 @@ class ArmController:
             self.serialController.sendSerial("RE\n") # Send instruction
             #wait 2 seconds for a response
             #send and recieve commands are RE
-            response = self.root.serialController.waitForResponse("RE",2)
+            response = self.serialController.waitForResponse("RE",2)
             if response is not None:
                 self.root.terminalPrint(response)
                 # Encoder test will never return an error so we can always directly process
@@ -1194,6 +1214,9 @@ class MoveCommand:
             self.F = jointsOrPosition.Rx
             self.E = jointsOrPosition.Ry
             self.D = jointsOrPosition.Rz
+        #No parameters for E7 besides J7
+        elif type == "E7":
+            pass
         else:
             self.A = jointsOrPosition[0]
             self.B = jointsOrPosition[1]
@@ -1212,12 +1235,14 @@ class MoveCommand:
         self.type = type
         #debugging print("type is: ",self.type, type)
     def __str__(self):
-        command = "Error"
+        command = "Error"#If no command is made
         if self.type=="ML":
             command = f"MLX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}Rel{self.J7Rel}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="MJ":
             command = f"MJX{self.A}Y{self.B}Z{self.C}Rz{self.D}Ry{self.E}Rx{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}Rnd0W{self.moveParameters.wrist}Lm{self.moveParameters.loopMode*6}Q0\n"
         elif self.type=="RJ":
             command = f"RJA{self.A}B{self.B}C{self.C}D{self.D}E{self.E}F{self.F}J7{self.J7}J80.00J90.00S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}WNLm{self.moveParameters.loopMode*6}\n"
+        elif self.type=="E7":
+            command = f"E7E{self.J7}Rel{self.J7Rel}S{self.moveParameters.speedType}{self.moveParameters.speed}Ac{self.moveParameters.acceleration}Dc{self.moveParameters.deceleration}Rm{self.moveParameters.ramp}\n"
         return command
 #endregion other classes

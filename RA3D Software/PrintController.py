@@ -6,15 +6,20 @@ from ArmController import Position, Origin, MoveCommand,MoveParameters
 
 class PrintController:
     #region init
-    def __init__(self, root):
+    def __init__(self, root,armController):
         self.root = root
-
+        self.armController = armController
         #------Important variables-------
         #MoveParameters(speed,acceleration,deceleratio,ramp,loopmode,speedtype)
+        self.speed = 50
+        self.acceleration = 15
+        self.decceleration = 15
+        self.ramp = 40
+        self.printOpenLoopControl = 0 #Thus closed cloop
         #0=closed loop
-        self.defaultPrintParameters = MoveParameters(50,15,15,40,0,"m") #50mm/s print speed
+        self.defaultPrintParameters = MoveParameters(self.speed,self.acceleration,self.decceleration,self.ramp,self.printOpenLoopControl,"m") #50mm/s print speed
         
-        self.ignoreflags = True #ignores flags and unrecognized gcode lines and boundary check
+        self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
         self.plateHeight = 316 #Change bed height relitive to pen
@@ -23,6 +28,7 @@ class PrintController:
         XEdge = [250,400]
 
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
+        
         #TODO These might be changed to reflect xedge, yedge
         #Boundaries to stop printing
         #Placeholder boundaries, should be adjusted
@@ -125,8 +131,9 @@ class PrintController:
         if message == "":
             pass
         elif message[:5] == "Error": # If the point is blank, don't try to send a command
-            self.root.warningPrint("Pausing print due to gcode"+message)
-            self.pausePrint()
+            self.root.warningPrint("Error printing "+ message)
+            if not self.ignoreFlags:
+                self.pausePrint()
         # TODO: Add waiting for temperature to heat up from M104/M109 commands
         # TODO: Add ability to home one axis
         elif message[:4] == "Home":
@@ -142,7 +149,7 @@ class PrintController:
             #Execute move command
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
             if self.feedRate != None and self.feedRate != 0:
-                #moveParameters.speedType = "m"
+                moveParameters.speedType = "m"
                 #Conver to mm/s from mm/min
                 moveParameters.speed = self.feedRate / 60
             #estimate timeout
@@ -171,17 +178,15 @@ class PrintController:
             self.lastPos = copy.deepcopy(self.printPos)
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
-            timeout = 20
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
             if self.feedRate != None and self.feedRate != 0:
-                #moveParameters.speedType = "m"
+                moveParameters.speedType = "m"
                 #Conver to mm/s from mm/min
                 moveParameters.speed = self.feedRate / 60
-            if self.printPos.x is not None and self.flag is None:
-                self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
+            if self.flag is None:
+                self.root.armController.extrude(self.extrudeRate,moveParameters=moveParameters,timeoutMultiplier=2, RelativeExtrude = self.relativeExtrusion)
         else:
-
-            self.root.terminalPrint("Unexpected message from gcodeToTeensy")
+            self.root.warningPrint("Unexpected message from gcodeToTeensy")
         #endregion message handling
         
         #Signifies thread has ended to start next thread
@@ -341,7 +346,7 @@ class PrintController:
                 return "Error moving out of bounds"
         else:
             pass
-            if not self.ignoreflags:
+            if not self.ignoreFlags:
                 return "Error unrecognized gcode line"
     
         #newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
@@ -419,7 +424,7 @@ class PrintController:
             return
         if self.root.armController.checkIfAllBusy(message="start print"):
             return
-        if self.ignoreflags:
+        if self.ignoreFlags:
             self.root.warningPrint("Ignore flags is enabled\nFlags will be ignored. Disable in print controller")
         if not self.checkBoundaryTrue:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
@@ -458,39 +463,6 @@ class PrintController:
         #will perform one print loop only
         self.printLoop()
     
-    #All flag management should be done here besides raising a flag
-    def checkFlag(self):
-        #Assuming that pausing print is desired if there is a flag
-        flag = self.flag
-        if flag is not None and not self.ignoreflags:
-            if self.printing:
-                self.pausePrint()
-                self.root.warningPrint(f"Print paused due to error: {self.flag}")
-                self.flag = None
-            if self.bedCalibrationInProgress or self.cornerSweeping:
-                self.endSweepOrCal()
-                self.root.warningPrint(f"Bed calibration/corner sweeping paused due to error: {self.flag}")
-                self.flag = None
-            return flag
-        elif self.flag is not None:
-            #display warning print instead of pausing when ignore flag is on
-            self.root.warningPrint("Flag: "+self.flag)
-            self.flag = None
-            return flag
-        return None
-
-    #Check if the printer is busy with printing, calibration or sweeping
-    def checkIfPrinterBusy(self,message = None,display=True):
-        if self.printing or self.cornerSweeping or self.bedCalibrationInProgress:
-            #if there is a message to display
-            if message and display:
-                self.root.terminalPrint("Cannot" + message + ", Printer busy")
-            elif display:
-                self.root.terminalPrint("Printer busy")
-            return True
-        
-        return False
-
     def pausePrint(self):
         self.root.terminalPrint("Pausing Print")
         self.printPaused = True
@@ -566,11 +538,43 @@ class PrintController:
         #just in case someone thinks this will cancel the print
         if self.printing:
             self.cancelPrint()
-        
+
+    
     #endregion gui
 
     #region ===============| Other Functions |=================
+    #All flag management should be done here besides raising a flag
+    def checkFlag(self):
+        #Assuming that pausing print is desired if there is a flag
+        flag = self.flag
+        if flag is not None and not self.ignoreFlags:
+            if self.printing:
+                self.pausePrint()
+                self.root.warningPrint(f"Print paused due to error: {self.flag}")
+                self.flag = None
+            if self.bedCalibrationInProgress or self.cornerSweeping:
+                self.endSweepOrCal()
+                self.root.warningPrint(f"Bed calibration/corner sweeping paused due to error: {self.flag}")
+                self.flag = None
+            return flag
+        elif self.flag is not None:
+            #display warning print instead of pausing when ignore flag is on
+            self.root.warningPrint("Flag: "+self.flag)
+            self.flag = None
+            return flag
+        return None
 
+    #Check if the printer is busy with printing, calibration or sweeping
+    def checkIfPrinterBusy(self,message = None,display=True):
+        if self.printing or self.cornerSweeping or self.bedCalibrationInProgress:
+            #if there is a message to display
+            if message and display:
+                self.root.terminalPrint("Cannot" + message + ", Printer busy")
+            elif display:
+                self.root.terminalPrint("Printer busy")
+            return True
+        
+        return False
 
     def syncOrigin(self):
         self.origin = self.root.armController.origin

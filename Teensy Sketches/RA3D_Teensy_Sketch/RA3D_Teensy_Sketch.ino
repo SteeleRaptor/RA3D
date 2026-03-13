@@ -132,7 +132,7 @@ int J3MotDir = 1;
 int J4MotDir = 1;
 int J5MotDir = 1;
 int J6MotDir = 1;
-int J7MotDir = 1;
+int J7MotDir = 1;//Change if extursion is backwards
 int J8MotDir = 1;
 int J9MotDir = 1;
 
@@ -2616,10 +2616,12 @@ void loop() {
   //dont start unless at least one command has been read in
   if (cmdBuffer1 != "") {
     //process data
-    estopActive = false;
+    estopActive = false;//reset estop
     inData = cmdBuffer1;
     inData.trim();
+    //Function is always first 2 characters
     String function = inData.substring(0, 2);
+    //inData ignores the first 2 characters
     inData = inData.substring(2);
     KinematicError = 0;
     debug = "";
@@ -3043,6 +3045,50 @@ void loop() {
     if (function == "Z7") {
       J7StepM = 0;
       sendRobotPos("Z7");
+    }
+    //----COMMAND EXTRUDE---
+    //Extrudes without moving
+    if (function == "E7") {
+      //Comand format
+      //E7E{deg}Rel{rel}Sp{Sp}Ac{Acc}Dc{Dcc}
+      int J7dir;
+
+      int J7Start = inData.indexOf("E");
+      int RelStart = inData.indexOf("Rel");
+      
+      int SPstart = inData.indexOf("S");
+      int AcStart = inData.indexOf("Ac");
+      int DcStart = inData.indexOf("Dc");
+      int RmStart = inData.indexOf("Rm");
+
+      J7_In = inData.substring(J7Start + 1, RelStart).toFloat();
+      int J7_Rel = inData.substring(RelStart+3, SPstart).toInt();
+     
+      String SpeedType = inData.substring(SPstart + 1, SPstart + 2);
+      float SpeedVal = inData.substring(SPstart + 2, AcStart).toFloat();
+      float ACCspd = inData.substring(AcStart + 2, DcStart).toFloat();
+      float DCCspd = inData.substring(DcStart + 2, RmStart).toFloat();
+      float ACCramp = inData.substring(RmStart + 2).toFloat();
+
+      int J7stepDif;
+      // if J7 is relative extrusion
+      if (J7_Rel){
+        //Negative step diff will be a positive change in angle
+        J7stepDif = -(J7_In*J7StepDeg);
+      } else{
+        int J7futStepM = (J7_In+J7axisLimNeg) * J7StepDeg;
+        J7stepDif = (J7StepM - J7futStepM);
+      }
+      if (J7stepDif <= 0) {
+        J7dir = 1;
+      } else {
+        J7dir = 0;
+      }
+      driveMotorsJ(0,0,0,0,0,0,abs(J7stepDif),0,0,0,0,0,0,0,0,J7dir,0, 0, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      //Debugging Serial.println("J7stepDif"+String(J7stepDif)+"J7_In"+String(J7_In)+"J7_Rel"+String(J7_Rel)+"\n");
+      ////////MOVE COMPLETE///////////
+      sendRobotPos("E7");
+      inData = "";  // Clear recieved buffer
     }
     /*
     //-----COMMAND ZERO J8---------------------------------------------------
@@ -4717,7 +4763,7 @@ void loop() {
       xyzuvw_Temp[5] = inData.substring(rxStart + 2, J7Start).toFloat();
 
 
-      J7_In = inData.substring(J7Start + 2, J8Start).toFloat();
+      J7_In = inData.substring(J7Start + 2, RelStart).toFloat();
       int J7_Rel = inData.substring(RelStart+3, J8Start).toInt();
       J8_In = inData.substring(J8Start + 2, J9Start).toFloat();
       J9_In = inData.substring(J9Start + 2, SPstart).toFloat();
@@ -4997,7 +5043,7 @@ void loop() {
         int J7stepDif;
         // if J7 is relative extrusion
         if (J7_Rel){
-          J7stepDif = (J7_In*J7StepDeg) / (wayPts - 1);
+          J7stepDif = -(J7_In*J7StepDeg) / (wayPts - 1);
         } else{
           int J7futStepM = (J7_In+J7axisLimNeg) * J7StepDeg;
           J7stepDif = (J7StepM - J7futStepM) / (wayPts - 1);

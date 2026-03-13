@@ -123,8 +123,9 @@ class PrintController:
             
             #Read gcode line and convert, handle rare messages inside
             message = self.gcodeToTeensy(lineToConvert) # Convert line and updates printPos
-            
-        self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
+        
+        if self.root.PrintDebugMode:
+            self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
         
         #region -----------Message Processing--------
         #Common commands are handled here, rare commands handled inside gcodeToTeensy
@@ -158,7 +159,8 @@ class PrintController:
 
             #if valid position and no flag
             if self.printPos.x is not None and self.flag is None:
-                self.root.terminalPrint(f"Point: {self.printPos.GetAbsolute()}") # Print the returned point list
+                if self.root.PrintDebugMode:
+                    self.root.terminalPrint(f"Point: {self.printPos.GetAbsolute()}") # Print the returned point list
                 
                 #So that when coming from a home command it moves with optimal wrist condition
                 if self.justMovedHome:

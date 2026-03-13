@@ -25,9 +25,14 @@ class TkWindow(Tk):
             "Plate Height" : ("plateHeight","PC"),
             "Ignore Flags" : ("ignoreFlags","PC"),
             "deg/mm": ("extruder_deg_per_mm","AC"),
-            "Sync Print Parameters": ("syncWithPrintParameters","AC")
+            "Sync Print Parameters": ("syncWithPrintParameters","AC"), #arm controller
+            "Debug Mode": ("DebugMode","self"),
+            "Print Debug Mode": ("PrintDebugMode", "self")
         }
-        self.DebugMode = True #Will display important debug prints but not all of them
+        self.DebugMode = False #Will display important debug prints but not all of them
+        self.PrintDebugMode = False #Will display gcode lines and print coordinates
+        #Debug modes off will NOT hide errors
+
         Tk.__init__(self)
         self.root = self
         # Set the window title
@@ -53,7 +58,8 @@ class TkWindow(Tk):
 
         # Create and draw widgets onto the window
         self.createTabs()
-        self.root.terminalPrint("GUI created")
+        if self.DebugMode:
+            self.root.terminalPrint("GUI created")
         self.serialController.refreshCOMPorts()
         # Set up a call to the update function after updateDelay milliseconds
         updateThread = threading.Thread(target=self.update)
@@ -206,9 +212,11 @@ class TkWindow(Tk):
         self.textScroll.config(command=self.textBox.yview)
         self.textBox.grid(row=2, column=0, columnspan=1, padx=(5,0), pady=5)
         self.textScroll.grid(row=2, column=1, padx=(0, 5), pady=5, sticky=N+S)
+
         # ==========| Bed Calibration Frame | =========
         self.bedCalibrationFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
         self.bedCalibrationFrame.grid(row=0, column=2, padx=5, pady=5, sticky=W+E+N+S)
+
         self.bedCalibrationLabel = Label(self.bedCalibrationFrame, text= "Bed Leveling")
         self.bedCalibrationLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W+E)
         self.startLevel = Button(self.bedCalibrationFrame, text="Start Level", width=12, command=self.printController.startPrintBedCalibration)
@@ -223,6 +231,21 @@ class TkWindow(Tk):
         self.cornerLabel.grid(row=2, column=1, padx=5, pady=5, sticky=W)
         self.cancelAny = Button(self.bedCalibrationFrame, text= "Cancel Any", width=10, command=self.printController.cancelAny)
         self.cancelAny.grid(row=3, column=1, padx=5, pady=5, sticky=W+E)
+        # ============= Credits Frame ===============
+        self.creditsFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
+        self.creditsFrame.grid(row=1,column=2,padx=5, pady=5, sticky=W+E+N+S)
+        RA3DLabel = Label(self.creditsFrame,text="RA3D",font=("Magneto", 20, "bold"))
+        RA3DLabel.grid(row=0,column=0,sticky=EW)
+        CreditsText1 = "Designed and implemented by the RA3D Team (Robotic Arm 3D)"
+        CreditsText2 = "Team Members: Justin Fauson, Cody Blough, Jon Dinan,\n Jonathan Pederson, and Mateo Osorio"
+        CreditsText3 = "Sponsor: Dr. Sezer Ozerinc"
+        Credits1 = Label(self.creditsFrame,text=CreditsText1)
+        Credits1.grid(row=1,column=0,sticky=W)
+        TeamMembers = Label(self.creditsFrame,text=CreditsText2,justify="left")
+        TeamMembers.grid(row=2,column=0,sticky=W)
+        Sponsor = Label(self.creditsFrame, text=CreditsText3,justify="left")
+        Sponsor.grid(row=3,column=0,sticky=W)
+
 
     def fillArmTab(self):
         # ==========| Serial Frame |==========
@@ -798,6 +821,8 @@ class TkWindow(Tk):
                     object = AC
                 case "SC":
                     object = SC
+                case "self":
+                    object = self
             currentValue = getattr(object,attr)
 
             settingLabel = Label(self.settingsFrame, text=item)
@@ -834,6 +859,8 @@ class TkWindow(Tk):
                     object = AC
                 case "SC":
                     object = SC
+                case "self":
+                    object = self
             
             currentValue = getattr(object,attr)
             #If there is a value to set

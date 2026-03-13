@@ -1,7 +1,7 @@
 # RA3D
 Senior Design Project
 Designed and implemented by the RA3D Team (Robotic Arm 3D)
-Team Members: Justin Fauson, Cody Blough, Jon Dinan,\n Jonathan Pederson, and Mateo Osorio
+Team Members: Justin Fauson, Cody Blough, Jon Dinan, Jonathan Pederson, and Mateo Osorio
 Sponsor: Dr. Sezer Ozerinc
 
 # Please Read User Manual Before Continuing

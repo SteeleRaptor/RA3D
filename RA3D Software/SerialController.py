@@ -80,7 +80,6 @@ class SerialController:
             self.serialThread.start()
             self.sortThread.start()
             
-            
         except SerialException:
             self.root.statusPrint(f"Failed to open port: {port}")
 
@@ -98,7 +97,6 @@ class SerialController:
                 pass
             self.boardConnected = False
             
-
     # Repeatedly checks the serial port for new responses
     def serialReader(self):
         while self.running:
@@ -120,7 +118,7 @@ class SerialController:
                 time.sleep(0.05)
             #self.checkResponseQueue()
             #Debugging
-            time.sleep(.01)
+            time.sleep(.002)
             self.peekQueue()#Should remove all queue elements that should process immediately
             #self.peekQueueForErrors() #If an error enters the queue is should be processed immediately
             if not self.responseQueue.empty():
@@ -143,8 +141,8 @@ class SerialController:
     #queue is cleaned of a specified item by rebuilding the queue
     #This function might be obsolete now
     def cleanQueue(self, item):
-        new_items = []
 
+        new_items = []
         while not self.responseQueue.empty():
             val = self.responseQueue.get()
             if val != item:
@@ -169,7 +167,7 @@ class SerialController:
                     self.responseQueue.queue.remove(item)
                     return
                 if item[:2] not in self.WaitToProcess:
-                    self.root.terminalPrint(item+ " not in wait to process")
+                    self.root.terminalPrint(item + " not in wait to process")
                     self.responseQueue.queue.remove(item)
                     self.sortResponse(item)
        
@@ -188,8 +186,8 @@ class SerialController:
                         endTime = 5 #how long to wait for
                         #Will stop waiting if the queue has moved on
                         while self.responseQueue.queue[0] == responseToWaitFor and accTime < endTime:
-                            time.sleep(.1)
-                            accTime += .1
+                            time.sleep(.01)
+                            accTime += .01
                         #See if wait was triggered by same response
                         if self.responseQueue.queue[0] == responseToWaitFor:
                             #if not self.waiting_responses and not self.sendingSerial:
@@ -199,7 +197,7 @@ class SerialController:
                 #print("processing responses")
             except IndexError:
                 pass
-            time.sleep(.01)
+            time.sleep(.002)
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
@@ -239,13 +237,16 @@ class SerialController:
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             flag = "Turn Hazard"
             AC.awaitingMoveResponse = False
-
+        elif sortResponse[:13] == "Limit Pressed":
+            self.root.statusPrint(f"Limits switch: {sortResponse[2:]}")
+            self.root.warningPrint(f"Limit switch pressed")
+            
         elif sortResponse[:9] == "Step Difs":
             pass
 
         #NOTE IF these responses are handled here that means they missed the timeout window or something else is wrong
         else:
-            R.warningPrint(f"Warning Received Unexpected Response: {sortResponse}\n Maybe timeout window missed")
+            R.terminalPrint(f"Warning Received Unexpected Response: {sortResponse}\n Maybe timeout window missed")
             if sortResponse[:2] == "TL":
                 #Limit switch test
                 R.terminalPrint(f"Received TL Response: {sortResponse}")
@@ -304,7 +305,7 @@ class SerialController:
         uniqueCode = prefix + str(uuid.uuid4())
         #Avoid any possible errors where timeout is negative
         if timeout <= 0:
-            print("timeout is negative")
+            print("timeout is negative or zero")
             timeout = 2
         self.waiting_responses.add(uniqueCode) #TODO may need arm to return specific POS responses
         while time.time() - start < timeout:
@@ -313,10 +314,12 @@ class SerialController:
                 if response.startswith(prefix):
                     #self.root.terminalPrint("response processed after waiting")
                     response = self.responseQueue.get(timeout=.1)
+                    #Discard unique code because no longer waiting
                     self.waiting_responses.discard(uniqueCode)
                     return response
             except queue.Empty, IndexError:
                 pass
+        #Discard unique code because no longer waiting
         self.waiting_responses.discard(uniqueCode)
         return None
     

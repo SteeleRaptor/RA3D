@@ -333,6 +333,8 @@ float rndSpeed;
 bool splineTrue;
 bool splineEndReceived;
 bool estopActive;
+bool calibrating;
+bool limitSwitchPressed;
 
 float Xtool = 0;
 float Ytool = 0;
@@ -1622,7 +1624,7 @@ void checkEncoders() {
 
 void driveMotorsJ(int J1step, int J2step, int J3step, int J4step, int J5step, int J6step, int J7step, int J8step, int J9step,
                   int J1dir, int J2dir, int J3dir, int J4dir, int J5dir, int J6dir, int J7dir, int J8dir, int J9dir,
-                  String SpeedType, float SpeedVal, float ACCspd, float DCCspd, float ACCramp) {
+                  String SpeedType, float SpeedVal, float ACCspd, float DCCspd, float ACCramp, bool ignoreLimits) {
   // Array of steps and directions
   int steps[9] = { J1step, J2step, J3step, J4step, J5step, J6step, J7step, J8step, J9step };
   int dirs[9] = { J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir };
@@ -1739,8 +1741,11 @@ void driveMotorsJ(int J1step, int J2step, int J3step, int J4step, int J5step, in
   int highStepCur = 0;
 
   //driving loop
-  while ((cur[0] < steps[0] || cur[1] < steps[1] || cur[2] < steps[2] || cur[3] < steps[3] || cur[4] < steps[4] || cur[5] < steps[5] || cur[6] < steps[6] || cur[7] < steps[7] || cur[8] < steps[8]) && estopActive == false) {
-    
+  while ((cur[0] < steps[0] || cur[1] < steps[1] || cur[2] < steps[2] || cur[3] < steps[3] || cur[4] < steps[4] || cur[5] < steps[5] || cur[6] < steps[6] || cur[7] < steps[7] || cur[8] < steps[8]) && estopActive == false && limitSwitchPressed == false) {
+    //Ignore limits on calibration
+    if (!ignoreLimits){
+      //LimitSwitchCheck();
+    }
     //Adjust delay to change speed
     //Determine whether to accelerate, decellerate or cruise
     ////DELAY CALC/////
@@ -1922,8 +1927,9 @@ void driveMotorsG(int J1step, int J2step, int J3step, int J4step, int J5step, in
   }
 
   ///// DRIVE MOTORS /////
-  while ((cur[0] != steps[0] || cur[1] != steps[1] || cur[2] != steps[2] || cur[3] != steps[3] || cur[4] != steps[4] || cur[5] != steps[5] || cur[6] != steps[6] || cur[7] != steps[7] || cur[8] != steps[8]) && estopActive == false) {
+  while ((cur[0] != steps[0] || cur[1] != steps[1] || cur[2] != steps[2] || cur[3] != steps[3] || cur[4] != steps[4] || cur[5] != steps[5] || cur[6] != steps[6] || cur[7] != steps[7] || cur[8] != steps[8]) && estopActive == false && limitSwitchPressed == false) {
     curDelay = calcStepGap;
+    //LimitSwitchCheck();
 
     float distDelay = 30;
     float disDelayCur = 0;
@@ -2038,7 +2044,8 @@ void driveMotorsL(int J1step, int J2step, int J3step, int J4step, int J5step, in
   int highStepCur = 0;
 
   // DRIVE MOTORS
-  while ((cur[0] < steps[0] || cur[1] < steps[1] || cur[2] < steps[2] || cur[3] < steps[3] || cur[4] < steps[4] || cur[5] < steps[5] || cur[6] < steps[6] || cur[7] < steps[7] || cur[8] < steps[8]) && !estopActive) {
+  while ((cur[0] < steps[0] || cur[1] < steps[1] || cur[2] < steps[2] || cur[3] < steps[3] || cur[4] < steps[4] || cur[5] < steps[5] || cur[6] < steps[6] || cur[7] < steps[7] || cur[8] < steps[8]) && !estopActive && !limitSwitchPressed) {
+    //LimitSwitchCheck();
     float distDelay = 30;
     float disDelayCur = 0;
 
@@ -2269,7 +2276,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
       if (simspeed) {
         driveMotorsG(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
       } else {
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp, false);
       }
       checkEncoders();
       if (response == true) {
@@ -2392,8 +2399,38 @@ void EstopProg() {
   }
 }
 
+static unsigned long firstHighUs[numJoints] = { 0 };
+const unsigned long DEBOUNCE_US = 3000;  // 3 ms
+int calPins[numJoints] = { J1calPin, J2calPin, J3calPin, J4calPin, J5calPin, J6calPin, J7calPin, J8calPin, J9calPin };
 
+void LimitSwitchCheck() {
 
+  unsigned long now = micros();
+
+  for (int i = 0; i < numJoints; i++) {
+
+    int curState = digitalRead(calPins[i]);
+
+    if (curState == HIGH) {
+      if (firstHighUs[i] == 0)
+        firstHighUs[i] = now;
+
+      if ((now - firstHighUs[i]) >= DEBOUNCE_US) {
+        limitTriggered();
+      }
+
+    } else {
+      firstHighUs[i] = 0;
+    }
+  }
+}
+
+void limitTriggered(){
+  if (!limitSwitchPressed && !calibrating) {
+    limitSwitchPressed = true;
+    Serial.println("Limit Pressed");
+  }
+}
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //MAIN
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2431,9 +2468,15 @@ void setup() {
   pinMode(J8calPin, INPUT);
   pinMode(J9calPin, INPUT);
 
-
   pinMode(EstopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(EstopPin), EstopProg, LOW);
+
+  attachInterrupt(digitalPinToInterrupt(J1calPin), limitTriggered, RISING);
+  /*attachInterrupt(digitalPinToInterrupt(J2calPin), limitTriggered, RISING);
+  attachInterrupt(digitalPinToInterrupt(J3calPin), limitTriggered, RISING);
+  attachInterrupt(digitalPinToInterrupt(J4calPin), limitTriggered, RISING);
+  attachInterrupt(digitalPinToInterrupt(J5calPin), limitTriggered, RISING);
+  attachInterrupt(digitalPinToInterrupt(J6calPin), limitTriggered, RISING);*/
 
   digitalWrite(J1stepPin, HIGH);
   digitalWrite(J2stepPin, HIGH);
@@ -2586,7 +2629,7 @@ void closedLoop(){
     resetEncoders();//reset collision detecion
     //drive motors if any motor has to move
     if (J1Move || J2Move || J3Move || J4Move || J5Move || J6Move){
-      driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), J7stepDif, J8stepDif, J9stepDif, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), J7stepDif, J8stepDif, J9stepDif, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
       //sendRobotPos("CL");//send robot position only if changed
     }
     checkEncoders();//check for collision
@@ -2617,6 +2660,7 @@ void loop() {
   if (cmdBuffer1 != "") {
     //process data
     estopActive = false;//reset estop
+    limitSwitchPressed = false; //reset limit switch
     inData = cmdBuffer1;
     inData.trim();
     //Function is always first 2 characters
@@ -2795,14 +2839,15 @@ void loop() {
 
 
       resetEncoders();
-      driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      //ignores limit switch so used to get out of being stuck
+      driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,true);
       /*if drive == "G"{
         driveMotorsG
       }*/
       checkEncoders();
       sendRobotPos("HM");
       delay(5);
-      Serial.println("Done");
+      //Serial.println("Done");
     }
     //-----COMMAND UPDATE PARAMS---------------------------------------------------
     //-----------------------------------------------------------------------
@@ -3084,7 +3129,7 @@ void loop() {
       } else {
         J7dir = 0;
       }
-      driveMotorsJ(0,0,0,0,0,0,abs(J7stepDif),0,0,0,0,0,0,0,0,J7dir,0, 0, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      driveMotorsJ(0,0,0,0,0,0,abs(J7stepDif),0,0,0,0,0,0,0,0,J7dir,0, 0, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
       //Debugging Serial.println("J7stepDif"+String(J7stepDif)+"J7_In"+String(J7_In)+"J7_Rel"+String(J7_Rel)+"\n");
       ////////MOVE COMPLETE///////////
       sendRobotPos("E7");
@@ -3190,6 +3235,7 @@ void loop() {
     //-----COMMAND TO CALIBRATE---------------------------------------------------
     //-----------------------------------------------------------------------
     if (function == "LL") {
+      calibrating = true;
       int J1start = inData.indexOf('A');
       int J2start = inData.indexOf('B');
       int J3start = inData.indexOf('C');
@@ -3430,9 +3476,10 @@ void loop() {
       J4TargetStep = J4stepCen;
       J5TargetStep = J5stepCen;
       J6TargetStep = J6stepCen;*/
-      driveMotorsJ(J1stepCen, J2stepCen, J3stepCen, J4stepCen, J5stepCen, J6stepCen, J7stepCen, J8stepCen, J9stepCen, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      driveMotorsJ(J1stepCen, J2stepCen, J3stepCen, J4stepCen, J5stepCen, J6stepCen, J7stepCen, J8stepCen, J9stepCen, J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp, true);
       sendRobotPos("LL");
       inData = "";  // Clear recieved buffer
+      calibrating = false;
     }
 
     //-----COMMAND TO CALIBRATE EXTRA---------------------------------------------------
@@ -3514,15 +3561,15 @@ void loop() {
       int J8stepCen = 0;
       int J9stepCen = 0;
       ///
-      int J1dir;
-      int J2dir;
-      int J3dir;
-      int J4dir;
-      int J5dir;
-      int J6dir;
-      int J7dir;
-      int J8dir;
-      int J9dir;
+      int J1dir = 0;
+      int J2dir = 0;
+      int J3dir = 0;
+      int J4dir = 0;
+      int J5dir = 0;
+      int J6dir = 0;
+      int J7dir = 0;
+      int J8dir = 0;
+      int J9dir = 0;
 
       int Jreq[9] = { J1req, J2req, J3req, J4req, J5req, J6req, J7req, J8req, J9req };
       int JStepLim[9] = { J1StepLim, J2StepLim, J3StepLim, J4StepLim, J5StepLim, J6StepLim, 0, J8StepLim, J9StepLim };
@@ -3534,46 +3581,26 @@ void loop() {
       //set master steps to be ajusted by offset
       //may need to inverse the sign for this
       if (J1req == 1) {
-        if (J1CalDir) {
           J1StepM = J1StepM + J1calOffExtra * J1StepDeg;
-        } else {
-          J1StepM = J1StepM - J1calOffExtra * J1StepDeg;
-        }
       }
       if (J2req == 1) {
-        if (J2CalDir) {
           J2StepM = J2StepM + J2calOffExtra * J2StepDeg;
-        } else {
-          J2StepM = J2StepM - J2calOffExtra * J2StepDeg;
-        }
       }
       if (J3req == 1) {
-        if (J3CalDir) {
+
           J3StepM = J3StepM + J3calOffExtra * J3StepDeg;
-        } else {
-          J3StepM = J3StepM - J3calOffExtra * J3StepDeg;
-        }
       }
       if (J4req == 1) {
-        if (J4CalDir) {
+
           J4StepM = J4StepM + J4calOffExtra * J4StepDeg;
-        } else {
-          J4StepM = J4StepM - J4calOffExtra * J4StepDeg;
-        }
       }
       if (J5req == 1) {
-        if (J5CalDir) {
-          J5StepM = J5StepM + J5calOffExtra * J5StepDeg;
-        } else {
-          J5StepM = J5StepM - J5calOffExtra * J5StepDeg;
-        }
+        J5StepM = J5StepM + J5calOffExtra * J5StepDeg;
+    
       }
       if (J6req == 1) {
-        if (J6CalDir) {
-          J6StepM = J6StepM + J6calOffExtra * J6StepDeg;
-        } else {
-          J6StepM = J6StepM - J6calOffExtra * J6StepDeg;
-        }
+          J6StepM = J6StepM + J6calOffExtra * J5StepDeg;
+        
       }
       if (J7req == 1) {
         J7StepM = J7StepM - J7callOffExtraDeg;
@@ -3588,39 +3615,39 @@ void loop() {
       //Invert Direction if negative offset
       /// J1 ///
       if (J1callOffExtraDeg < 0) {
-        J1dir = !(J1dir);// ?  0: 1;
+        J1dir = 1;// ?  0: 1;
       }
       /// J2 ///
       if (J2callOffExtraDeg < 0) {
-        J2dir = !(J2dir);
+        J2dir = 1;
       }
       /// J3 ///
       if (J3callOffExtraDeg < 0) {
-        J3dir = !(J3dir);
+        J3dir = 1;
       }
       /// J4 ///
       if (J4callOffExtraDeg < 0) {
-        J4dir = !(J4dir);
+        J4dir = 1;
       }
       /// J5 ///
       if (J5callOffExtraDeg < 0) {
-        J5dir = !(J5dir);
+        J5dir = 1;
       }
       /// J6 ///
       if (J6callOffExtraDeg < 0) {
-        J6dir = !(J6dir);
+        J6dir = 1;
       }
       /// J7 ///
       if (J7callOffExtraDeg < 0) {
-        J7dir = !(J7dir);
+        J7dir = 1;
       }
       /// J8 ///
       if (J8callOffExtraDeg < 0) {
-        J8dir = !(J8dir);
+        J8dir = 1;
       }
       /// J9 ///
       if (J9callOffExtraDeg < 0) {
-        J9dir = !(J9dir);
+        J9dir = 1;
       }
 
       float ACCspd = 10;
@@ -3630,7 +3657,7 @@ void loop() {
       float ACCramp = 50;
       setEncoders();
       //Drive by amount changed
-      driveMotorsJ(abs(J1callOffExtraDeg), abs(J2callOffExtraDeg), abs(J3callOffExtraDeg), abs(J4callOffExtraDeg), abs(J5callOffExtraDeg), abs(J6callOffExtraDeg), abs(J7callOffExtraDeg), abs(J8callOffExtraDeg), abs(J9callOffExtraDeg), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+      driveMotorsJ(abs(J1callOffExtraDeg), abs(J2callOffExtraDeg), abs(J3callOffExtraDeg), abs(J4callOffExtraDeg), abs(J5callOffExtraDeg), abs(J6callOffExtraDeg), abs(J7callOffExtraDeg), abs(J8callOffExtraDeg), abs(J9callOffExtraDeg), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
       sendRobotPos("LE");
       inData = "";  // Clear recieved buffer
     }
@@ -3803,7 +3830,7 @@ void loop() {
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
           updatePos();
         }
 
@@ -4044,7 +4071,7 @@ void loop() {
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
           updatePos();
         }
 
@@ -4280,7 +4307,7 @@ void loop() {
 
         //send move command if no axis limit error
         if (TotalAxisFault == 0 && KinematicError == 0) {
-          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+          driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
           updatePos();
         }
 
@@ -4495,7 +4522,7 @@ void loop() {
       //send move command if no axis limit error
       if (TotalAxisFault == 0 && KinematicError == 0) {
         resetEncoders();
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
         checkEncoders();
         sendRobotPos("JT");
       } else if (KinematicError == 1) {
@@ -4673,7 +4700,7 @@ void loop() {
       if (TotalAxisFault == 0 && KinematicError == 0) {
         //move to center positions except J5 to 45deg
         resetEncoders();
-        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp);
+        driveMotorsJ(abs(J1stepDif), abs(J2stepDif), abs(J3stepDif), abs(J4stepDif), abs(J5stepDif), abs(J6stepDif), abs(J7stepDif), abs(J8stepDif), abs(J9stepDif), J1dir, J2dir, J3dir, J4dir, J5dir, J6dir, J7dir, J8dir, J9dir, SpeedType, SpeedVal, ACCspd, DCCspd, ACCramp,false);
         if (closedLoopTrue){
           checkEncoders();
         }

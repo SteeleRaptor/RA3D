@@ -27,10 +27,13 @@ class TkWindow(Tk):
             "deg/mm": ("extruder_deg_per_mm","AC"),
             "Sync Print Parameters": ("syncWithPrintParameters","AC"), #arm controller
             "Debug Mode": ("DebugMode","self"),
-            "Print Debug Mode": ("PrintDebugMode", "self")
+            "Print Debug Mode": ("PrintDebugMode", "self"),
+            "Feedrate" : ("feedRate", "PC"),
+            "Printing Timeout Extra": ("timeoutExtra","PC"),
+            "Hard code printer speed": ("hardCodePrinterSpeed","PC")
         }
-        self.DebugMode = False #Will display important debug prints but not all of them
-        self.PrintDebugMode = False #Will display gcode lines and print coordinates
+        self.DebugMode = True #Will display important debug prints but not all of them
+        self.PrintDebugMode = True #Will display gcode lines and print coordinates
         #Debug modes off will NOT hide errors
 
         Tk.__init__(self)
@@ -39,7 +42,7 @@ class TkWindow(Tk):
         self.title("RA3D Control Software")
         # (TEMP) Set window as topmost
         # self.attributes('-topmost', True)
-        self.updateDelay = 200 # Delay between update function calls in milliseconds
+        self.updateDelay = 150 # Delay between update function calls in milliseconds
         # Set the window dimensions and position on screen
         w = 1200 # Window width
         h = 600 # Window height
@@ -60,9 +63,7 @@ class TkWindow(Tk):
         if self.DebugMode:
             self.root.terminalPrint("GUI created")
         self.serialController.refreshCOMPorts()
-        # Set up a call to the update function after updateDelay milliseconds
-        updateThread = threading.Thread(target=self.update)
-        updateThread.start()
+       
         
         #TODO remove these eventually
         self.timeoutStartedCal = False
@@ -73,6 +74,10 @@ class TkWindow(Tk):
         self.printThreadStarted = False
         #Set origin last so everything is in place
         self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
+         # Set up a call to the update function after updateDelay milliseconds
+        #updateThread = threading.Thread(target=self.update)
+        #updateThread.start()
+        self.update()
     #endregion init
 
     #region Shutdown
@@ -876,7 +881,8 @@ class TkWindow(Tk):
                             valueToSet = False
                         else:
                             raise ValueError
-                    valueToSet = correctType(valueToSet)
+                    if correctType != None:
+                        valueToSet = correctType(valueToSet)
                     setattr(object, attr, valueToSet)
 
                 except ValueError:
@@ -900,7 +906,7 @@ class TkWindow(Tk):
         # ===========| ArmController |============
         
         # ==========| PrintController |==========
-        #Each print loop runs in the thread sothat it can "wait" and not halt the UI
+        #Each print loop runs in the thread so that it can "wait" and not halt the UI
         if self.printController.printing and not self.printThreadStarted and not self.printController.printPaused:
             printThread = threading.Thread(target=self.printController.printLoop)
             printThread.start()
@@ -983,7 +989,7 @@ class TkWindow(Tk):
         popup.grab_set() 
         popup.lift()
         # Add widgets to the popup
-        label2 = Label(popup, text="Adjust calibration without limit switches.\n Works accumalatively")
+        label2 = Label(popup, text="Adjust calibration without limit switches.\n Works accumalatively. \n Be careful to not move past limit switches.")
         label2.grid(row=1,column=0)
         self.calOffsetFrameP = Frame(popup)
         self.calOffsetFrameP.grid(row=2, column=0, padx=5, pady=5, sticky=W+E)

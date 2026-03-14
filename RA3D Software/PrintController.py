@@ -11,14 +11,14 @@ class PrintController:
         self.armController = armController
         #------Important variables-------
         #MoveParameters(speed,acceleration,deceleratio,ramp,loopmode,speedtype)
-        self.speed = 50
-        self.acceleration = 15
-        self.decceleration = 15
-        self.ramp = 40
-        self.printOpenLoopControl = 0 #Thus closed cloop
+        self.speed = 50 #mm/s
+        self.acceleration = 5 #percent of move that is accelerating
+        self.decceleration = 5 #percent of move that is decelerating
+        self.ramp = 20 #minimum is 10
         #0=closed loop
+        self.printOpenLoopControl = 0 #Thus closed cloop
         self.defaultPrintParameters = MoveParameters(self.speed,self.acceleration,self.decceleration,self.ramp,self.printOpenLoopControl,"m") #50mm/s print speed
-        
+        self.timeoutExtra = 60 #Extra timeout had to every timeout estimation
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
@@ -27,6 +27,7 @@ class PrintController:
         YEdge = [-80,80]
         XEdge = [250,400]
 
+        self.hardCodePrinterSpeed = True #Will obey the print parameters and not the gcode feed rate
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
         
         #TODO These might be changed to reflect xedge, yedge
@@ -149,13 +150,14 @@ class PrintController:
             # printer moves home than to position with normal wrist condition
             #Execute move command
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
-            if self.feedRate != None and self.feedRate != 0:
-                moveParameters.speedType = "m"
-                #Conver to mm/s from mm/min
-                moveParameters.speed = self.feedRate / 60
+            if not self.hardCodePrinterSpeed:
+                if self.feedRate != None and self.feedRate != 0:
+                    moveParameters.speedType = "m"
+                    #Conver to mm/s from mm/min
+                    moveParameters.speed = self.feedRate / 60
             #estimate timeout
             timeout = self.root.armController.estimateMoveTime(self.lastPos,self.printPos,moveParameters.speed)
-            timeout += 10 #extra time for communication
+            timeout += self.timeoutExtra #extra time for communication
 
             #if valid position and no flag
             if self.printPos.x is not None and self.flag is None:
@@ -558,17 +560,21 @@ class PrintController:
                 self.endSweepOrCal()
                 self.root.warningPrint(f"Bed calibration/corner sweeping paused due to error: {self.flag}")
                 self.flag = None
+            #Clear queue because queue tends to get clogged when encountering flags
+            self.root.serialController.clearQueue()
             return flag
         elif self.flag is not None:
             #display warning print instead of pausing when ignore flag is on
             self.root.warningPrint("Flag: "+self.flag)
             self.flag = None
+            #Clear queue because queue tends to get clogged when encountering flags
+            self.root.serialController.clearQueue()
             return flag
         return None
 
     #Check if the printer is busy with printing, calibration or sweeping
     def checkIfPrinterBusy(self,message = None,display=True):
-        if self.printing or self.cornerSweeping or self.bedCalibrationInProgress:
+        if self.cornerSweeping or self.bedCalibrationInProgress or (self.printing and not self.printPaused):
             #if there is a message to display
             if message and display:
                 self.root.terminalPrint("Cannot" + message + ", Printer busy")

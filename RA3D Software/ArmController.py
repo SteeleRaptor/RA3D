@@ -130,7 +130,7 @@ class ArmController:
                                     calJ3=self.calJStage1[2],
                                     calJ4=self.calJStage1[3],
                                     calJ5=self.calJStage1[4],
-                                    calJ6=self.calJStage1[5])
+                                    calJ6=self.calJStage1[5],single=False)
                 self.calibrationState = 2
                 response = self.serialController.waitForResponse("POSLL",35)
                 #reevalute if calibration is in progress
@@ -146,7 +146,8 @@ class ArmController:
                     # Move to next state
                     self.calibrationState = 3
                     # Print out the response received
-                    self.root.terminalPrint(response)
+                    if self.root.DebugMode:
+                        self.root.terminalPrint(response)
                     response = None #reset response for next response
                 else:
                     # If not, inform user of Stage 1 Failure
@@ -163,7 +164,7 @@ class ArmController:
                                     calJ3=self.calJStage2[2],
                                     calJ4=self.calJStage2[3],
                                     calJ5=self.calJStage2[4],
-                                    calJ6=self.calJStage2[5])
+                                    calJ6=self.calJStage2[5],single=False)
                 self.calibrationState = 4
                 #Calibration will not continue until a response is received or timed out
                 response = self.serialController.waitForResponse("POSLL",35)
@@ -181,7 +182,8 @@ class ArmController:
                     # Set arm calibration flag to True
                     self.armCalibrated = True
                     # Print out the response received
-                    self.root.terminalPrint(response)
+                    if self.root.DebugMode:
+                        self.root.terminalPrint(response)
                 else:
                     # If not, inform user of Stage 2 Failure
                     self.root.statusPrint("Stage 2 Calibration FAILED")
@@ -203,26 +205,30 @@ class ArmController:
         self.armCalibrated = True
         
     #calibrate indvidual joints
-    def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
+    def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False, single=True):
         self.getCalOffsets() # Update calibration offsets from entry fields
         command = f"LLA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
-        self.root.terminalPrint("Command to send: ")
-        self.root.terminalPrint(command[0:-2])#don't include new line character
+        if self.root.DebugMode:
+            self.root.terminalPrint("Command to send: ")
+            self.root.terminalPrint(command[0:-2])#don't include new line character
         if self.serialController.boardConnected is False:
             self.root.statusPrint("Command not sent due to no board connected")
         # Tell the serial controller to send the serial
         self.serialController.sendSerial(command)
+        if single:
+            self.waitForResponseAndProcess("POSLL",timeout=30)
 
     #Post calibrate individual joints
     def postCalibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
         if self.checkIfAllBusy(message="post calibrate"):
             return
         self.getPostCalOffsets() # Update calibration offsets from entry fields
-
+        self.moveHome()
         #Prep command
         command = f"LEA{calJ1}B{calJ2}C{calJ3}D{calJ4}E{calJ5}F{calJ6}G0H0I0J{self.J1CalOffset}K{self.J2CalOffset}L{self.J3CalOffset}M{self.J4CalOffset}N{self.J5CalOffset}O{self.J6CalOffset}P0Q0\n"
-        self.root.terminalPrint("Command to send: ")
-        self.root.terminalPrint(command[0:-2]) #don't include new line character
+        if self.root.DebugMode:
+            self.root.terminalPrint("Command to send: ")
+            self.root.terminalPrint(command[0:-2]) #don't include new line character
         
         # Tell the serial controller to send the serial
         self.serialController.sendSerial(command)
@@ -240,6 +246,7 @@ class ArmController:
         self.root.J4OffsetEntryP.insert(0,"0")
         self.root.J5OffsetEntryP.insert(0,"0")
         self.root.J6OffsetEntryP.insert(0,"0")
+        self.waitForResponseAndProcess("POSLE",timeout=30)
 
     #Get post cal offsets from entry fields
     def getPostCalOffsets(self):
@@ -249,7 +256,8 @@ class ArmController:
         self.J4CalOffset = float(self.root.J4OffsetEntryP.get())
         self.J5CalOffset = float(self.root.J5OffsetEntryP.get())
         self.J6CalOffset = float(self.root.J6OffsetEntryP.get())
-        self.root.terminalPrint(f"Post calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
+        if self.root.DebugMode:
+            self.root.terminalPrint(f"Post calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
     
     # gett cal offesets from entry fields
     def getCalOffsets(self):
@@ -260,13 +268,16 @@ class ArmController:
         self.J4CalOffset = float(self.root.J4OffsetEntry.get())
         self.J5CalOffset = float(self.root.J5OffsetEntry.get())
         self.J6CalOffset = float(self.root.J6OffsetEntry.get())
-        self.root.terminalPrint(f"Calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
+        if self.root.DebugMode:
+            self.root.terminalPrint(f"Calibration offsets J1: {self.J1CalOffset}, J2: {self.J2CalOffset}, J3: {self.J3CalOffset}, J4: {self.J4CalOffset}, J5: {self.J5CalOffset}, J6: {self.J6CalOffset}")
     #endregion Calibration
 
     #region ========|Position|=============
 
     #Process position response to update UI
     def processPosition(self, response):
+        if self.root.DebugMode:
+            self.root.terminalPrint(response)
         AIdx = response.find('A') # A value is angle of J1
         response = response[AIdx:] # Remove POS from string
         # Collect all the indexes for finding values
@@ -347,7 +358,7 @@ class ArmController:
         self.root.statusPrint("Requesting position update...")
         self.serialController.sendSerial("RP\n") # Send instruction
         self.awaitingPosResponse = True # Set the flag
-        response = self.serialController.waitForResponse("POSRP",3)
+        response = self.serialController.waitForResponse("POSRP",7)
         # Check if the serial controller has a response ready
         #self.root.terminalPrint("response is " + str(response))
         # Inform user and process the position response
@@ -371,7 +382,9 @@ class ArmController:
             self.root.statusPrint("Arm is busy with something else at the moment")
             return
         self.root.statusPrint("Beginning post calibration")
-        self.postCalibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
+        postCalibrateThread = threading.Thread(target=self.postCalibrateJoints, kwargs={"calJ1":calJ1,"calJ2":calJ2, "calJ3":calJ3, "calJ4":calJ4, "calJ5":calJ5, "calJ6":calJ6})
+        postCalibrateThread.start()
+        #self.postCalibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
 
     #calibration for one joint at a time
     def startSpecificCalibration(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False):
@@ -579,7 +592,7 @@ class ArmController:
         if moveParameters is None:
             moveParameters = self.moveParameters
         J7 = extrudeRate*self.extruder_deg_per_mm
-        timeout = timeoutMultiplier*extrudeRate/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
+        timeout = timeoutMultiplier*math.abs(extrudeRate)/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
         if self.checkIfBusy(message="E7 extrude"):
             return
         command = MoveCommand("E7",None,moveParameters=moveParameters,J7=J7,J7Rel=relative)
@@ -609,12 +622,12 @@ class ArmController:
         self.root.serialController.sendSerial("Z7\n")
         self.waitForResponseAndProcess("POSZ7",15,message="Zero J7",setFlag=False)
     
-    def waitForResponseAndProcess(self,prefix,timeout=2,message="", setFlag = True):
+    def waitForResponseAndProcess(self,prefix,timeout=15,message="", setFlag = True):
         response = self.root.serialController.waitForResponse(prefix,timeout)
         if response is not None:
             self.processPosition(response)
-            self.root.terminalPrint(response)
             if self.root.DebugMode:
+                self.root.terminalPrint(response)
                 self.root.statusPrint("Move command executed successfully")
         else:
             #Set flag used whether the timeout should send a flag to the printer
@@ -666,9 +679,6 @@ class ArmController:
     
     #Move to the position where the arm rests on itself
     def prepMoveSafe(self):
-        #Pause print so everything stops moving
-        #It is assume the user will want the print paused if pressing this button
-        self.root.printController.pausePrint()
         #This is important because move safe will not move safe if arm is not calibrated
         if self.serialController.boardConnected is False or self.armCalibrated is False:
             self.root.statusPrint("Failed to move to safe positiion, Board not connected")
@@ -693,7 +703,7 @@ class ArmController:
 
     #Move to a xyz coordinate in best path, nonlinear path
     #MJ cannot control extruder
-    def sendMJ(self,commandPos, moveParameters,timeout=20):
+    def sendMJ(self,commandPos, moveParameters,timeout=30):
 
         #Leaving this specific check for awaitingMoveResponse so user knows why move failed
         #Even though nominal check handles this
@@ -726,6 +736,7 @@ class ArmController:
     #Move linear to a xyz coordinater, timeout default is 5
     def sendML(self, pos, moveParameters, extrudeRate=0, RelativeExtrude=True,timeout=30):
         
+        #simply adjustment based on speed for the standard timeout
         if moveParameters.speedType == "m" and timeout == 30:
             #assume a move length of 50
             timeout2 = 50/moveParameters.speed
@@ -759,7 +770,7 @@ class ArmController:
         self.awaitingMoveResponse = False
 
     #Move arm joint angles
-    def sendRJ(self, Joints, moveParameters, timeout=20):
+    def sendRJ(self, Joints, moveParameters, timeout=30):
         #self.root.terminalPrint("Sending RJ command...")
         if self.awaitingMoveResponse:
             self.root.statusPrint("Cannot send ML command as currently awaiting response from a previous move command")
@@ -776,22 +787,13 @@ class ArmController:
         # Send the serial command
        
         self.awaitingMoveResponse = True # Set the awaiting move response flag 
+        self.serialController.sendSerial(str(command))
 
         #Timeout and feedback handling
-        self.serialController.sendSerial(str(command))
-        response = self.serialController.waitForResponse("POSRJ",timeout)
-        
-        if response is not None:
-            self.processPosition(response)
-            self.root.terminalPrint(response)
-            if self.root.DebugMode:
-                self.root.statusPrint("Move command executed successfully")
-        else:
-            self.root.printController.flag = "timeout after: " + str(timeout) + "s"
-            self.root.terminalPrint("Send RJ timed out after "+str(timeout))
-        
+        self.waitForResponseAndProcess("POSRJ",timeout=timeout,message="Send RJ")
         self.awaitingMoveResponse = False
     
+    #These are teensy commands that have not been implemented
     def moveCircle(self):
         pass
     def moveArc(self):
@@ -805,14 +807,17 @@ class ArmController:
         delZ = curPos.z-lastPos.z
         distance = math.sqrt(delX**2+delY**2+delZ**2)
         estimateTime = distance/speed
-        print("Time:", estimateTime, " distance:", distance, " speed:", speed)
+        if self.root.PrintDebugMode:
+            print("Time:", estimateTime, " distance:", distance, " speed:", speed)
         return estimateTime
     
     # Moves the robot to a safe position to be turned off
     # Cancels everything, ignore flags, and just sends the serial command
     # timeout is large because movesafe can be held in the teensy queue
-    def moveSafe(self,timeout=30):
-        self.root.printController.pauseAll() #pause printing functions
+    def moveSafe(self,timeout=60):
+        #Pause print so everything stops moving
+        #It is assume the user will want the print paused if pressing this button
+        self.root.printController.pauseAll()
         self.cancelActions()#pause actions like calibration or testing
         #wait until commands have finished
 
@@ -828,7 +833,21 @@ class ArmController:
     
     # Moves to the neutral position, all joints at zero degrees
     def moveHome(self):
-        self.sendRJ([0,0,0,0,0,0], self.defaultMoveParameters,timeout=15)
+        if self.awaitingMoveResponse:
+            self.root.statusPrint("Cannot send HM command as currently awaiting response from a previous move command")
+            self.root.printController.flag = "Already moving"
+            return
+        # Check if a board is connected or if the arm is not calibrated
+        if self.notNominalCheck(message="move home"):
+            self.root.printController.flag = "Arm busy"
+            return
+        self.awaitingMoveResponse = True # Set the awaiting move response flag 
+        self.root.serialController.sendSerial("HM\n")
+        self.waitForResponseAndProcess("POSHM",30,message="Move Home",setFlag=True)
+        self.awaitingMoveResponse = False
+
+      
+        
     
     
     #endregion move commands

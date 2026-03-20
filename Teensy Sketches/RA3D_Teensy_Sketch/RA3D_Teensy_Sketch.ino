@@ -2471,7 +2471,8 @@ void setup() {
   pinMode(EstopPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(EstopPin), EstopProg, LOW);
 
-  attachInterrupt(digitalPinToInterrupt(J1calPin), limitTriggered, RISING);
+  //Currently not being used
+  //attachInterrupt(digitalPinToInterrupt(J1calPin), limitTriggered, RISING);
   /*attachInterrupt(digitalPinToInterrupt(J2calPin), limitTriggered, RISING);
   attachInterrupt(digitalPinToInterrupt(J3calPin), limitTriggered, RISING);
   attachInterrupt(digitalPinToInterrupt(J4calPin), limitTriggered, RISING);

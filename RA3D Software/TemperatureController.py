@@ -122,14 +122,18 @@ class TemperatureController:
         Vmeas = rawAdc / pow(2, 15) * self.fullScaleVoltage
         # Convert the voltage into a resistance
         thermR = Vmeas / (self.voltageDividerVcc - Vmeas) * self.hotendR
-        # Calculate the temperature from the resistance
-        hotendTempKelvin = 1 / ((1 / self.thermistorTo) + (1 / self.thermistorBeta) * math.log(thermR / self.thermistorRo))
-        # Convert to Celsius and save
-        self.hotendTempCelsius = hotendTempKelvin - 273.15
-        # Handle the interference when the heater is on
-        # TODO: NO CLUE ON THIS VALUE, NEED TO FIND THROUGH TESTING LATER
-        if (self.hotendHeaterOn):
-            self.hotendTempCelsius = self.hotendTempCelsius + self.hotendTempAdjustment
+        # Only perform calculations if thermR is positive. Should only be negative if the thermistor isn't working at all
+        if thermR > 0:
+            # Calculate the temperature from the resistance
+            hotendTempKelvin = 1 / ((1 / self.thermistorTo) + (1 / self.thermistorBeta) * math.log(thermR / self.thermistorRo))
+            # Convert to Celsius and save
+            self.hotendTempCelsius = hotendTempKelvin - 273.15
+            # Handle the interference when the heater is on
+            if (self.hotendHeaterOn):
+                self.hotendTempCelsius = self.hotendTempCelsius + self.hotendTempAdjustment
+        else:
+            # TODO: Possibly disable heaters if this happens
+            self.root.statusPrint("Error: hotend thermR is negative")
         # Return value
         return self.hotendTempCelsius
 
@@ -138,13 +142,18 @@ class TemperatureController:
         Vmeas = rawAdc / pow(2, 15) * self.fullScaleVoltage
         # Convert the voltage into a resistance
         thermR = Vmeas / (self.voltageDividerVcc - Vmeas) * self.bedR
-        # Calculate the temperature from the resistance
-        bedTempKelvin = 1 / ((1 / self.thermistorTo) + (1 / self.thermistorBeta) * math.log(thermR / self.thermistorRo))
-        # Convert to Celsius and save
-        self.bedTempCelsius = bedTempKelvin - 273.15
-        # Handle the interference when the heater is on
-        if (self.bedHeaterOn):
-            self.bedTempCelsius = self.bedTempCelsius + self.bedTempAdjustment
+        # Only perform calculations if thermR is positive. Should only be negative if the thermistor isn't working at all
+        if thermR > 0:
+            # Calculate the temperature from the resistance
+            bedTempKelvin = 1 / ((1 / self.thermistorTo) + (1 / self.thermistorBeta) * math.log(thermR / self.thermistorRo))
+            # Convert to Celsius and save
+            self.bedTempCelsius = bedTempKelvin - 273.15
+            # Handle the interference when the heater is on
+            if (self.bedHeaterOn):
+                self.bedTempCelsius = self.bedTempCelsius + self.bedTempAdjustment
+        else:
+            # TODO: Possibly disable heaters if this happens
+            self.root.statusPrint("Error: bed thermR is negative")
         # Return value
         return self.bedTempCelsius
     #endregion

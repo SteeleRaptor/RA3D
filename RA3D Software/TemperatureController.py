@@ -43,8 +43,8 @@ class TemperatureController:
         self.COMP_QUE  = 0b11  # 0b11  = Disable comparator
 
         # Constants for temperature calculation
-        self.hotendR = 100000 # Hotend voltage divider resistor value
-        self.bedR    = 100000 # Bed voltage divider resistor value
+        self.hotendR = 9930 # Hotend voltage divider resistor value
+        self.bedR    = 99200 # Bed voltage divider resistor value
         self.voltageDividerVcc = 3.3
         self.thermistorBeta = 3950 # Beta value for the thermistors (Should be the same for both)
         self.thermistorRo = 100000 # Resistance of thermistors at room temp (Should be the same for both)
@@ -65,7 +65,7 @@ class TemperatureController:
         self.bedHeaterOn = False           # If the bed heater is turned on or not
         self.hotendTargetTemp = 0          # Target temperature for the hotend to heat up to
         self.bedTargetTemp = 0             # Target temperature for the bed to heat up to
-        self.hotendTempAdjustment = 3.25   # Adjustment amount to counter the interference from heater current #TODO: NEED TO FIND THIS VALUE STILL
+        self.hotendTempAdjustment = 18.83  # Adjustment amount to counter the interference from heater current
         self.bedTempAdjustment = 3.25      # Adjsutment amount to counter the interference from heater current
 
         # Set up the config register according to default values stated earlier

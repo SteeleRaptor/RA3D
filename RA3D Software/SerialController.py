@@ -274,13 +274,25 @@ class SerialController:
 
     # Returns a list of all COM ports with a device connected
     def getCOMPorts(self):
+        # Get a full list of all comm ports of device
         ports = list(serial.tools.list_ports.comports())
         returnList = []
+        # If there are no ports, report that
         if not ports:
             self.root.statusPrint("No serial ports w/ connected devices found")
+        # If not...
         else:
+            # Inform user of how many ports were found
             self.root.statusPrint(f"Found {len(ports)} connected device(s):")
+            # Iterate through all ports
             for port in ports:
+                # Print out information about the port
                 self.root.terminalPrint(f"Name: {port.device}\nDescription: {port.description}\nID: {port.hwid}\n\n")
+                # Check if the port is the GPIO serial port
+                if port.device == "/dev/ttyS0":
+                    # If so, continue to the next port
+                    self.root.terminalPrint("Not appending device to dropdown")
+                    continue
+                # Append the found port to the device list
                 returnList.append(port.device)
         return returnList

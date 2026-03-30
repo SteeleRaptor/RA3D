@@ -586,6 +586,12 @@ class PrintController:
 
     def syncOrigin(self):
         self.origin = self.root.armController.origin
+    #change recommened origin based on plate height
+    def changeRecommendedOrigin(self, PlateHeight):
+        self.recommendedOriginPosition.z = PlateHeight
+        #extract position to origin
+        self.recommendedOrigin = self.recommendedOriginPosition.toOrigin()
+        self.root.terminalPrint(f"Recommended origin set to {self.recommendedOrigin.getOrigin()}")
 
     #determines whether a position is within the boundaries of the printer
     #Get this functioning properly

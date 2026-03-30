@@ -18,11 +18,11 @@ class TkWindow(Tk):
         #Simply add to this dictionary to add a setting
         # "Display Name":("VariableName","Object")
         self.settingsDict = {
-            "Print speed (mm/s)": ("speed","PC"), #print controller
+            "Default Print speed (mm/s)": ("speed","PC"), #print controller
             "Acceleration": ("acceleration","PC"),
             "Decceleration": ("decceleration","PC"),
             "Ramp": ("ramp","PC"),
-            "Plate Height" : ("plateHeight","PC"),
+            "Default Plate Height" : ("plateHeight","PC"),
             "Ignore Flags" : ("ignoreFlags","PC"),
             "deg/mm": ("extruder_deg_per_mm","AC"),
             "Sync Print Parameters": ("syncWithPrintParameters","AC"), #arm controller
@@ -30,7 +30,7 @@ class TkWindow(Tk):
             "Print Debug Mode": ("PrintDebugMode", "self"),
             "Feedrate" : ("feedRate", "PC"),
             "Printing Timeout Extra": ("timeoutExtra","PC"),
-            "Hard code printer speed": ("hardCodePrinterSpeed","PC")
+            "Hard code printer speed to default": ("hardCodePrinterSpeed","PC")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
@@ -628,7 +628,7 @@ class TkWindow(Tk):
         #Move to Origin
         self.moveToOrigin = Button(self.originFrame, text="Move To Origin", command=self.armController.moveOrigin)
         self.moveToOrigin.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        self.moveToRecommendedOrigin = Button(self.originFrame, text="Move To Recomended Origin", command=self.armController.moveRecommendedOrigin)
+        self.moveToRecommendedOrigin = Button(self.originFrame, text="Move To Default Origin", command=self.armController.moveRecommendedOrigin)
         self.moveToRecommendedOrigin.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky=W)
 
         #Delta Origin
@@ -894,9 +894,9 @@ class TkWindow(Tk):
             currentValue = getattr(object,attr)
             self.currents[item].config(text=str(currentValue))
 
-        #Recreate move parameters
-        self.printController.defaultPrintParameters = MoveParameters(PC.speed,PC.acceleration,PC.decceleration,PC.ramp,PC.printOpenLoopControl,"m")
-
+        #Recreate parameters
+        PC.defaultPrintParameters = MoveParameters(PC.speed,PC.acceleration,PC.decceleration,PC.ramp,PC.printOpenLoopControl,"m")
+        PC.changeRecommendedOrigin(PC.plateHeight) #change origin with plate height
 
     #region main update function
     def update(self):

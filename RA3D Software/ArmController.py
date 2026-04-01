@@ -112,7 +112,7 @@ class ArmController:
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
 
         # Call the calibration update function
-        calibrationThread = threading.Thread(target=self.calibrateArm())
+        calibrationThread = threading.Thread(target=self.calibrateArm)
         calibrationThread.start()
         
 
@@ -592,7 +592,7 @@ class ArmController:
         if moveParameters is None:
             moveParameters = self.moveParameters
         J7 = extrudeRate*self.extruder_deg_per_mm
-        timeout = timeoutMultiplier*math.abs(extrudeRate)/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
+        timeout = timeoutMultiplier*abs(extrudeRate)/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
         if self.checkIfBusy(message="E7 extrude"):
             return
         command = MoveCommand("E7",None,moveParameters=moveParameters,J7=J7,J7Rel=relative)

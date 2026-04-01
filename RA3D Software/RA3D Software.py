@@ -28,7 +28,7 @@ class TkWindow(Tk):
             "Sync Print Parameters": ("syncWithPrintParameters","AC"), #arm controller
             "Debug Mode": ("DebugMode","self"),
             "Print Debug Mode": ("PrintDebugMode", "self"),
-            "Feedrate" : ("feedRate", "PC"),
+            "Current Gcode Feedrate" : ("feedRate", "PC"),
             "Printing Timeout Extra": ("timeoutExtra","PC"),
             "Hard code printer speed to default": ("hardCodePrinterSpeed","PC")
         }

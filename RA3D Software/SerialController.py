@@ -25,6 +25,7 @@ class SerialController:
         self.waiting_responses = set()
         self.sendingSerial = False#Keep track to send serial so a response is not sorted while sending
         self.Errors = ["Estop", "ER","EL"] #Error codes
+        self.ErrorRaised = False #Flag to indicate if an error was raised, used to stop waiting for responses if an error is raised
         #Everything that will not be processed if immediately received
         self.WaitToProcess = ["PO","TL","RE"] #currently these can only be 2 characters
 
@@ -160,17 +161,27 @@ class SerialController:
             for item in list(self.responseQueue.queue):
                 #if an error
                 if item in self.Errors:
-                    #set flag of printer
-                    self.root.printController.flag = item
-                    self.root.terminalPrint(f"Error {item} found after peeking ahead")
+                    
+                    
                     #remove item from queue
                     self.responseQueue.queue.remove(item)
+                    self.RaiseError(item)
                     return
                 if item[:2] not in self.WaitToProcess:
                     self.root.terminalPrint(item + " not in wait to process")
                     self.responseQueue.queue.remove(item)
                     self.sortResponse(item)
-       
+
+    #Raise Error from arm to notify other proceses 
+    def RaiseError(self, error):
+        #set flag of printer
+        self.root.printController.flag = error
+        self.root.terminalPrint(f"Error {error} occured")
+        self.ErrorRaised = True
+        time.sleep(2) #Allow other threads to process error
+        self.ErrorRaised = False
+        self.clearQueue() #Clear queue of any responses that may have come in during error
+        
     #Advances the response queue every .01 seconds    
     def processResponses(self):
         #exit this thread if serial is not connected
@@ -307,8 +318,8 @@ class SerialController:
         if timeout <= 0:
             print("timeout is negative or zero")
             timeout = 2
-        self.waiting_responses.add(uniqueCode) #TODO may need arm to return specific POS responses
-        while time.time() - start < timeout:
+        self.waiting_responses.add(uniqueCode)
+        while time.time() - start < timeout and self.ErrorRaised==False:
             try:
                 response = self.responseQueue.queue[0]#peek queue
                 if response.startswith(prefix):
@@ -318,6 +329,7 @@ class SerialController:
                     self.waiting_responses.discard(uniqueCode)
                     return response
             except (queue.Empty, IndexError):
+                time.sleep(0.01)
                 pass
         #Discard unique code because no longer waiting
         self.waiting_responses.discard(uniqueCode)

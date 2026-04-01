@@ -57,6 +57,7 @@ class TkWindow(Tk):
         self.armController = ArmController(self.root, self.serialController)
         self.printController = PrintController(self.root)
         self.temperatureController = TemperatureController(self.root)
+        self.printController = PrintController(self.root,self.armController)
 
         # Create and draw widgets onto the window
         self.createTabs()

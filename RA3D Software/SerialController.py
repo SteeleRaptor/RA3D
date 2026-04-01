@@ -317,7 +317,7 @@ class SerialController:
                     #Discard unique code because no longer waiting
                     self.waiting_responses.discard(uniqueCode)
                     return response
-            except queue.Empty, IndexError:
+            except (queue.Empty, IndexError):
                 pass
         #Discard unique code because no longer waiting
         self.waiting_responses.discard(uniqueCode)

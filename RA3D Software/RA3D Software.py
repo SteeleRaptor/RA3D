@@ -55,8 +55,6 @@ class TkWindow(Tk):
         # Instantiate objects for the various controller classes
         self.serialController = SerialController(self.root)
         self.armController = ArmController(self.root, self.serialController)
-        self.printController = PrintController(self.root)
-        self.temperatureController = TemperatureController(self.root)
         self.printController = PrintController(self.root,self.armController)
 
         # Create and draw widgets onto the window

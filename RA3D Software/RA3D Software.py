@@ -39,7 +39,7 @@ class TkWindow(Tk):
         #Debug modes off will NOT hide errors
 
         #Most cases for the blinking the LED should be shown by displaying a warning print
-        self.BlinkLED = True #Blink the LED when there is a problem
+        self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
         
         # Pin declaration for the LED

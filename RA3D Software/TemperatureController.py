@@ -64,6 +64,8 @@ class TemperatureController:
         self.bedHeaterOn = False           # If the bed heater is turned on or not
         self.hotendTargetTemp = 0          # Target temperature for the hotend to heat up to
         self.bedTargetTemp = 0             # Target temperature for the bed to heat up to
+        self.hotendTempHardLimit = 300     # Hard limit to not allow crossing over for the hotend
+        self.bedTempHardLimit = 100        # Hard limit to not allow crossing over for the bed
         self.hotendTempAdjustment = 18.83  # Adjustment amount to counter the interference from heater current
         self.bedTempAdjustment = 3.25      # Adjsutment amount to counter the interference from heater current
 
@@ -175,7 +177,13 @@ class TemperatureController:
         # Temperature control
         if (self.hotendTempCtrlEnabled):
             # Basic on/off implementation
-            if (self.hotendTempCelsius < self.hotendTargetTemp):
+            if (self.hotendTempCelsius > self.hotendTempHardLimit):
+                # If the hotend measurement is above the hard limit, force heater off and show error
+                self.root.warningPrint("Hotend exceeded hard limit")
+                self.disableHotendControl() # Disable hotend control for safety
+                self.hotendHeaterOn = False
+                GPIO.output(self.hotendPin, GPIO.LOW)
+            elif (self.hotendTempCelsius < self.hotendTargetTemp):
                 # Turn the hotend heater on
                 self.hotendHeaterOn = True
                 GPIO.output(self.hotendPin, GPIO.HIGH)
@@ -189,6 +197,12 @@ class TemperatureController:
 
         if (self.bedTempCtrlEnabled):
             # Basic on/off implementation
+            if (self.bedTempCelsius > self.bedTempHardLimit):
+                # If the bed temp is above the hard limit, force heater off and show error
+                self.root.warningPrint("Bed exceeded hard limit")
+                self.disableBedControl() # Disable bed control for safety
+                self.bedHeaterOn = False
+                GPIO.output(self.bedPin, GPIO.LOW)
             if (self.bedTempCelsius < self.bedTargetTemp):
                 # Turn the bed heater on
                 self.bedHeaterOn = True
@@ -213,7 +227,7 @@ class TemperatureController:
                 self.enableHotendControl()
                 self.root.hotendCtrlButton.config(relief="ridge")
                 #TODO: Temporarily just set target to whatever is in target box
-                self.hotendTargetTemp = float(self.root.hotendTarget.get())
+                self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
         elif (heater == "bed"):
             if (self.bedTempCtrlEnabled):
                 self.disableBedControl()
@@ -222,17 +236,24 @@ class TemperatureController:
                 self.enableBedControl()
                 self.root.bedCtrlButton.config(relief="ridge")
                 #TODO: Temporarily just set target to whatever is in target box
-                self.bedTargetTemp = float(self.root.bedTarget.get())
+                self.setBedTargetTemp(float(self.root.bedTarget.get()))
+
     # Used for setting a target temperature for the hotend
     def setHotendTargetTemp(self, targetTemp):
         if (targetTemp < 0):
             self.root.terminalPrint("Provided target temperature is less than zero (hotend)")
+            return
+        if (targetTemp > self.hotendTempHardLimit):
+            self.root.warningPrint(f"Hotend temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
+            return
         self.hotendTargetTemp = targetTemp
 
     # Used for setting a target temperature for the bed
     def setBedTargetTemp(self, targetTemp):
         if (targetTemp < 0):
             self.root.terminalPrint("Provided target temperature is less than zero (bed)")
+        if (targetTemp > self.bedTempHardLimit):
+            self.root.warningPrint(f"Bed temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
         self.bedTargetTemp = targetTemp
 
     # Enables temperature control for the hotend

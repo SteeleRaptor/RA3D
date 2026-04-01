@@ -986,7 +986,7 @@ class TkWindow(Tk):
         if self.printController.ignoreFlags:
             message2 = "\nPressing ok will resume movement"
         else:
-            message2 = "\nPrinting wil stop"
+            message2 = "\nPrinting will stop"
         #show message
         messagebox.showinfo("Warning! ", message+message2)
         self.statusPrint(message)

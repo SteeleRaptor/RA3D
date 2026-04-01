@@ -262,3 +262,11 @@ class TemperatureController:
         self.root.terminalPrint("Bed heater control disabled")
     
     #endregion
+
+    #region Printer Commands
+    # These functions are used for the print controller to check if target temperatures have been reached for the M109 and M190 gcode commands
+    def HotendTargetReached(self):
+        return self.hotendTempCelsius >= self.hotendTargetTemp
+    def BedTargetReached(self):
+        return self.bedTempCelsius >= self.bedTargetTemp
+    #endregion

@@ -36,6 +36,10 @@ class TkWindow(Tk):
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
         #Debug modes off will NOT hide errors
 
+        #Most cases for the blinking the LED should be shown by displaying a warning print
+        self.BlinkLED = True #Blink the LED when there is a problem
+        self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
+
         Tk.__init__(self)
         self.root = self
         # Set the window title
@@ -963,6 +967,7 @@ class TkWindow(Tk):
         self.terminalPrint(message)
 
     def warningPrint(self, message):
+        self.BlinkLED = True # Used to signal the update loop to start blinking the LED
         #Display a 2nd message based on ignoreflags
         message2 = ""
         if self.printController.ignoreFlags:
@@ -972,6 +977,7 @@ class TkWindow(Tk):
         #show message
         messagebox.showinfo("Warning! ", message+message2)
         self.statusPrint(message)
+        self.BlinkLED = False # Stop blinking the LED
 
     #endregion print functions
     #region popup

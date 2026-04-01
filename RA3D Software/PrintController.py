@@ -39,6 +39,11 @@ class PrintController:
         self.bufferBoundary = 10 # Warning pops up if this boundary is entered from the max boundaries
         self.bedCalibrateHeight = 50 #Height moved up for calibration
 
+
+        self.maxHotEndTempSetting = 300 #Max hotend temp that can be set from gcode
+        self.maxBedTempSetting = 120 #Max bed temp that can be set from gcode
+        
+        #Could add another safeguard within the temperatur controller
         #------End important variables-------
 
         #recomended Origin for move set at middle of calibration corners
@@ -98,7 +103,7 @@ class PrintController:
         self.checkFlag() #check flag to see if to continue printing
         
         #If the flag stopped the print, exit
-        if self.printing == False:
+        if self.printing == False or self.printPaused == True:
             self.root.printThreadStarted = False
             return
         
@@ -123,13 +128,13 @@ class PrintController:
             self.root.progressBar["value"] = (self.currentInstruction / len(self.gcodeLines)) * 100 # Update progress bar to match
             
             #Read gcode line and convert, handle rare messages inside
-            message = self.gcodeToTeensy(lineToConvert) # Convert line and updates printPos
+            message = self.interpretGcode(lineToConvert) # Convert line and updates printPos
         
         if self.root.PrintDebugMode:
             self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
         
         #region -----------Message Processing--------
-        #Common commands are handled here, rare commands handled inside gcodeToTeensy
+        #Common commands are handled here, rare commands handled inside interpretGcode
         if message == "":
             pass
         elif message[:5] == "Error": # If the point is blank, don't try to send a command
@@ -190,14 +195,15 @@ class PrintController:
             if self.flag is None:
                 self.root.armController.extrude(self.extrudeRate,moveParameters=moveParameters,timeoutMultiplier=2, RelativeExtrude = self.relativeExtrusion)
         else:
-            self.root.warningPrint("Unexpected message from gcodeToTeensy")
+            self.root.warningPrint("Unexpected message from interpretGcode")
         #endregion message handling
         
         #Signifies thread has ended to start next thread
         self.root.printThreadStarted = False #Do NOT return anywhere else in this function
 
     # Converts a GCode instruction to the instruction to send over serial
-    def gcodeToTeensy(self, lineToConvert):
+    # Manages rare gcode commands and updates the print position based on the gcode command
+    def interpretGcode(self, lineToConvert):
         #Assume extruderate will not be set
         self.extrudeRate = 0
 
@@ -215,10 +221,26 @@ class PrintController:
         elif lineToConvert == "M82":
             return "Error absolute extrusion not supported"
         #Temperature control command
+        #Set Hot End Temperature
         elif lineToConvert[:4] == "M104":
+            sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+            s = float(sMatch.group(1)) if sMatch else None
+            if s is not None and s >= 0 and s <= self.maxHotEndTempSetting:
+                self.temperatureController.setHotendTargetTemp(s)
             return ""
-        elif lineToConvert == "M109":
+        #Set Bed Temperature
+        elif lineToConvert[:4] == "M140":
+            sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
+            s = float(sMatch.group(1)) if sMatch else None
+            if s is not None and s >= 0 and s <= self.maxBedTempSetting:
+                self.temperatureController.setBedTargetTemp(s)
             return ""
+        #Wait for Hot End Temperature
+        elif lineToConvert[:4] == "M109":
+            while not self.temperatureController.HotendTargetReached():
+                time.sleep(1) # Wait for 1 second before checking again
+            return ""
+        
         # Actual instructions to convert
         elif lineToConvert[0:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]
@@ -422,6 +444,7 @@ class PrintController:
         self.root.cancelPrintButton.config(state="normal")
 
     def startPrint(self):
+        self.LEDon = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
         self.syncOrigin()#Get origin from arm controller
         if not self.origin.checkOriginSet():
             self.root.statusPrint("Origin not set, print cancelled")
@@ -432,10 +455,13 @@ class PrintController:
             self.root.warningPrint("Ignore flags is enabled\nFlags will be ignored. Disable in print controller")
         if not self.checkBoundaryTrue:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
+        
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
-            return
+            return #all other initialization ignored when resuming print
+        
+        self.currentInstruction = 0 # Reset the currentInstruction counter to start of file
         
         #Zero extruder axis used for measuring total filament used
         self.root.armController.zeroJ7()
@@ -444,18 +470,19 @@ class PrintController:
         self.flag = None
         self.root.serialController.clearQueue() #clear queue so it is not backed up
 
-        # When starting print, reset the "last*" parameters
-        print(self.origin.z, "test2")
+        
+        #print(self.origin.z, "test2")
         self.printPos.origin = self.origin
         self.printPos = self.origin.toPosition()
         #Last position starts at origin
         self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,90,0,self.origin)
-        print(self.lastPos.z)
+        #print(self.lastPos.z)
+
+        #Reset feedrate and extruderate
         self.lastF = 0.0
         self.lastE = 0.0
 
-        if not self.printPaused:
-            self.findStartBlock()#Find where the gcode insturctions actually start
+        self.findStartBlock()#Find where the gcode insturctions actually start
         self.printing = True
         self.root.statusPrint("Starting print...")
 
@@ -468,13 +495,15 @@ class PrintController:
         self.printLoop()
     
     def pausePrint(self):
+        self.LEDon = False # Turn off LED to signify print is paused
         self.root.terminalPrint("Pausing Print")
         self.printPaused = True
 
     def cancelPrint(self):
+        self.LEDon = False # Turn off LED to signify print is cancelled
         self.currentInstruction=0
         self.printing = False
-        self.printPaused = False
+        self.printPaused = False #If print was paused, it is no longer paused if it is cancelled
         self.root.statusPrint("Print cancelled")
         pass
 

@@ -444,8 +444,10 @@ class PrintController:
         self.root.cancelPrintButton.config(state="normal")
 
     def startPrint(self):
-        self.LEDon = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
+        
         self.syncOrigin()#Get origin from arm controller
+
+        #Check for problems that would prevent print from starting
         if not self.origin.checkOriginSet():
             self.root.statusPrint("Origin not set, print cancelled")
             return
@@ -456,6 +458,9 @@ class PrintController:
         if not self.checkBoundaryTrue:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
         
+        #Print starts here if no problems
+        self.root.LEDon = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
+
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
@@ -495,12 +500,12 @@ class PrintController:
         self.printLoop()
     
     def pausePrint(self):
-        self.LEDon = False # Turn off LED to signify print is paused
+        self.root.LEDon = False # Turn off LED to signify print is paused
         self.root.terminalPrint("Pausing Print")
         self.printPaused = True
 
     def cancelPrint(self):
-        self.LEDon = False # Turn off LED to signify print is cancelled
+        self.root.LEDon = False # Turn off LED to signify print is cancelled
         self.currentInstruction=0
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled

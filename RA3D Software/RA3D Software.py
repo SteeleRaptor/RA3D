@@ -2,7 +2,9 @@ from tkinter import *
 from tkinter import messagebox
 import tkinter.ttk as ttk
 import threading
+import time
 from datetime import datetime
+import RPi.GPIO as GPIO
 
 from SerialController import SerialController
 from ArmController import ArmController, MoveParameters
@@ -39,6 +41,13 @@ class TkWindow(Tk):
         #Most cases for the blinking the LED should be shown by displaying a warning print
         self.BlinkLED = True #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
+        
+        # Pin declaration for the LED
+        self.LEDPin = 36
+        # Initialize the GPIO
+        GPIO.setmode(GPIO.BOARD)
+        # Initialize the LED
+        GPIO.setup(self.LEDPin, GPIO.OUT)
 
         Tk.__init__(self)
         self.root = self
@@ -81,14 +90,16 @@ class TkWindow(Tk):
          # Set up a call to the update function after updateDelay milliseconds
         #updateThread = threading.Thread(target=self.update)
         #updateThread.start()
+        self.ledThread = threading.Thread(target=self.updateLED, daemon=True)
+        self.ledThread.start()
         self.update()
     #endregion init
 
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
-        # Call the temperatureController's shutdown function which releases its control on the GPIOs
-        self.temperatureController.shutdown()
+        # Release the GPIO pins from use
+        GPIO.cleanup()
         # Close the window
         self.root.destroy()
     #endregion
@@ -982,6 +993,28 @@ class TkWindow(Tk):
         self.BlinkLED = False # Stop blinking the LED
 
     #endregion print functions
+    #region LED Update Loop
+    def updateLED(self):
+        while True:
+            # LED Blinking takes priority over simple on/off
+            if self.BlinkLED:
+                # Check the current state of the LED
+                tempState = GPIO.input(self.LEDPin)
+                # Invert the state
+                if tempState == GPIO.HIGH:
+                    GPIO.output(self.LEDPin, GPIO.LOW)
+                else:
+                    GPIO.output(self.LEDPin, GPIO.HIGH)
+            # If the LEDOn flag is set, turn the LED on
+            elif self.LEDOn:
+                GPIO.output(self.LEDPin, GPIO.HIGH)
+            # If no flags are set, turn the LED off
+            else:
+                GPIO.output(self.LEDPin, GPIO.LOW)
+            # Use this to set blinking rate and how quickly the LED updates
+            time.sleep(0.25)
+
+    #endregion
     #region popup
     def createPostCalibration(self):
         # Create a new top-level window

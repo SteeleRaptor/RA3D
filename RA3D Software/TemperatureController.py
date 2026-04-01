@@ -24,7 +24,6 @@ class TemperatureController:
         self.hotendPin = 32
         self.bedPin = 33
         # GPIO Pin Initializations
-        GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.hotendPin, GPIO.OUT)
         GPIO.setup(self.bedPin, GPIO.OUT)        
 
@@ -70,11 +69,6 @@ class TemperatureController:
 
         # Set up the config register according to default values stated earlier
         self.setConfigReg()
-    #endregion
-
-    #region Program Shutdown Function
-    def shutdown(self):
-        GPIO.cleanup() # Release the GPIO pins from use
     #endregion
 
     #region ADC Control

@@ -41,6 +41,7 @@ class TkWindow(Tk):
         #Most cases for the blinking the LED should be shown by displaying a warning print
         self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
+        self.ledThreadRunning = True # Used to stop the LED thread
         
         # Pin declaration for the LED
         self.LEDPin = 36
@@ -98,6 +99,7 @@ class TkWindow(Tk):
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
+        self.ledThreadRunning = False
         # Release the GPIO pins from use
         GPIO.cleanup()
         # Close the window
@@ -995,7 +997,7 @@ class TkWindow(Tk):
     #endregion print functions
     #region LED Update Loop
     def updateLED(self):
-        while True:
+        while self.ledThreadRunning:
             # LED Blinking takes priority over simple on/off
             if self.BlinkLED:
                 # Check the current state of the LED

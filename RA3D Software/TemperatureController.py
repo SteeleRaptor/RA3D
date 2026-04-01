@@ -188,7 +188,7 @@ class TemperatureController:
             else:
                 # Turn the hotend heater off
                 self.hotendHeaterOn = False
-                GPIO.output(self.hoteendPin, GPIO.LOW)
+                GPIO.output(self.hotendPin, GPIO.LOW)
         else:
             # Drive the hotend signal low in case it is on when control flag disabled
             GPIO.output(self.hotendPin, GPIO.LOW)

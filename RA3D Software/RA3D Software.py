@@ -53,9 +53,10 @@ class TkWindow(Tk):
         self.geometry(f"{w}x{h}+{x}+{y}") # Set the width, height, x, and y values
         
         # Instantiate objects for the various controller classes
-        self.serialController = SerialController(self.root)
-        self.armController = ArmController(self.root, self.serialController)
-        self.printController = PrintController(self.root,self.armController)
+        self.serialController      = SerialController(self.root)
+        self.armController         = ArmController(self.root, self.serialController)
+        self.printController       = PrintController(self.root, self.armController)
+        self.temperatureController = TemperatureController(self.root)
 
         # Create and draw widgets onto the window
         self.createTabs()
@@ -234,6 +235,7 @@ class TkWindow(Tk):
         self.cornerLabel.grid(row=2, column=1, padx=5, pady=5, sticky=W)
         self.cancelAny = Button(self.bedCalibrationFrame, text= "Cancel Any", width=10, command=self.printController.cancelAny)
         self.cancelAny.grid(row=3, column=1, padx=5, pady=5, sticky=W+E)
+
         # ============= Credits Frame ===============
         self.creditsFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
         self.creditsFrame.grid(row=1,column=2,padx=5, pady=5, sticky=W+E+N+S)

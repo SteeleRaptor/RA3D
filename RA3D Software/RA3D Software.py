@@ -33,7 +33,8 @@ class TkWindow(Tk):
             "Current Gcode Feedrate" : ("feedRate", "PC"),
             "Printing Timeout Extra": ("timeoutExtra","PC"),
             "Hard code printer speed to default": ("hardCodePrinterSpeed","PC"),
-            "Solid LED": ("LEDOn","self")
+            "Solid LED": ("LEDOn","self"),
+            "Heated Filament Multiplier": ("heatedFilamentMultiplier","PC")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
@@ -918,6 +919,7 @@ class TkWindow(Tk):
         #Recreate parameters
         PC.defaultPrintParameters = MoveParameters(PC.speed,PC.acceleration,PC.decceleration,PC.ramp,PC.printOpenLoopControl,"m")
         PC.changeRecommendedOrigin(PC.plateHeight) #change origin with plate height
+        PC.extruder_deg_per_mm = PC.extruder_deg_per_mm_cool * PC.heatedFilamentMultiplier
 
     #region main update function
     def update(self):

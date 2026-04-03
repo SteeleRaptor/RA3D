@@ -22,18 +22,18 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 268.5 #Change bed height relative to pen
+        self.plateHeight = 269 #Change bed height relative to pen
         #boundarys for corner calibration/setting recommended origin
-        YEdge = [-80,80]
-        XEdge = [250,400]
+        YEdge = [-100,100]
+        XEdge = [300,500]
 
-        self.hardCodePrinterSpeed = True #Will obey the print parameters and not the gcode feed rate
+        self.hardCodePrinterSpeed = False #Will obey the print parameters and not the gcode feed rate
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
         
         #TODO These might be changed to reflect xedge, yedge
         #Boundaries to stop printing
         #Placeholder boundaries, should be adjusted
-        self.maxBoundaryX = [200,500]
+        self.maxBoundaryX = [270,530]
         self.maxBoundaryY = [-130,130]
         self.maxBoundaryZ = [250,900]
         self.bufferBoundary = 10 # Warning pops up if this boundary is entered from the max boundaries
@@ -462,7 +462,7 @@ class PrintController:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
         
         #Print starts here if no problems
-        self.root.LEDon = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
+        self.root.LEDOn = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
 
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
@@ -503,12 +503,12 @@ class PrintController:
         self.printLoop()
     
     def pausePrint(self):
-        self.root.LEDon = False # Turn off LED to signify print is paused
+        self.root.LEDOn = False # Turn off LED to signify print is paused
         self.root.terminalPrint("Pausing Print")
         self.printPaused = True
 
     def cancelPrint(self):
-        self.root.LEDon = False # Turn off LED to signify print is cancelled
+        self.root.LEDOn = False # Turn off LED to signify print is cancelled
         self.currentInstruction=0
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled

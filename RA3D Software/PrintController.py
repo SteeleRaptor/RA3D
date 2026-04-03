@@ -479,7 +479,7 @@ class PrintController:
         
         #print(self.origin.z, "test2")
         self.printPos.origin = self.origin
-        self.printPos = self.origin.toPosition()
+        self.printPos = self.origin.toPosition(angle=self.defaultAngle) #Reset print position to origin
         #Last position starts at origin
         self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,self.defaultAngle,0,self.origin)
         #print(self.lastPos.z)

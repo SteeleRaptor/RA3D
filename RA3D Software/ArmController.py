@@ -1091,7 +1091,7 @@ class ArmController:
         if self.origin.checkOriginSet():
             moveParameters = copy.deepcopy(self.defaultMoveParameters)
             moveParameters.wrist = "N" #Make wrist condition J4 near 0
-            self.sendMJ(Position(self.origin.x,self.origin.y,self.origin.z,0,90,0, None), moveParameters=moveParameters)
+            self.sendMJ(Position(self.origin.x,self.origin.y,self.origin.z,0,self.root.printController.defaultAngle,0, None), moveParameters=moveParameters)
 
 
     #Updates UI display of UI from origin, called whenever a position is received
@@ -1110,7 +1110,7 @@ class ArmController:
         self.root.zDeltaOrigin.config(text=deltaZ)
 
     def moveRecommendedOrigin(self):
-        self.sendMJ(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters)
+        threading.Thread(target=self.sendMJ, args=(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters)).start()
 
     #endregion origin
 

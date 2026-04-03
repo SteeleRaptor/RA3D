@@ -78,7 +78,7 @@ class ArmController:
 
         #Extruder variables
         self.extruder_deg_per_mm_cool = 10.90909
-        self.heatedFilamentMultiplier = 2 #multiplier for extrusion when filament is heated, determined experimentally
+        self.heatedFilamentMultiplier = 0.7 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
 
     #endregion init

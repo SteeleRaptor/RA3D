@@ -286,7 +286,7 @@ class TemperatureController:
     #region Printer Commands
     # These functions are used for the print controller to check if target temperatures have been reached for the M109 and M190 gcode commands
     def HotendTargetReached(self):
-        if self.hotendTempCelsisus > self.minExtrusionTemp:
+        if self.hotendTempCelsius > self.minExtrusionTemp:
             return self.hotendTempCelsius >= self.hotendTargetTemp-self.targetTolerance
         else:
             return False

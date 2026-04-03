@@ -926,7 +926,7 @@ class TkWindow(Tk):
         # ==========| PrintController |==========
         #Each print loop runs in the thread so that it can "wait" and not halt the UI
         if self.printController.printing and not self.printThreadStarted and not self.printController.printPaused:
-            if self.printController.HotEndTargetReached:
+            if self.printController.HotendTargetReached():
                 self.statusPrint("Hotend target temperature reached, starting print")
                 printThread = threading.Thread(target=self.printController.printLoop)
                 printThread.start()

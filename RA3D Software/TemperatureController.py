@@ -67,8 +67,13 @@ class TemperatureController:
         self.hotendTempHardLimit = 300     # Hard limit to not allow crossing over for the hotend
         self.bedTempHardLimit = 100        # Hard limit to not allow crossing over for the bed
         self.hotendTempAdjustment = 18.83  # Adjustment amount to counter the interference from heater current
-        self.bedTempAdjustment = 3.25      # Adjsutment amount to counter the interference from heater current
+        self.bedTempAdjustment = 3.25      # Adjustment amount to counter the interference from heater current
+        self.targetTolerance = 3           # Tolerance for target temperature in degrees Celsius. 
 
+        #Used so that room temperature is not considered an acceptable temperature for extrusion,
+        #which could cause damage to the extruder if it attempted to extrude without the hotend heating up first
+        self.minExtrusionTemp = 170        # Minimum hotend temperature for extrusion of any plastic to occur
+        
         # Set up the config register according to default values stated earlier
         self.setConfigReg()
     #endregion
@@ -281,7 +286,11 @@ class TemperatureController:
     #region Printer Commands
     # These functions are used for the print controller to check if target temperatures have been reached for the M109 and M190 gcode commands
     def HotendTargetReached(self):
-        return self.hotendTempCelsius >= self.hotendTargetTemp-3
+        if self.hotendTempCelsisus > self.minExtrusionTemp:
+            return self.hotendTempCelsius >= self.hotendTargetTemp-self.targetTolerance
+        else:
+            return False
     def BedTargetReached(self):
-        return self.bedTempCelsius >= self.bedTargetTemp-3
+        return self.bedTempCelsius >= self.bedTargetTemp-self.targetTolerance
+    
     #endregion

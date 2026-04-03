@@ -32,7 +32,8 @@ class TkWindow(Tk):
             "Print Debug Mode": ("PrintDebugMode", "self"),
             "Current Gcode Feedrate" : ("feedRate", "PC"),
             "Printing Timeout Extra": ("timeoutExtra","PC"),
-            "Hard code printer speed to default": ("hardCodePrinterSpeed","PC")
+            "Hard code printer speed to default": ("hardCodePrinterSpeed","PC"),
+            "Solid LED": ("LEDOn","self")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
@@ -58,7 +59,7 @@ class TkWindow(Tk):
         # self.attributes('-topmost', True)
         self.updateDelay = 150 # Delay between update function calls in milliseconds
         # Set the window dimensions and position on screen
-        w = 1200 # Window width
+        w = 1400 # Window width
         h = 600 # Window height
         ws = self.winfo_screenwidth() # Get screen width
         hs = self.winfo_screenheight() # Get screen height

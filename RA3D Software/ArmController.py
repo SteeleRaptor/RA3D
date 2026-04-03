@@ -1212,7 +1212,7 @@ class Origin:
     #Positions origin is itself so the relative coordinate should be 0,0,0
     def toPosition(self):
         origin = copy.deepcopy(self)
-        pos = Position(self.x,self.y,self.z,0,90,0,origin) #standard R position
+        pos = Position(self.x,self.y,self.z,0,self.root.printController.defaultAngle,0,origin) #standard R position
         return pos
     
 class MoveParameters:

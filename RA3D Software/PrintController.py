@@ -35,7 +35,7 @@ class PrintController:
         #Placeholder boundaries, should be adjusted
         self.maxBoundaryX = [200,500]
         self.maxBoundaryY = [-130,130]
-        self.maxBoundaryZ = [290,800]
+        self.maxBoundaryZ = [250,900]
         self.bufferBoundary = 10 # Warning pops up if this boundary is entered from the max boundaries
         self.bedCalibrateHeight = 50 #Height moved up for calibration
 
@@ -224,6 +224,7 @@ class PrintController:
         #Temperature control command
         #Set Hot End Temperature
         elif lineToConvert[:4] == "M104":
+            return ""
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxHotEndTempSetting:
@@ -231,6 +232,7 @@ class PrintController:
             return ""
         #Set Bed Temperature
         elif lineToConvert[:4] == "M140":
+            return ""
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxBedTempSetting:

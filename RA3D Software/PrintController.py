@@ -226,18 +226,18 @@ class PrintController:
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxHotEndTempSetting:
-                self.temperatureController.setHotendTargetTemp(s)
+                self.root.temperatureController.setHotendTargetTemp(s)
             return ""
         #Set Bed Temperature
         elif lineToConvert[:4] == "M140":
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxBedTempSetting:
-                self.temperatureController.setBedTargetTemp(s)
+                self.root.temperatureController.setBedTargetTemp(s)
             return ""
         #Wait for Hot End Temperature
         elif lineToConvert[:4] == "M109":
-            while not self.temperatureController.HotendTargetReached():
+            while not self.root.temperatureController.HotendTargetReached():
                 time.sleep(1) # Wait for 1 second before checking again
             return ""
         

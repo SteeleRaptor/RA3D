@@ -588,6 +588,9 @@ class ArmController:
     #For extrusion without movement
     #timeoutMultiplier is how much extra time per expected second is needed
     def extrude(self,extrudeRate,moveParameters=None,relative=True,timeoutMultiplier=3):
+        if not self.root.temperatureController.HotendTargetReached():
+            self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
+            return
         timeoutMin = 8 #minimum timeout
         if moveParameters is None:
             moveParameters = self.moveParameters

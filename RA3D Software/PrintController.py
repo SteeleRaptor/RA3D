@@ -22,7 +22,7 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 316 #Change bed height relitive to pen
+        self.plateHeight = 268.5 #Change bed height relative to pen
         #boundarys for corner calibration/setting recommended origin
         YEdge = [-80,80]
         XEdge = [250,400]
@@ -43,11 +43,12 @@ class PrintController:
         self.maxHotEndTempSetting = 300 #Max hotend temp that can be set from gcode
         self.maxBedTempSetting = 120 #Max bed temp that can be set from gcode
         
+        self.backlashAngleOffset = 5.55 #offset to account for backlash
         #Could add another safeguard within the temperatur controller
         #------End important variables-------
-
+        self.defaultAngle = 90 - self.backlashAngleOffset
         #recomended Origin for move set at middle of calibration corners
-        self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,90,0,None)
+        self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,self.backlashAngleOffset,0,None)
         #extract position to origin
         self.recommendedOrigin = self.recommendedOriginPosition.toOrigin()
         
@@ -55,10 +56,10 @@ class PrintController:
         self.origin = self.recommendedOrigin
 
         # Calibration corners
-        FLCorner = Position(XEdge[1],YEdge[0],self.plateHeight,0,90,0,None)
-        FRCorner = Position(XEdge[1],YEdge[1],self.plateHeight,0,90,0,None)
-        BLCorner = Position(XEdge[0],YEdge[0],self.plateHeight,0,90,0,None)
-        BRCorner = Position(XEdge[0],YEdge[1],self.plateHeight,0,90,0,None)
+        FLCorner = Position(XEdge[1],YEdge[0],self.plateHeight,0,self.backlashAngleOffset,0,None)
+        FRCorner = Position(XEdge[1],YEdge[1],self.plateHeight,0,self.backlashAngleOffset,0,None)
+        BLCorner = Position(XEdge[0],YEdge[0],self.plateHeight,0,self.backlashAngleOffset,0,None)
+        BRCorner = Position(XEdge[0],YEdge[1],self.plateHeight,0,self.backlashAngleOffset,0,None)
 
         #corners are absolute relative to the physical structure
         #but z values will update to be the same as origin if the origin is changed in the UI
@@ -312,7 +313,7 @@ class PrintController:
                 if self.axis5:
                     self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
                 else:
-                    self.printPos.SetRelative(x,y,z,0,90,0)
+                    self.printPos.SetRelative(x,y,z,0,self.backlashAngleOffset,0)
            
             
             
@@ -480,7 +481,7 @@ class PrintController:
         self.printPos.origin = self.origin
         self.printPos = self.origin.toPosition()
         #Last position starts at origin
-        self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,90,0,self.origin)
+        self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,self.backlashAngleOffset,0,self.origin)
         #print(self.lastPos.z)
 
         #Reset feedrate and extruderate

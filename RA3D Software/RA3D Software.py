@@ -39,6 +39,8 @@ class TkWindow(Tk):
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
         #Debug modes off will NOT hide errors
 
+        self.coolendMode = False #use for testing the arm and extrusion without requiring the hotend to be at temperature
+
         #Most cases for the blinking the LED should be shown by displaying a warning print
         self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
@@ -463,6 +465,7 @@ class TkWindow(Tk):
         self.J5LimState = Label(self.limitTestFrame, text="x")
         self.J6LimLabel = Label(self.limitTestFrame, text="J6:")
         self.J6LimState = Label(self.limitTestFrame, text="x")
+        
         # Display the widgets
         self.J1LimLabel.grid(row=1, column=0)
         self.J1LimState.grid(row=1, column=1)

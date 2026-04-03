@@ -463,7 +463,7 @@ Matrix4x4 Robot_BaseFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 /// Custom robot tool (tool frame, end of arm tool or TCP)
 // IMPORTANT for proper rotation around the hot end these must be set up correctly. There is a inverse kinematic
 // document to calculate this matrix. Added rotations to this matrix doesn't seem to have an effect.
-Matrix4x4 Robot_ToolFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+Matrix4x4 Robot_ToolFrame = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 23.147, 40, 0, 1 };
 //Matrix4x4 Robot_ToolFrame = { 0, 0, 1, 22.39, 0, 1, 0, 0, -1, 0, 0, 40, 0, 0, 0, 1 };
 
 /// Robot parameters

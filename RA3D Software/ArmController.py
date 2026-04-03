@@ -25,7 +25,7 @@ class ArmController:
         self.calJStage2 = [0, 0, 0, 1, 1, 1] # J4, J5, & J6 calibration in Stage 2
 
         # Speed parameters used for movement commands
-        self.defaultMoveParameters = MoveParameters(80,10,10,30,0,'p')
+        self.defaultMoveParameters = MoveParameters(20,10,10,30,0,'p')
         self.moveParameters = copy.deepcopy(self.defaultMoveParameters)
         self.syncWithPrintParameters = False #Sync basic movements(not all) with the print parameters
         #Movements not affected include move safe move home move origin and jogs
@@ -397,7 +397,8 @@ class ArmController:
             self.root.statusPrint("Arm is busy with something else at the moment")
             return
         self.root.statusPrint("Beginning arm calibration")
-        self.calibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
+        specificCalibrationThread = threading.Thread(target=self.calibrateJoints, kwargs={"calJ1":calJ1,"calJ2":calJ2, "calJ3":calJ3, "calJ4":calJ4, "calJ5":calJ5, "calJ6":calJ6}).start()
+        specificCalibrationThread.start()
 
     #getxyz
     #TODO add request posistion before setting

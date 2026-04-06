@@ -131,7 +131,7 @@ class TkWindow(Tk):
         # Add the tabs to the notebook
         self.notebook.add(self.printTab, text="Printing")
         self.notebook.add(self.armTab, text="Arm Control")
-        self.notebook.add(self.toolTab, text="Tool (Hot End)")
+        self.notebook.add(self.toolTab, text="Extruder")
         self.notebook.add(self.debugTab, text="Debug")
         self.notebook.add(self.settingsTab, text="Settings")
         # Call the various functions for creating the widgets in each tab
@@ -676,6 +676,9 @@ class TkWindow(Tk):
         self.zDeltaOrigin.grid(row=3, column=5, padx=5, pady=5)
 
     def fillToolTab(self):
+        # The tool jog frame is buggy and not currently useful so it has been commented out
+        # Still here in case we want to use it in the future
+        '''        
         # ===Tool jog frame===
         self.toolJogFrame = Frame(self.toolTab, highlightthickness=2, highlightbackground="#000000")
         self.toolJogFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+N+E+S)
@@ -711,7 +714,7 @@ class TkWindow(Tk):
         self.toolJogSetZ.grid(row=1, column=2, padx=5, pady=5)
         self.toolJogSetRz.grid(row=2, column=0, padx=5, pady=5)
         self.toolJogSetRy.grid(row=2, column=1, padx=5, pady=5)
-        self.toolJogSetRx.grid(row=2, column=2, padx=5, pady=5)
+        self.toolJogSetRx.grid(row=2, column=2, padx=5, pady=5)'''
         # ========= Extruder Frame ===========
         self.extruderFrame = Frame(self.toolTab, highlightthickness=2, highlightbackground="#000000")
         self.extruderFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+N+E+S)
@@ -729,11 +732,11 @@ class TkWindow(Tk):
         self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament)
         self.unloadButton.grid(row=4, column=0,padx=(0, 5), pady=5)
         self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
-        self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
+        self.zeroJ7Button.grid(row=5,column=1,padx=(0, 5), pady=5)
         self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")
-        self.currentJ7Label2.grid(row=3,column=0, padx=5, pady=5, sticky=N+S)
+        self.currentJ7Label2.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
         self.currentJ72 = Label(self.extruderFrame,text="0 mm")
-        self.currentJ72.grid(row=3,column=1, padx=5, pady=5, sticky=N+S)
+        self.currentJ72.grid(row=7,column=1, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):

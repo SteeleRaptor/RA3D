@@ -613,14 +613,24 @@ class ArmController:
         if self.checkIfBusy(message="Load Filament"):
             return
         self.root.statusPrint("Loading filament...")
-        loadThread = threading.Thread(target=self.extrude, args=[self.loadLength], kwargs={"timeoutMultiplier":5})
+        #Adjusted based on multiplier because the length is cool not heated length
+        if not self.root.coolendMode:
+            lengthToLoad = self.loadLength/self.heatedFilamentMultiplier
+        else:
+            lengthToLoad = self.loadLength
+        loadThread = threading.Thread(target=self.extrude, args=[lengthToLoad], kwargs={"timeoutMultiplier":5})
         loadThread.start()
 
     def unloadFilament(self):
         if self.checkIfBusy(message="Unload Filament"):
             return
         self.root.statusPrint("Unloading filament...")
-        unloadThread = threading.Thread(target=self.extrude, args=[-self.loadLength], kwargs={"timeoutMultiplier":5,"moveParameters":self.unloadParameters})
+         #Adjusted based on multiplier because the length is cool not heated length
+        if not self.root.coolendMode:
+            lengthToLoad = self.loadLength/self.heatedFilamentMultiplier
+        else:
+            lengthToLoad = self.loadLength
+        unloadThread = threading.Thread(target=self.extrude, args=[-lengthToLoad], kwargs={"timeoutMultiplier":5,"moveParameters":self.unloadParameters})
         unloadThread.start()
 
     def extrudeButton(self):
@@ -782,9 +792,9 @@ class ArmController:
         if self.root.temperatureController.HotendTargetReached():
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.printController.flag = "Hotend target temperature not reached"
-            J7 = extrudeRate*self.extruder_deg_per_mm
             return
         
+        J7 = extrudeRate*self.extruder_deg_per_mm #convert from mm to deg
         # Create the command
         command = MoveCommand("ML",pos, moveParameters, J7=J7, J7Rel=RelativeExtrude)
         #self.root.terminalPrint(str(command)[0:-2])
@@ -873,10 +883,6 @@ class ArmController:
         self.root.serialController.sendSerial("HM\n")
         self.waitForResponseAndProcess("POSHM",30,message="Move Home",setFlag=True)
         self.awaitingMoveResponse = False
-
-      
-        
-    
     
     #endregion move commands
     

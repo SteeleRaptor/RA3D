@@ -25,15 +25,15 @@ class PrintController:
         self.plateHeight = 264 #Change bed height relative to pen
         self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
+        #These boundaries are for better printing
         YEdge = [-100,100] #These values were adjusted carefully, should not change
         XEdge = [300,500]
 
         self.hardCodePrinterSpeed = False #Will obey the print parameters and not the gcode feed rate
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
         
-        #TODO These might be changed to reflect xedge, yedge
         #Boundaries to stop printing
-        #Placeholder boundaries, should be adjusted
+        #These boundaries are to prevent dangeous movement
         self.maxBoundaryX = [270,530]
         self.maxBoundaryY = [-130,130]
         self.maxBoundaryZ = [250,900]
@@ -130,6 +130,7 @@ class PrintController:
             #Read gcode line and convert, handle rare messages inside
             message = self.interpretGcode(lineToConvert) # Convert line and updates printPos
         
+        #Display gcode lines for debugging
         if self.root.PrintDebugMode:
             self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
         
@@ -141,17 +142,14 @@ class PrintController:
             self.root.warningPrint("Error printing "+ message)
             if not self.ignoreFlags:
                 self.pausePrint()
-        # TODO: Add waiting for temperature to heat up from M104/M109 commands
         # TODO: Add ability to home one axis
         elif message[:4] == "Home":
             self.root.armController.moveHome()
-            #TODO check to see if home printer only happens at beginning of gcode
+            #TODO check to see if home printer only happens at beginning of gcode for 5 axis printing
             #When we combine 2 gcodes the 2nd one cannot move origin
-            #self.root.armController.moveOrigin() #Use normal wrist condition
-            self.justMovedHome = True
-            #move
+            self.justMovedHome = True #For better wrist condition after moving from home position
         elif message == "Success":
-            #TODO add method that on each layer or when turn hazard encountered,
+            #TODO when turn hazard encountered,
             # printer moves home than to position with normal wrist condition
             #Execute move command
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
@@ -185,6 +183,7 @@ class PrintController:
             
             #must be last thing to do, copy last position
             self.lastPos = copy.deepcopy(self.printPos)
+
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
             
@@ -218,12 +217,14 @@ class PrintController:
             return ""
         elif lineToConvert == "\n": # Line is newline
             return "" # Don't convert
-        elif lineToConvert == "M83":
-            self.root.terminalPrint("Using relative Extrusion")
+        #Relative Extrusion
+        elif lineToConvert[:3] == "M83":
+            self.root.terminalPrint("Using relative extrusion")
             self.relativeExtrusion = True
             return ""
-        elif lineToConvert == "M82":
-            self.root.terminalPrint("Using absolute Extrusion")
+        #Absolute Extrusion
+        elif lineToConvert[:3] == "M82":
+            self.root.terminalPrint("Using absolute extrusion")
             self.relativeExtrusion = False
             return ""
         #Temperature control command
@@ -234,8 +235,8 @@ class PrintController:
             if s is not None and s >= 0 and s <= self.maxHotEndTempSetting:
                 self.root.temperatureController.setHotendTargetTemp(s)
                 self.root.temperatureController.enableHotendControl()
-                
             return ""
+        
         #Set Bed Temperature
         elif lineToConvert[:4] == "M140":
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
@@ -244,6 +245,7 @@ class PrintController:
                 self.root.temperatureController.setBedTargetTemp(s+10)
                 self.root.temperatureController.enableBedControl()
             return ""
+        
         #Wait for Hot End Temperature
         elif lineToConvert[:4] == "M109":
             while not self.root.temperatureController.HotendTargetReached():
@@ -255,15 +257,17 @@ class PrintController:
                 time.sleep(1) # Wait for 1 second before checking again
             return ""
         # Actual instructions to convert
-        elif lineToConvert[0:3] == "G28": # Home the printer
+        elif lineToConvert[:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]
-        elif lineToConvert[0:3] == "G90": # Absolute positioning
+        elif lineToConvert[:3] == "G90": # Absolute positioning
+            self.relativePositioning = False
             self.root.terminalPrint("Using absolute positioning")
-            # TODO: This needs handling or removal
             return ""
-        elif lineToConvert[0:3] == "G91":
-
-            return "Error relative positioning not supported"
+        elif lineToConvert[:3] == "G91":
+            self.relativePositioning = True
+            self.root.terminalPrint("Using relative positioning")
+            return ""
+        #Zero extruder axis
         elif lineToConvert == "G92 E0\n":
             self.root.armController.zeroJ7()
         #wait
@@ -289,14 +293,25 @@ class PrintController:
                 u = None
                 v = None
             
-            #Coordinates here are RELATIVE
+            #Coordinates here are RELATIVE to the origin
+            #Absolute positiong
+            
             x = float(xMatch.group(1)) if xMatch else None
             y = float(yMatch.group(1)) if yMatch else None
             z = float(zMatch.group(1)) if zMatch else None
+            #Relative positioning
+            if self.relativePositioning:
+                if x is not None:
+                    x += self.lastPos.GetRelativeX()
+                if y is not None:
+                    y += self.lastPos.GetRelativeY()
+                if z is not None:
+                    z += self.lastPos.GetRelativeZ()
 
             #Adjust for change
             z = z - self.dropHeight
             z = max(z,0) #don't allow negative z values
+
             #print("z read:", z)
             f = float(fMatch.group(1)) if fMatch else None
             e = float(eMatch.group(1)) if eMatch else None
@@ -313,7 +328,10 @@ class PrintController:
                     u +=-90 #may add instead of subtract
                     #TODO I think u is elevation and v azimuth, need to check
                     Rz,Ry,Rx = self.aer_to_euler_zyx(v,u,0) # 3 options for transformation
+
             NoMove = False #For some commands they only specify E
+
+    
             if x == None and y==None and z==None:
                 NoMove = True
                 self.printPos=copy.deepcopy(self.lastPos)
@@ -332,9 +350,8 @@ class PrintController:
                 else:
                     self.printPos.SetRelative(x,y,z,0,self.defaultAngle,0)
            
-            
-            
             #Do not extrude if not told to
+            #Handle If E or F or both are missing
             if not NoMove:
                 if e == None:
                     e = 0
@@ -349,22 +366,17 @@ class PrintController:
             elif f == None:
                 self.extrudeRate = e
                 return "Extrusion only"
-        
 
             atBoundary = False
-            #If values are part boundaries set to be at boundaries
+            #If values are past max boundaries set to be at boundaries
             if self.checkBoundaryTrue:
-                if self.printPos.y > self.maxBoundaryY[1]:
-                    self.printPos.y = self.maxBoundaryY[1]-1
+                if self.printPos.y > self.YEdge[1]:
                     atBoundary = True
-                if self.printPos.y < self.maxBoundaryY[0]:
-                    self.printPos.y = self.maxBoundaryY[0]+1
+                if self.printPos.y < self.YEdge[0]:
                     atBoundary = True
-                if self.printPos.x > self.maxBoundaryX[1]:
-                    self.printPos.x = self.maxBoundaryX[1]-1
+                if self.printPos.x > self.XEdge[1]:
                     atBoundary = True
-                if self.printPos.x < self.maxBoundaryX[0]:
-                    self.printPos.x = self.maxBoundaryX[0]+1
+                if self.printPos.x < self.XEdge[0]:
                     atBoundary = True
                 if atBoundary:
                     self.root.terminalPrint("Warning moving/printing at boundaries, print will continue")
@@ -389,7 +401,6 @@ class PrintController:
                 self.root.warningPrint("Moving of bounds")
                 return "Error moving out of bounds"
         else:
-            pass
             if not self.ignoreFlags:
                 return "Error unrecognized gcode line"
     
@@ -643,7 +654,6 @@ class PrintController:
         self.root.terminalPrint(f"Recommended origin set to {self.recommendedOrigin.getOrigin()}")
 
     #determines whether a position is within the boundaries of the printer
-    #Get this functioning properly
     def checkBoundary(self, pos):
         # check whether position is within buffer boundary, if so print warning
         if pos.x < self.maxBoundaryX[0] or pos.x > self.maxBoundaryX[1]:

@@ -26,8 +26,8 @@ class PrintController:
         self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
-        YEdge = [-100,100] #These values were adjusted carefully, should not change
-        XEdge = [300,500]
+        self.YEdge = [-100,100] #These values were adjusted carefully, should not change
+        self.XEdge = [300,500]
 
         self.hardCodePrinterSpeed = False #Will obey the print parameters and not the gcode feed rate
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
@@ -49,7 +49,7 @@ class PrintController:
         #------End important variables-------
         self.defaultAngle = 90 - self.backlashAngleOffset
         #recomended Origin for move set at middle of calibration corners
-        self.recommendedOriginPosition = Position((XEdge[0]+XEdge[1])/2,0,self.plateHeight,0,self.defaultAngle,0,None)
+        self.recommendedOriginPosition = Position((self.XEdge[0]+self.XEdge[1])/2,0,self.plateHeight,0,self.defaultAngle,0,None)
         #extract position to origin
         self.recommendedOrigin = self.recommendedOriginPosition.toOrigin()
         
@@ -57,10 +57,10 @@ class PrintController:
         self.origin = self.recommendedOrigin
 
         # Calibration corners
-        FLCorner = Position(XEdge[1],YEdge[0],self.plateHeight,0,self.defaultAngle,0,None)
-        FRCorner = Position(XEdge[1],YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
-        BLCorner = Position(XEdge[0],YEdge[0],self.plateHeight,0,self.defaultAngle,0,None)
-        BRCorner = Position(XEdge[0],YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
+        FLCorner = Position(self.XEdge[1],self.YEdge[0],self.plateHeight,0,self.defaultAngle,0,None)
+        FRCorner = Position(self.XEdge[1],self.YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
+        BLCorner = Position(self.XEdge[0],self.YEdge[0],self.plateHeight,0,self.defaultAngle,0,None)
+        BRCorner = Position(self.XEdge[0],self.YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
 
         #corners are absolute relative to the physical structure
         #but z values will update to be the same as origin if the origin is changed in the UI

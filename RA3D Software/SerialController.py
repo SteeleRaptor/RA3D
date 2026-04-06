@@ -161,9 +161,8 @@ class SerialController:
             for item in list(self.responseQueue.queue):
                 #if an error
                 if item in self.Errors:
-                    
-                    
                     #remove item from queue
+                    self.sortResponse(item)
                     self.responseQueue.queue.remove(item)
                     self.RaiseError(item)
                     return

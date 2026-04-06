@@ -22,7 +22,8 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 269 #Change bed height relative to pen
+        self.plateHeight = 264 #Change bed height relative to pen
+        self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         YEdge = [-100,100]
         XEdge = [300,500]
@@ -80,6 +81,7 @@ class PrintController:
         
         self.justMovedHome = False
         self.relativeExtrusion = True
+        self.relativePositioning = False #default is abosolute positioning
 
         self.selectedFilepath = None
         self.gcodeLines = []
@@ -114,10 +116,7 @@ class PrintController:
             #check if at end of file
             if self.currentInstruction > len(self.gcodeLines) - 1:
                 self.root.statusPrint("End of program reached")
-                self.currentInstruction = 0
-                self.printing = False
-                #Move Home when complete
-                self.root.armController.moveHome()
+                self.endPrint() #Do any necessary processes to end the print
                 message = ""
                 break
             
@@ -188,11 +187,15 @@ class PrintController:
             self.lastPos = copy.deepcopy(self.printPos)
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
-            moveParameters = copy.deepcopy(self.defaultPrintParameters)
+            
             if self.feedRate != None and self.feedRate != 0:
+                moveParameters = copy.deepcopy(self.defaultPrintParameters)
                 moveParameters.speedType = "m"
                 #Conver to mm/s from mm/min
                 moveParameters.speed = self.feedRate / 60
+            else:
+                #Use default extrusion parameters rather default print parameters
+                moveParameters = None
             if self.flag is None:
                 self.root.armController.extrude(self.extrudeRate,moveParameters=moveParameters,timeoutMultiplier=2, RelativeExtrude = self.relativeExtrusion)
         else:
@@ -220,30 +223,37 @@ class PrintController:
             self.relativeExtrusion = True
             return ""
         elif lineToConvert == "M82":
-            return "Error absolute extrusion not supported"
+            self.root.terminalPrint("Using absolute Extrusion")
+            self.relativeExtrusion = False
+            return ""
         #Temperature control command
         #Set Hot End Temperature
         elif lineToConvert[:4] == "M104":
-            return ""
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxHotEndTempSetting:
                 self.root.temperatureController.setHotendTargetTemp(s)
+                self.root.temperatureController.enableHotendControl()
+                
             return ""
         #Set Bed Temperature
         elif lineToConvert[:4] == "M140":
-            return ""
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxBedTempSetting:
-                self.root.temperatureController.setBedTargetTemp(s)
+                self.root.temperatureController.setBedTargetTemp(s+10)
+                self.root.temperatureController.enableBedControl()
             return ""
         #Wait for Hot End Temperature
         elif lineToConvert[:4] == "M109":
             while not self.root.temperatureController.HotendTargetReached():
                 time.sleep(1) # Wait for 1 second before checking again
             return ""
-        
+        #Wait for Bed Temperature
+        elif lineToConvert[:4] == "M190":
+            while not self.root.temperatureController.BedTargetReached():
+                time.sleep(1) # Wait for 1 second before checking again
+            return ""
         # Actual instructions to convert
         elif lineToConvert[0:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]
@@ -252,6 +262,7 @@ class PrintController:
             # TODO: This needs handling or removal
             return ""
         elif lineToConvert[0:3] == "G91":
+
             return "Error relative positioning not supported"
         elif lineToConvert == "G92 E0\n":
             self.root.armController.zeroJ7()
@@ -282,6 +293,10 @@ class PrintController:
             x = float(xMatch.group(1)) if xMatch else None
             y = float(yMatch.group(1)) if yMatch else None
             z = float(zMatch.group(1)) if zMatch else None
+
+            #Adjust for change
+            z = z - self.dropHeight
+            z = max(z,0) #don't allow negative z values
             #print("z read:", z)
             f = float(fMatch.group(1)) if fMatch else None
             e = float(eMatch.group(1)) if eMatch else None
@@ -381,16 +396,17 @@ class PrintController:
         #newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
         #return newLine
         return ""
-
-    #This may be redundant now if loop skips comments
-    def findStartBlock(self):
-        count = 0
-        for line in self.gcodeLines:
-            if line.strip() == "; EXECUTABLE_BLOCK_START":
-                self.currentInstruction = count
-                return
-            count +=1
-        print("No start line found")
+    
+    #Function used when end of print is reached or when print is cancelled to end any related processes
+    def endPrint(self):
+        self.root.temperatureController.disableHotendControl()
+        self.root.temperatureController.disableBedControl()
+        self.root.LEDOn = False # Turn off LED to signify print is cancelled
+        self.currentInstruction=0
+        self.printing = False
+        self.printPaused = False #If print was paused, it is no longer paused if it is cancelled or ended
+        #Move Home when complete
+        self.root.armController.moveHome()
 
     #endregion main functions
 
@@ -489,8 +505,6 @@ class PrintController:
         #Reset feedrate and extruderate
         self.lastF = 0.0
         self.lastE = 0.0
-
-        self.findStartBlock()#Find where the gcode insturctions actually start
         self.printing = True
         self.root.statusPrint("Starting print...")
 
@@ -508,10 +522,7 @@ class PrintController:
         self.printPaused = True
 
     def cancelPrint(self):
-        self.root.LEDOn = False # Turn off LED to signify print is cancelled
-        self.currentInstruction=0
-        self.printing = False
-        self.printPaused = False #If print was paused, it is no longer paused if it is cancelled
+        self.endPrint() #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
         pass
 
@@ -575,10 +586,11 @@ class PrintController:
 
     #will cancel any related printing setup functions
     def cancelAny(self):
-        threading.Thread(target=self.endSweepOrCal) #On thread because move command is on there
-        #just in case someone thinks this will cancel the print
         if self.printing:
             self.cancelPrint()
+        threading.Thread(target=self.endSweepOrCal).start() #On thread because move command is on there
+        #just in case someone thinks this will cancel the print
+        
 
     
     #endregion gui

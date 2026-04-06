@@ -68,7 +68,7 @@ class TemperatureController:
         self.bedTempHardLimit = 100        # Hard limit to not allow crossing over for the bed
         self.hotendTempAdjustment = 18.83  # Adjustment amount to counter the interference from heater current
         self.bedTempAdjustment = 3.25      # Adjustment amount to counter the interference from heater current
-        self.targetTolerance = 3           # Tolerance for target temperature in degrees Celsius. 
+        self.targetTolerance = 30          # Tolerance for target temperature in degrees Celsius. 
 
         #Used so that room temperature is not considered an acceptable temperature for extrusion,
         #which could cause damage to the extruder if it attempted to extrude without the hotend heating up first
@@ -161,6 +161,7 @@ class TemperatureController:
 
     #region Update
     def updateTemp(self):
+
         # Alternates per call which thermistor to measure to not overwhelm the ADC
         if (self.measurementState == 0):
                 # Handle reading and calculating hotend temperature
@@ -227,19 +228,16 @@ class TemperatureController:
         if (heater == "hotend"):
             if (self.hotendTempCtrlEnabled):
                 self.disableHotendControl()
-                self.root.hotendCtrlButton.config(relief="raised")
             else:
                 self.enableHotendControl()
-                self.root.hotendCtrlButton.config(relief="ridge")
                 #TODO: Temporarily just set target to whatever is in target box
                 self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
         elif (heater == "bed"):
             if (self.bedTempCtrlEnabled):
                 self.disableBedControl()
-                self.root.bedCtrlButton.config(relief="raised")
+                
             else:
                 self.enableBedControl()
-                self.root.bedCtrlButton.config(relief="ridge")
                 #TODO: Temporarily just set target to whatever is in target box
                 self.setBedTargetTemp(float(self.root.bedTarget.get()))
 
@@ -264,21 +262,26 @@ class TemperatureController:
     # Enables temperature control for the hotend
     def enableHotendControl(self):
         self.hotendTempCtrlEnabled = True
+        self.root.hotendCtrlButton.config(relief="ridge")
         self.root.terminalPrint("Hotend heater control enabled")
 
     # Disables temperature control for the hotend
     def disableHotendControl(self):
         self.hotendTempCtrlEnabled = False
+        self.root.hotendCtrlButton.config(relief="raised")
+        
         self.root.terminalPrint("Hotend heater control disabled")
 
     # Enables temperature control for the bed
     def enableBedControl(self):
         self.bedTempCtrlEnabled = True
+        self.root.bedCtrlButton.config(relief="ridge")
         self.root.terminalPrint("Bed heater control enabled")
 
     # Disables temperature control for the bed
     def disableBedControl(self):
         self.bedTempCtrlEnabled = False
+        self.root.bedCtrlButton.config(relief="raised")
         self.root.terminalPrint("Bed heater control disabled")
     
     #endregion

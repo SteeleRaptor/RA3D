@@ -429,7 +429,7 @@ class TkWindow(Tk):
         self.calJ2Button = Button(self.indivCalFrame, text="Cal J2", command=lambda: self.armController.startSpecificCalibration(0, 1, 0, 0, 0, 0), width=7)
         self.calJ3Button = Button(self.indivCalFrame, text="Cal J3", command=lambda: self.armController.startSpecificCalibration(0, 0, 1, 0, 0, 0), width=7)
         self.calJ4Button = Button(self.indivCalFrame, text="Cal J4", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 1, 0, 0), width=7)
-        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7)
+        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, state="disabled")
         self.calJ6Button = Button(self.indivCalFrame, text="Cal J6", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 0, 1), width=7)
         # Place buttons
         self.calJ1Button.grid(row=1, column=0, padx=5, pady=5,)
@@ -499,6 +499,7 @@ class TkWindow(Tk):
         self.J5EncState = Label(self.encoderTestFrame, text="xxxx")
         self.J6EncLabel = Label(self.encoderTestFrame, text="J6:")
         self.J6EncState = Label(self.encoderTestFrame, text="xxxx")
+
         # Display the widgets
         self.J1EncLabel.grid(row=1, column=0)
         self.J1EncState.grid(row=1, column=1)
@@ -723,6 +724,10 @@ class TkWindow(Tk):
         self.J7CoordEntry2.grid(row=1, column=1, padx=(0, 5), pady=5)
         self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrudeButton)
         self.extrudeButton.grid(row=2, column=0,padx=(0, 5), pady=5)
+        self.loadButton = Button(self.extruderFrame, text = "Load", command=self.armController.loadFilament)
+        self.loadButton.grid(row=2, column=0,padx=(0, 5), pady=5)
+        self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament)
+        self.unloadButton.grid(row=2, column=0,padx=(0, 5), pady=5)
         self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
         self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
         self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")

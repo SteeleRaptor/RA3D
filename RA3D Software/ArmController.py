@@ -80,6 +80,9 @@ class ArmController:
         self.extruder_deg_per_mm_cool = 10.90909
         self.heatedFilamentMultiplier = 0.378 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
+        self.loadLength = 300 #length of filament to load fst, determined experimentally
+        self.defaultExtrudeParameters = MoveParameters(30,10,10,30,0,'m')
+        self.unloadParameters = MoveParameters(80,10,10,30,0,'p')
 
     #endregion init
 
@@ -593,10 +596,11 @@ class ArmController:
     def extrude(self,extrudeRate,moveParameters=None,relative=True,timeoutMultiplier=3):
         if not self.root.temperatureController.HotendTargetReached():
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
+            self.printController.flag = "Hotend target temperature not reached"
             return
         timeoutMin = 8 #minimum timeout
         if moveParameters is None:
-            moveParameters = self.moveParameters
+            moveParameters = self.defaultExtrudeParameters
         J7 = extrudeRate*self.extruder_deg_per_mm
         timeout = timeoutMultiplier*abs(extrudeRate)/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
         if self.checkIfBusy(message="E7 extrude"):
@@ -604,7 +608,21 @@ class ArmController:
         command = MoveCommand("E7",None,moveParameters=moveParameters,J7=J7,J7Rel=relative)
         self.root.serialController.sendSerial(str(command))#convert command to string before sending
         self.waitForResponseAndProcess("POSE7",timeout=timeout, message="E7 extrude")
-    
+
+    def loadFilament(self):
+        if self.checkIfBusy(message="Load Filament"):
+            return
+        self.root.statusPrint("Loading filament...")
+        loadThread = threading.Thread(target=self.extrude, args=[self.loadLength], kwargs={"timeoutMultiplier":5})
+        loadThread.start()
+
+    def unloadFilament(self):
+        if self.checkIfBusy(message="Unload Filament"):
+            return
+        self.root.statusPrint("Unloading filament...")
+        unloadThread = threading.Thread(target=self.extrude, args=[-self.loadLength], kwargs={"timeoutMultiplier":5,"moveParameters":self.unloadParameters})
+        unloadThread.start()
+
     def extrudeButton(self):
         # Read the values from each entry box
         extrudeRate = self.root.J7CoordEntry2.get()
@@ -761,7 +779,11 @@ class ArmController:
             return
         
         #Convert extrudeRate to change in motor angle
-        J7 = extrudeRate*self.extruder_deg_per_mm
+        if self.root.temperatureController.HotendTargetReached():
+            self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
+            self.printController.flag = "Hotend target temperature not reached"
+            J7 = extrudeRate*self.extruder_deg_per_mm
+            return
         
         # Create the command
         command = MoveCommand("ML",pos, moveParameters, J7=J7, J7Rel=RelativeExtrude)

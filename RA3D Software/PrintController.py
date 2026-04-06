@@ -102,7 +102,7 @@ class PrintController:
 
     # This is the main function that will loop when printing a file
     def printLoop(self):
-
+        # NOTE for proper flag handling the program should repeat the last command depending on the flag, this is not been implemented
         self.checkFlag() #check flag to see if to continue printing
         
         #If the flag stopped the print, exit
@@ -152,6 +152,8 @@ class PrintController:
             #TODO when turn hazard encountered,
             # printer moves home than to position with normal wrist condition
             #Execute move command
+           
+
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
             if not self.hardCodePrinterSpeed:
                 if self.feedRate != None and self.feedRate != 0:
@@ -178,15 +180,17 @@ class PrintController:
                     #self.root.armController.moveHome()#NOTE this line is for drawing tests only
                     self.root.armController.sendMJ(self.printPos, moveParameters=moveParameters, timeout=timeout)
                 else:
-                    # Send the command to the arm, will wait for a response
-                    self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
-            
-            #must be last thing to do, copy last position
-            self.lastPos = copy.deepcopy(self.printPos)
-
+                    #Check if hotend is at target temperature before extruding, if not set flag to stop print and display warning
+                    if not self.temperatureController.HotendTargetReached():
+                        self.flag = "Hotend not at target temperature"
+                    else:
+                        # Send the command to the arm, will wait for a response
+                        self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
-            
+            #Must be at hotened before extruding
+            if not self.temperatureController.HotendTargetReached():
+                self.flag = "Hotend not at target temperature"
             if self.feedRate != None and self.feedRate != 0:
                 moveParameters = copy.deepcopy(self.defaultPrintParameters)
                 moveParameters.speedType = "m"
@@ -200,7 +204,8 @@ class PrintController:
         else:
             self.root.warningPrint("Unexpected message from interpretGcode")
         #endregion message handling
-        
+        #must be last thing to do, copy last position
+        self.lastPos = copy.deepcopy(self.printPos)
         #Signifies thread has ended to start next thread
         self.root.printThreadStarted = False #Do NOT return anywhere else in this function
 

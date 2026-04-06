@@ -86,6 +86,7 @@ M220 S100 ;Reset feed rate
 M221 S100 ;Reset flow rate 
 
 M140 S55 ;Set final bed temp
+M104 S230 ;Set hotend temp
 G28 ;Home 
 G92 E0 ;Reset extruder 
 G1 Z2.0 F3000 ;Move Z Axis up 

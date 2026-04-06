@@ -596,7 +596,7 @@ class ArmController:
     def extrude(self,extrudeRate,moveParameters=None,relative=True,timeoutMultiplier=3):
         if not self.root.temperatureController.HotendTargetReached():
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
-            self.printController.flag = "Hotend target temperature not reached"
+            self.root.printController.flag = "Hotend target temperature not reached"
             return
         timeoutMin = 8 #minimum timeout
         if moveParameters is None:
@@ -791,7 +791,7 @@ class ArmController:
         #Convert extrudeRate to change in motor angle
         if self.root.temperatureController.HotendTargetReached():
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
-            self.printController.flag = "Hotend target temperature not reached"
+            self.root.printController.flag = "Hotend target temperature not reached"
             return
         
         J7 = extrudeRate*self.extruder_deg_per_mm #convert from mm to deg

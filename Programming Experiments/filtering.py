@@ -29,7 +29,7 @@ isOn = []
 # Read in the csv data
 # log6.csv is hotend measurements without a crosstalk compensator
 # log7.csv is hotend measurements with a crosstalk compensator
-with open ("Programming Experiments/log6.csv", newline='') as csvfile:
+with open ("Programming Experiments/log.csv", newline='') as csvfile:
     spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
     for row in spamreader:
         if row[0] == "time":

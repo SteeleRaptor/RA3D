@@ -18,14 +18,14 @@ class PrintController:
         #0=closed loop
         self.printOpenLoopControl = 0 #Thus closed cloop
         self.defaultPrintParameters = MoveParameters(self.speed,self.acceleration,self.decceleration,self.ramp,self.printOpenLoopControl,"m") #50mm/s print speed
-        self.timeoutExtra = 60 #Extra timeout had to every timeout estimation
+        self.timeoutExtra = 60 #Extra timeout added to every timeout estimation
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
         self.plateHeight = 264 #Change bed height relative to pen
         self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
-        YEdge = [-100,100]
+        YEdge = [-100,100] #These values were adjusted carefully, should not change
         XEdge = [300,500]
 
         self.hardCodePrinterSpeed = False #Will obey the print parameters and not the gcode feed rate

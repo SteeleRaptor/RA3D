@@ -224,6 +224,7 @@ class TemperatureController:
     #endregion
 
     #region Temperature Control
+    #toggle control for UI
     def toggleControl(self, heater):
         if (heater == "hotend"):
             if (self.hotendTempCtrlEnabled):

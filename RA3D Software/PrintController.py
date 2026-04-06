@@ -249,7 +249,7 @@ class PrintController:
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxBedTempSetting:
-                self.root.temperatureController.setBedTargetTemp(s+10)
+                self.root.temperatureController.setBedTargetTemp(s)
                 self.root.temperatureController.enableBedControl()
             return ""
         
@@ -317,9 +317,6 @@ class PrintController:
                 if z is not None:
                     z += self.lastPos.GetRelativeZ()
 
-            #Adjust for change
-            z = z - self.dropHeight
-            z = max(z,0) #don't allow negative z values
 
             #print("z read:", z)
             f = float(fMatch.group(1)) if fMatch else None
@@ -358,6 +355,11 @@ class PrintController:
                     self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
                 else:
                     self.printPos.SetRelative(x,y,z,0,self.defaultAngle,0)
+            if z is not None: 
+                #Adjust for change
+                z = z - self.dropHeight
+                z = max(z,0) #don't allow negative z values
+
            
             #Do not extrude if not told to
             #Handle If E or F or both are missing

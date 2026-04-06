@@ -230,6 +230,7 @@ class PrintController:
         #Temperature control command
         #Set Hot End Temperature
         elif lineToConvert[:4] == "M104":
+            self.root.terminalPrint("Setting hotend temperature...")
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxHotEndTempSetting:
@@ -239,6 +240,7 @@ class PrintController:
         
         #Set Bed Temperature
         elif lineToConvert[:4] == "M140":
+            self.root.terminalPrint("Setting bed temperature...")
             sMatch = re.search(r"[sS](-?(?:\d+\.?\d*|\.\d+))", lineToConvert)
             s = float(sMatch.group(1)) if sMatch else None
             if s is not None and s >= 0 and s <= self.maxBedTempSetting:
@@ -248,21 +250,23 @@ class PrintController:
         
         #Wait for Hot End Temperature
         elif lineToConvert[:4] == "M109":
+            self.root.terminalPrint("Waiting for hotend to reach target temperature...")
             while not self.root.temperatureController.HotendTargetReached():
                 time.sleep(1) # Wait for 1 second before checking again
             return ""
         #Wait for Bed Temperature
         elif lineToConvert[:4] == "M190":
+            self.root.terminalPrint("Waiting for bed to reach target temperature...")
             while not self.root.temperatureController.BedTargetReached():
                 time.sleep(1) # Wait for 1 second before checking again
             return ""
-        # Actual instructions to convert
         elif lineToConvert[:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]
         elif lineToConvert[:3] == "G90": # Absolute positioning
             self.relativePositioning = False
             self.root.terminalPrint("Using absolute positioning")
             return ""
+        #relative positioning
         elif lineToConvert[:3] == "G91":
             self.relativePositioning = True
             self.root.terminalPrint("Using relative positioning")
@@ -331,7 +335,7 @@ class PrintController:
 
             NoMove = False #For some commands they only specify E
 
-    
+
             if x == None and y==None and z==None:
                 NoMove = True
                 self.printPos=copy.deepcopy(self.lastPos)

@@ -181,7 +181,7 @@ class PrintController:
                     self.root.armController.sendMJ(self.printPos, moveParameters=moveParameters, timeout=timeout)
                 else:
                     #Check if hotend is at target temperature before extruding, if not set flag to stop print and display warning
-                    if not self.temperatureController.HotendTargetReached():
+                    if not self.root.temperatureController.HotendTargetReached():
                         self.flag = "Hotend not at target temperature"
                     else:
                         # Send the command to the arm, will wait for a response
@@ -189,7 +189,7 @@ class PrintController:
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
             #Must be at hotened before extruding
-            if not self.temperatureController.HotendTargetReached():
+            if not self.root.temperatureController.HotendTargetReached():
                 self.flag = "Hotend not at target temperature"
             if self.feedRate != None and self.feedRate != 0:
                 moveParameters = copy.deepcopy(self.defaultPrintParameters)

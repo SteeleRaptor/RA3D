@@ -789,7 +789,7 @@ class ArmController:
             return
         
         #Convert extrudeRate to change in motor angle
-        if self.root.temperatureController.HotendTargetReached():
+        if not self.root.temperatureController.HotendTargetReached():
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.root.printController.flag = "Hotend target temperature not reached"
             return

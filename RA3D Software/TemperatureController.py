@@ -73,6 +73,9 @@ class TemperatureController:
         #Used so that room temperature is not considered an acceptable temperature for extrusion,
         #which could cause damage to the extruder if it attempted to extrude without the hotend heating up first
         self.minExtrusionTemp = 170        # Minimum hotend temperature for extrusion of any plastic to occur
+        self.maxPrevValues = 50
+        self.prevHotendTemps = []
+        self.prevBedTemps = []
         
         # Set up the config register according to default values stated earlier
         self.setConfigReg()
@@ -166,7 +169,14 @@ class TemperatureController:
         if (self.measurementState == 0):
                 # Handle reading and calculating hotend temperature
                 adcVal = self.readADC()
+                # Calculate the temperature
                 self.calculateHotendTemp(adcVal)
+                # Save the temperature to list of previous temperatures
+                self.prevHotendTemps.append(self.hotendTempCelsius)
+                # Restrict length of list
+                if len(self.prevHotendTemps) > self.maxPrevValues:
+                    self.prevHotendTemps.pop(0)
+                # Configure GUI element
                 self.root.hotendActual.config(text=f"{round(self.hotendTempCelsius, 2)}°C")
                 # Change the ADC channel to A1 (Bed)
                 self.selectADCChannel(1)
@@ -174,7 +184,14 @@ class TemperatureController:
         else:
                 # Handle reading and calculating bed temperature
                 adcVal = self.readADC()
+                # Calculate the temperature
                 self.calculateBedTemp(adcVal)
+                # Save the temperature to list of previous temperatures
+                self.prevBedTemps.append(self.bedTempCelsius)
+                # Restrict length of list
+                if len(self.prevBedTemps) > self.maxPrevValues:
+                    self.prevBedTemps.pop(0)
+                # Configure GUI element
                 self.root.bedActual.config(text=f"{round(self.bedTempCelsius, 2)}°C")
                 # Change the ADC channel to A0 (Hotend)
                 self.selectADCChannel(0)

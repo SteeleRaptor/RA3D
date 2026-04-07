@@ -5,6 +5,9 @@ import threading
 import time
 from datetime import datetime
 import RPi.GPIO as GPIO
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import numpy as np
 
 from SerialController import SerialController
 from ArmController import ArmController, MoveParameters
@@ -117,24 +120,28 @@ class TkWindow(Tk):
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True)
         # Create the tabs
+        self.homeTab = Frame(self.notebook, bg="#00FFFF")
         self.printTab = Frame(self.notebook, bg="#FF0000")
         self.armTab = Frame(self.notebook, bg="#00FF00")
         self.toolTab = Frame(self.notebook, bg="#5301AB")
         self.debugTab = Frame(self.notebook, bg="#0000FF")
         self.settingsTab = Frame(self.notebook, bg="#FFFF00")
         # Put the tabs on screen
+        self.homeTab.pack(fill="both", expand=True)
         self.printTab.pack(fill="both", expand=True)
         self.armTab.pack(fill="both", expand=True)
         self.toolTab.pack(fill="both", expand=True)
         self.debugTab.pack(fill="both", expand=True)
         self.settingsTab.pack(fill="both", expand=True)
         # Add the tabs to the notebook
+        self.notebook.add(self.homeTab, text="Home")
         self.notebook.add(self.printTab, text="Printing")
         self.notebook.add(self.armTab, text="Arm Control")
         self.notebook.add(self.toolTab, text="Extruder")
         self.notebook.add(self.debugTab, text="Debug")
         self.notebook.add(self.settingsTab, text="Settings")
         # Call the various functions for creating the widgets in each tab
+        self.fillHomeTab()
         self.fillPrintTab()
         self.fillArmTab()
         self.fillToolTab()
@@ -146,6 +153,62 @@ class TkWindow(Tk):
         self.statusBarFrame.pack(fill="both", expand=True, side="bottom")
         self.statusLabel = Label(self.statusBarFrame, text="Status: Example")
         self.statusLabel.grid(row=0, column=0, sticky=W+N+S)
+
+    def fillHomeTab(self):
+        # ==========| Print Info Frame |==========
+        self.printInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=350)
+        self.printInfoHomeFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
+
+        # ==========| Thermals Frame |==========
+        self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=350)
+        self.thermalsHomeFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
+        self.thermalsHomeLabel = Label(self.thermalsHomeFrame, text="Thermals")
+        self.thermalsHomeLabel.grid(row=0, column=0, columnspan=4, sticky=W+N+S, padx=5, pady=5)
+        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=4, sticky=W+E)
+        self.thermalNameLabel = Label(self.thermalsHomeFrame, text="Name")
+        self.thermalNameLabel.grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual")
+        self.thermalActualLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
+        self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target")
+        self.thermalTargetLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
+        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=3, column=0, columnspan=4, sticky=W+E)
+        # Hotend temp info
+        self.hotendHomeLabel = Label(self.thermalsHomeFrame, text="Hotend")
+        self.hotendHomeLabel.grid(row=4, column=0, sticky=W, padx=5, pady=5)
+        self.hotendHomeActual = Label(self.thermalsHomeFrame, text="xxx")
+        self.hotendHomeActual.grid(row=4, column=2, sticky=E, padx=5, pady=5)
+        self.hotendHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
+        self.hotendHomeTarget.grid(row=4, column=3, sticky=E, padx=5, pady=5)
+        # Bed temp info
+        self.bedHomeLabel = Label(self.thermalsHomeFrame, text="Bed")
+        self.bedHomeLabel.grid(row=5, column=0, sticky=W, padx=5, pady=5)
+        self.bedHomeActual = Label(self.thermalsHomeFrame, text="xxx")
+        self.bedHomeActual.grid(row=5, column=2, sticky=E, padx=5, pady=5)
+        self.bedHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
+        self.bedHomeTarget.grid(row=5, column=3, sticky=E, padx=5, pady=5)
+
+        # Live temperatures plot
+        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=6, column=0, columnspan=4, sticky=W+E)
+        self.thermalFig = Figure(figsize=(4, 3), dpi=100)
+        self.thermalPlot = self.thermalFig.add_subplot(111)
+        self.thermalPlot.set_title("Thermals")
+        self.thermalHotendLine, = self.thermalPlot.plot([], [], 'r-', label="Hotend")
+        self.thermalBedLine, = self.thermalPlot.plot([], [], 'b-', label="Bed")
+        self.thermalCanvas = FigureCanvasTkAgg(self.thermalFig, master=self.thermalsHomeFrame)
+        self.thermalCanvas.get_tk_widget().grid(row=7, column=0, columnspan=4, sticky=W+E+N+S, padx=5, pady=5)
+        self.thermalPlot.set_ylabel("Temperature (C)")
+        self.thermalPlot.set_xlabel("Time (s)")
+        self.hotendTargetLine = self.thermalPlot.axhline(y=self.temperatureController.hotendTargetTemp, color='r', linestyle='--')
+        self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
+        self.yMax = 100
+
+        # ==========| Calibration Frame |==========
+        self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=200)
+        self.thermalsHomeFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
+
+        # ==========| Arm Info Frame |==========
+        self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=200)
+        self.thermalsHomeFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
 
     def fillPrintTab(self):
         # ==========| File Selection Frame |==========
@@ -947,6 +1010,30 @@ class TkWindow(Tk):
         
         # TODO: Temporary
         self.temperatureController.updateTemp()
+
+        # ==========| Home Tab |==========
+        hotendData = self.temperatureController.prevHotendTemps
+        bedData = self.temperatureController.prevBedTemps
+        if ((len(hotendData) == len(bedData) > 0) and (len(hotendData) > 1)):
+            # Update the labels
+            self.hotendHomeActual.config(text=round(self.temperatureController.hotendTempCelsius, 2))
+            self.hotendHomeTarget.config(text=round(self.temperatureController.hotendTargetTemp, 2))
+            self.bedHomeActual.config(text=round(self.temperatureController.bedTempCelsius, 2))
+            self.bedHomeTarget.config(text=round(self.temperatureController.bedTargetTemp, 2))
+
+            # Update the plot
+            xData = np.linspace(self.updateDelay / -1000 * len(hotendData), 0, len(hotendData))
+            self.thermalHotendLine.set_data(xData, hotendData)
+            self.thermalBedLine.set_data(xData, bedData)
+            self.thermalPlot.set_xlim(min(xData), max(xData))
+            self.yMax = max([max(hotendData), max(bedData), self.temperatureController.hotendTargetTemp, self.temperatureController.bedTargetTemp]) + 10
+
+            self.thermalPlot.set_ylim(0, self.yMax)
+            self.hotendTargetLine.remove()
+            self.bedTargetLine.remove()
+            self.hotendTargetLine = self.thermalPlot.axhline(y=self.temperatureController.hotendTargetTemp, color='r', linestyle='--')
+            self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
+            self.thermalCanvas.draw()
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)

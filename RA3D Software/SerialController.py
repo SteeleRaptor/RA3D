@@ -24,7 +24,7 @@ class SerialController:
         
         self.waiting_responses = set()
         self.sendingSerial = False#Keep track to send serial so a response is not sorted while sending
-        self.Errors = ["Estop", "ER","EL"] #Error codes
+        self.Errors = ["Es", "ER","EL"] #Error codes
         self.ErrorRaised = False #Flag to indicate if an error was raised, used to stop waiting for responses if an error is raised
         #Everything that will not be processed if immediately received
         self.WaitToProcess = ["PO","TL","RE"] #currently these can only be 2 characters
@@ -160,7 +160,7 @@ class SerialController:
             #for each item in queue
             for item in list(self.responseQueue.queue):
                 #if an error
-                if item in self.Errors:
+                if item[:2] in self.Errors:
                     #remove item from queue
                     self.sortResponse(item)
                     self.responseQueue.queue.remove(item)
@@ -227,7 +227,7 @@ class SerialController:
             flag = "Estop"
             PC.pauseAll() #This will pause the program regardless if ignore flags is on
             R.warningPrint("Estop pushed, stopping print")
-            self.cleanQueue("Estop")
+            #self.cleanQueue("Estop")
 
         if sortResponse[:2]== "ER":
             R.statusPrint(f"Kinematic Error: {sortResponse[2:]}")

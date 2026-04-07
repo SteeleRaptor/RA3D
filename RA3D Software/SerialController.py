@@ -29,6 +29,14 @@ class SerialController:
         #Everything that will not be processed if immediately received
         self.WaitToProcess = ["PO","TL","RE"] #currently these can only be 2 characters
 
+    def autoConnect(self):
+        self.root.statusPrint("Attempting automatic port connection")
+        self.root.portSelection.set("/dev/ttyACM0")
+        # Attempt the connection and if failed...
+        if self.serialConnect() == 0:
+            self.root.statusPrint("Failed to automatically connect to port")
+            self.root.portSelection.set("Select Port")
+
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
         # Check if the serial controller is already connected to a board
@@ -44,6 +52,9 @@ class SerialController:
                 self.root.portDropdown.config(state="disabled") # Disable port dropdown
                 self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
                 self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
+                return 1
+            else:
+                return 0
 
         else:
 
@@ -55,6 +66,7 @@ class SerialController:
             self.root.portDropdown.config(state="readonly") # Enable port dropdown
             self.root.refreshCOMButton.config(state="normal") # Enable refresh button
             self.root.portStatusLabel.config(text="Status: Disconnected") # Change port status text
+            return 0
 
     def connectPort(self, port):
         self.port = port

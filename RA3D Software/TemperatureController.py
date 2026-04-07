@@ -1,4 +1,5 @@
 
+from tkinter import *
 import smbus
 import math
 import RPi.GPIO as GPIO
@@ -266,6 +267,8 @@ class TemperatureController:
             return
         if (targetTemp > self.hotendTempHardLimit):
             self.root.warningPrint(f"Hotend temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
+            self.root.hotendHomeTarget.delete(0, END)
+            self.root.hotendHomeTarget.insert(0, "0")
             return
         self.hotendTargetTemp = targetTemp
 
@@ -275,6 +278,9 @@ class TemperatureController:
             self.root.terminalPrint("Provided target temperature is less than zero (bed)")
         if (targetTemp > self.bedTempHardLimit):
             self.root.warningPrint(f"Bed temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
+            self.root.bedHomeTarget.delete(0, END)
+            self.root.bedHomeTarget.insert(0, "0")
+            return
         self.bedTargetTemp = targetTemp
 
     # Enables temperature control for the hotend

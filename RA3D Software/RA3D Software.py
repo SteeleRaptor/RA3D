@@ -100,6 +100,8 @@ class TkWindow(Tk):
         #updateThread.start()
         self.ledThread = threading.Thread(target=self.updateLED, daemon=True)
         self.ledThread.start()
+        self.serialController.autoConnect()
+        self.root.bind("<Button-1>", self.clearEntryFocus)
         self.update()
     #endregion init
 
@@ -156,8 +158,34 @@ class TkWindow(Tk):
 
     def fillHomeTab(self):
         # ==========| Print Info Frame |==========
-        self.printInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=350)
+        printInfoWidth = 600
+        self.printInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=printInfoWidth, height=350)
         self.printInfoHomeFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
+        # Print status label (Printing, paused, etc.)
+        self.printStatusHomeLabel = Label(self.printInfoHomeFrame, text="IDLING...", font=("Magneto", 30, "bold"))
+        self.printStatusHomeLabel.grid(row=0, column=0, columnspan=3, rowspan=2, padx=5, pady=5, sticky=N+W)
+        # Start button
+        self.startPrintHomeButton = Button(self.printInfoHomeFrame, text="Start", width=10, height=2, command=self.printController.startPrint, state="disabled")
+        self.startPrintHomeButton.grid(row=0, column=3, padx=5, pady=5, sticky=E)
+        # Pause button
+        self.pausePrintHomeButton = Button(self.printInfoHomeFrame, text="Pause", width=10, height=2, command=self.printController.pausePrint, state="disabled")
+        self.pausePrintHomeButton.grid(row=1, column=3, padx=5, pady=5, sticky=E)
+        # Stop button
+        self.stopPrintHomeButton = Button(self.printInfoHomeFrame, text="Stop", width=10, height=2, command=self.printController.cancelPrint, state="disabled")
+        self.stopPrintHomeButton.grid(row=2, column=3, padx=5, pady=5, sticky=E)
+        # Select file button
+        self.selectFileHomeButton = Button(self.printInfoHomeFrame, text="Select File", width=10, command=self.printController.selectFile)
+        self.selectFileHomeButton.grid(row=4, column=0, padx=5, pady=5, sticky=W)
+        # File name label
+        self.selectedFileHomeLabel = Label(self.printInfoHomeFrame, text="Please select a file")
+        self.selectedFileHomeLabel.grid(row=4, column=1, padx=5, pady=5, sticky=W)
+        # Progress label
+        self.progressHomeLabel = Label(self.printInfoHomeFrame, text="0%")
+        self.progressHomeLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W+S)
+        # Progress bar
+        self.printProgressBarHome = ttk.Progressbar(self.printInfoHomeFrame, orient=HORIZONTAL, length=printInfoWidth - 20, mode="determinate")
+        self.printProgressBarHome.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky=W+E)
+        self.printProgressBarHome['value'] = 0
 
         # ==========| Thermals Frame |==========
         self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=350)
@@ -177,30 +205,38 @@ class TkWindow(Tk):
         self.hotendHomeLabel.grid(row=4, column=0, sticky=W, padx=5, pady=5)
         self.hotendHomeActual = Label(self.thermalsHomeFrame, text="xxx")
         self.hotendHomeActual.grid(row=4, column=2, sticky=E, padx=5, pady=5)
-        self.hotendHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
+        #self.hotendHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
+        self.hotendHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
+        self.hotendHomeTarget.insert(0, "0")
         self.hotendHomeTarget.grid(row=4, column=3, sticky=E, padx=5, pady=5)
         # Bed temp info
         self.bedHomeLabel = Label(self.thermalsHomeFrame, text="Bed")
         self.bedHomeLabel.grid(row=5, column=0, sticky=W, padx=5, pady=5)
         self.bedHomeActual = Label(self.thermalsHomeFrame, text="xxx")
         self.bedHomeActual.grid(row=5, column=2, sticky=E, padx=5, pady=5)
-        self.bedHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
+        #self.bedHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
+        self.bedHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
+        self.bedHomeTarget.insert(0, "0")
         self.bedHomeTarget.grid(row=5, column=3, sticky=E, padx=5, pady=5)
 
         # Live temperatures plot
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=6, column=0, columnspan=4, sticky=W+E)
-        self.thermalFig = Figure(figsize=(4, 3), dpi=100)
+        self.thermalFig = Figure(figsize=(5, 2.5), dpi=100)
         self.thermalPlot = self.thermalFig.add_subplot(111)
-        self.thermalPlot.set_title("Thermals")
         self.thermalHotendLine, = self.thermalPlot.plot([], [], 'r-', label="Hotend")
         self.thermalBedLine, = self.thermalPlot.plot([], [], 'b-', label="Bed")
         self.thermalCanvas = FigureCanvasTkAgg(self.thermalFig, master=self.thermalsHomeFrame)
         self.thermalCanvas.get_tk_widget().grid(row=7, column=0, columnspan=4, sticky=W+E+N+S, padx=5, pady=5)
         self.thermalPlot.set_ylabel("Temperature (C)")
         self.thermalPlot.set_xlabel("Time (s)")
+        self.thermalPlot.margins(x=0.1, y=0.05)
+        self.thermalPlot.spines['right'].set_visible(False)
+        self.thermalPlot.spines['top'].set_visible(False)
+        self.thermalFig.set_facecolor(self.thermalsHomeFrame.cget("bg"))
+        self.thermalPlot.grid(True)
         self.hotendTargetLine = self.thermalPlot.axhline(y=self.temperatureController.hotendTargetTemp, color='r', linestyle='--')
         self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
-        self.yMax = 100
+        self.yMax = 100 # Used for y-axis scaling of the plot
 
         # ==========| Calibration Frame |==========
         self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=200)
@@ -1017,9 +1053,9 @@ class TkWindow(Tk):
         if ((len(hotendData) == len(bedData) > 0) and (len(hotendData) > 1)):
             # Update the labels
             self.hotendHomeActual.config(text=round(self.temperatureController.hotendTempCelsius, 2))
-            self.hotendHomeTarget.config(text=round(self.temperatureController.hotendTargetTemp, 2))
+            #self.hotendHomeTarget.config(text=round(self.temperatureController.hotendTargetTemp, 2))
             self.bedHomeActual.config(text=round(self.temperatureController.bedTempCelsius, 2))
-            self.bedHomeTarget.config(text=round(self.temperatureController.bedTargetTemp, 2))
+            #self.bedHomeTarget.config(text=round(self.temperatureController.bedTargetTemp, 2))
 
             # Update the plot
             xData = np.linspace(self.updateDelay / -1000 * len(hotendData), 0, len(hotendData))
@@ -1034,6 +1070,14 @@ class TkWindow(Tk):
             self.hotendTargetLine = self.thermalPlot.axhline(y=self.temperatureController.hotendTargetTemp, color='r', linestyle='--')
             self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
             self.thermalCanvas.draw()
+        # If the target temperature entries are deselected, periodically read the target temperature from there and update
+        try:
+            if self.root.focus_get() != self.hotendHomeTarget:
+                self.temperatureController.setHotendTargetTemp(float(self.hotendHomeTarget.get()))
+            if self.root.focus_get() != self.bedHomeTarget:
+                self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()))
+        except Exception:
+            pass
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)
@@ -1064,6 +1108,16 @@ class TkWindow(Tk):
         else:
             # If not, enable the connect button
             self.connectButton.config(state="normal")
+    
+    def clearEntryFocus(self, event):
+        # Check if our current focus is a specific entry widget and if the new focus is different
+        # If so we unfocus the entry and do some other stuff if needed
+        if self.root.focus_get() == self.hotendHomeTarget and event.widget != self.hotendHomeTarget:
+            self.temperatureController.setHotendTargetTemp(float(self.hotendHomeTarget.get()))
+            self.root.focus_set()
+        elif self.root.focus_get() == self.bedHomeTarget and event.widget != self.bedHomeTarget:
+            self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()))
+            self.root.focus_set()
     #endregion other functions
     #region Print Functions
     # Used to print to the in window terminal

@@ -22,7 +22,7 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 264 #Change bed height relative to pen
+        self.plateHeight = 245 #Change bed height relative to pen
         self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
@@ -36,7 +36,7 @@ class PrintController:
         #These boundaries are to prevent dangeous movement
         self.maxBoundaryX = [270,530]
         self.maxBoundaryY = [-130,130]
-        self.maxBoundaryZ = [250,900]
+        self.maxBoundaryZ = [200,900]
         self.bufferBoundary = 10 # Warning pops up if this boundary is entered from the max boundaries
         self.bedCalibrateHeight = 50 #Height moved up for calibration
 

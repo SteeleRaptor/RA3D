@@ -788,12 +788,12 @@ class ArmController:
             self.root.printController.flag = "Arm busy"
             return
         
-        #Convert extrudeRate to change in motor angle
-        if not self.root.temperatureController.HotendTargetReached():
+        #Check if extruding and hotend temp is reached
+        if not self.root.temperatureController.HotendTargetReached() and extrudeRate != 0:
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.root.printController.flag = "Hotend target temperature not reached"
             return
-        
+        #Convert extrudeRate to change in motor angle
         J7 = extrudeRate*self.extruder_deg_per_mm #convert from mm to deg
         # Create the command
         command = MoveCommand("ML",pos, moveParameters, J7=J7, J7Rel=RelativeExtrude)

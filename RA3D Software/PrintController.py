@@ -44,7 +44,7 @@ class PrintController:
         self.maxHotEndTempSetting = 300 #Max hotend temp that can be set from gcode
         self.maxBedTempSetting = 120 #Max bed temp that can be set from gcode
         
-        self.backlashAngleOffset = 5.55 #offset to account for backlash
+        self.backlashAngleOffset = 0 #5.55 #offset to account for backlash
         #Could add another safeguard within the temperatur controller
         #------End important variables-------
         self.defaultAngle = 90 - self.backlashAngleOffset

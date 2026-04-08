@@ -130,8 +130,8 @@ class PrintController:
             #Read gcode line and convert, handle rare messages inside
             message = self.interpretGcode(lineToConvert) # Convert line and updates printPos
         
-        #Display gcode lines for debugging
-        if self.root.PrintDebugMode:
+        #Display gcode lines for debugging and if a lineToConvert exists
+        if lineToConvert and self.root.PrintDebugMode:
             self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
         
         #region -----------Message Processing--------
@@ -152,8 +152,6 @@ class PrintController:
             #TODO when turn hazard encountered,
             # printer moves home than to position with normal wrist condition
             #Execute move command
-           
-
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
             if not self.hardCodePrinterSpeed:
                 if self.feedRate != None and self.feedRate != 0:
@@ -186,6 +184,7 @@ class PrintController:
                     else:
                         # Send the command to the arm, will wait for a response
                         self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
+        
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
             #Must be at hotened before extruding

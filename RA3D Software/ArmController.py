@@ -80,7 +80,7 @@ class ArmController:
         self.extruder_deg_per_mm_cool = 10.90909
         self.heatedFilamentMultiplier = 0.378 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
-        self.loadLength = 300 #length of filament to load fst, determined experimentally
+        self.loadLength = 450 #length of filament to load fst, determined experimentally
         self.defaultExtrudeParameters = MoveParameters(30,10,10,30,0,'m')
         self.unloadParameters = MoveParameters(80,10,10,30,0,'p')
 
@@ -713,10 +713,6 @@ class ArmController:
     
     #Move to the position where the arm rests on itself
     def prepMoveSafe(self):
-        #This is important because move safe will not move safe if arm is not calibrated
-        if self.serialController.boardConnected is False or self.armCalibrated is False:
-            self.root.statusPrint("Failed to move to safe positiion, Board not connected")
-            return
         #start thread
         moveSafeThread = threading.Thread(target=self.moveSafe)
         moveSafeThread.start()
@@ -724,11 +720,13 @@ class ArmController:
     #set move parameters to open loop
     def setOpenLoop(self):
         self.moveParameters.setLoopMode(1)
+        self.root.printController.defaultPrintParameters.setLoopMode(1)
         self.root.loopStatus.config(text="Open Loop")
 
     #set move parameters to closed loop
     def setClosedLoop(self):
         self.moveParameters.setLoopMode(0)
+        self.root.printController.defaultPrintParameters.setLoopMode(0)
         self.root.loopStatus.config(text="Closed Loop")
     
     #endregion GUI
@@ -853,6 +851,10 @@ class ArmController:
     # Cancels everything, ignore flags, and just sends the serial command
     # timeout is large because movesafe can be held in the teensy queue
     def moveSafe(self,timeout=60):
+        #This is important because move safe will not move safe if arm is not calibrated
+        if self.serialController.boardConnected is False or self.armCalibrated is False:
+            self.root.statusPrint("Failed to move to safe positiion, Board not connected")
+            return
         #Pause print so everything stops moving
         #It is assume the user will want the print paused if pressing this button
         self.root.printController.pauseAll()

@@ -217,8 +217,6 @@ class SerialController:
         AC = self.root.armController
         R = self.root
         flag = None
-        # TODO: Add in a message/action for every response and edit teensy to send more information
-        # TODO I will change this so that only unexpected responses or errors are processed here
         
         #self.root.terminalPrint(f"Received Response: {sortResponse}")
         self.root.terminalPrint("Warning! Sorting response\nReponses handled by sorting signfy a problem")
@@ -247,6 +245,7 @@ class SerialController:
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             flag = "Turn Hazard"
             AC.awaitingMoveResponse = False
+
         elif sortResponse[:13] == "Limit Pressed":
             self.root.statusPrint(f"Limits switch: {sortResponse[2:]}")
             self.root.warningPrint(f"Limit switch pressed")

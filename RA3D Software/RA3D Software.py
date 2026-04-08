@@ -103,6 +103,7 @@ class TkWindow(Tk):
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
+        self.armController.moveSafe()
         self.ledThreadRunning = False
         # Release the GPIO pins from use
         GPIO.cleanup()
@@ -820,6 +821,16 @@ class TkWindow(Tk):
         #NOTE these frames and labels don't need self if they're never accessed after setup
         self.settingsFrame = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
         self.settingsFrame.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
+        self.settingsFrame2 = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
+        self.settingsFrame2.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
+
+
+        if len(self.settingsDict) <= 8:
+            self.settingsLength1 = len(self.settingsDict)
+            self.settingsLength2 = 0
+        else:
+            self.settingsLength1 = 8
+            self.settingsLength2 = len(self.settingsDict) - 8
 
         # Headers for all settings
         header1 = Label(self.settingsFrame, text="Setting",padx=5)
@@ -833,9 +844,26 @@ class TkWindow(Tk):
         header2.grid(row=0, column=2,pady=(5,0))
         header3.grid(row=0, column=4,pady=(5,0))
         horizontalLine1.grid(row=1,column=0,columnspan=5,sticky=EW)
-        horizontalLine2.grid(row=len(self.settingsDict)+2,column=0,columnspan=5,pady=5,sticky=EW)
-        verticalLine1.grid(row=0,column=1,rowspan=len(self.settingsDict)+3,sticky=NS,pady=(0,5))
-        verticalLine2.grid(row=0,column=3,rowspan=len(self.settingsDict)+3,sticky=NS,pady=(0,5))
+        horizontalLine2.grid(row=self.settingsLength1+2,column=0,columnspan=5,pady=5,sticky=EW)
+        verticalLine1.grid(row=0,column=1,rowspan=self.settingsLength1+3,sticky=NS,pady=(0,5))
+        verticalLine2.grid(row=0,column=3,rowspan=self.settingsLength1+3,sticky=NS,pady=(0,5))
+        
+        if self.settingsLength2 > 0:
+            # Headers for all settings
+            header1_1 = Label(self.settingsFrame2, text="Setting",padx=5)
+            header2_1 = Label(self.settingsFrame2, text="Current",padx=5)
+            header3_1 = Label(self.settingsFrame2, text="Change To",padx=5)
+            horizontalLine1_1 = ttk.Separator(self.settingsFrame2,orient="horizontal")
+            verticalLine1_1 = ttk.Separator(self.settingsFrame2,orient="vertical")
+            verticalLine2_1 = ttk.Separator(self.settingsFrame2,orient="vertical")
+            horizontalLine2_1 = ttk.Separator(self.settingsFrame2,orient="horizontal")
+            header1_1.grid(row=0, column=0,pady=(5,0))
+            header2_1.grid(row=0, column=2,pady=(5,0))
+            header3_1.grid(row=0, column=4,pady=(5,0))
+            horizontalLine1_1.grid(row=1,column=0,columnspan=5,sticky=EW)
+            horizontalLine2_1.grid(row=self.settingsLength2+2,column=0,columnspan=5,pady=5,sticky=EW)
+            verticalLine1_1.grid(row=0,column=1,rowspan=self.settingsLength2+3,sticky=NS,pady=(0,5))
+            verticalLine2_1.grid(row=0,column=3,rowspan=self.settingsLength2+3,sticky=NS,pady=(0,5))
         
         #Stores the label and entry objects
         self.entries = {}
@@ -859,11 +887,15 @@ class TkWindow(Tk):
                 case "self":
                     object = self
             currentValue = getattr(object,attr)
-
-            settingLabel = Label(self.settingsFrame, text=item)
-
-            self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
-            self.entries[item] = Entry(self.settingsFrame,width=10)
+            if row < 10:
+                settingLabel = Label(self.settingsFrame, text=item)
+                self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
+                self.entries[item] = Entry(self.settingsFrame,width=10)
+            else:
+                settingLabel = Label(self.settingsFrame2, text=item)
+                self.currents[item] = Label(self.settingsFrame2, text=str(currentValue))
+                self.entries[item] = Entry(self.settingsFrame2,width=10)
+                row = 2 #reset row for second column
             
             #Place
             settingLabel.grid(row=row, column=0)

@@ -196,28 +196,34 @@ class TkWindow(Tk):
         self.thermalNameLabel = Label(self.thermalsHomeFrame, text="Name")
         self.thermalNameLabel.grid(row=2, column=0, sticky=W, padx=5, pady=5)
         self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual")
-        self.thermalActualLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
+        self.thermalActualLabel.grid(row=2, column=1, sticky=E, padx=5, pady=5)
         self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target")
-        self.thermalTargetLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
+        self.thermalTargetLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
+        self.thermalEnabledLabel = Label(self.thermalsHomeFrame, text="Enabled")
+        self.thermalEnabledLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=3, column=0, columnspan=4, sticky=W+E)
         # Hotend temp info
         self.hotendHomeLabel = Label(self.thermalsHomeFrame, text="Hotend")
         self.hotendHomeLabel.grid(row=4, column=0, sticky=W, padx=5, pady=5)
         self.hotendHomeActual = Label(self.thermalsHomeFrame, text="xxx")
-        self.hotendHomeActual.grid(row=4, column=2, sticky=E, padx=5, pady=5)
+        self.hotendHomeActual.grid(row=4, column=1, sticky=E, padx=5, pady=5)
         #self.hotendHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
         self.hotendHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
         self.hotendHomeTarget.insert(0, "0")
-        self.hotendHomeTarget.grid(row=4, column=3, sticky=E, padx=5, pady=5)
+        self.hotendHomeTarget.grid(row=4, column=2, sticky=E, padx=5, pady=5)
+        self.hotendHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableHotendControl)
+        self.hotendHomeEnableButton.grid(row=4, column=3, sticky=E, padx=5, pady=5)
         # Bed temp info
         self.bedHomeLabel = Label(self.thermalsHomeFrame, text="Bed")
         self.bedHomeLabel.grid(row=5, column=0, sticky=W, padx=5, pady=5)
         self.bedHomeActual = Label(self.thermalsHomeFrame, text="xxx")
-        self.bedHomeActual.grid(row=5, column=2, sticky=E, padx=5, pady=5)
+        self.bedHomeActual.grid(row=5, column=1, sticky=E, padx=5, pady=5)
         #self.bedHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
         self.bedHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
         self.bedHomeTarget.insert(0, "0")
-        self.bedHomeTarget.grid(row=5, column=3, sticky=E, padx=5, pady=5)
+        self.bedHomeTarget.grid(row=5, column=2, sticky=E, padx=5, pady=5)
+        self.bedHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableBedControl)
+        self.bedHomeEnableButton.grid(row=5, column=3, sticky=E, padx=5, pady=5)
 
         # Live temperatures plot
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=6, column=0, columnspan=4, sticky=W+E)
@@ -1052,9 +1058,9 @@ class TkWindow(Tk):
         bedData = self.temperatureController.prevBedTemps
         if ((len(hotendData) == len(bedData) > 0) and (len(hotendData) > 1)):
             # Update the labels
-            self.hotendHomeActual.config(text=round(self.temperatureController.hotendTempCelsius, 2))
+            self.hotendHomeActual.config(text=f"{self.temperatureController.hotendTempCelsius:.2f}")
             #self.hotendHomeTarget.config(text=round(self.temperatureController.hotendTargetTemp, 2))
-            self.bedHomeActual.config(text=round(self.temperatureController.bedTempCelsius, 2))
+            self.bedHomeActual.config(text=f"{self.temperatureController.bedTempCelsius:.2f}")
             #self.bedHomeTarget.config(text=round(self.temperatureController.bedTargetTemp, 2))
 
             # Update the plot

@@ -74,7 +74,7 @@ class TemperatureController:
         #Used so that room temperature is not considered an acceptable temperature for extrusion,
         #which could cause damage to the extruder if it attempted to extrude without the hotend heating up first
         self.minExtrusionTemp = 170        # Minimum hotend temperature for extrusion of any plastic to occur
-        self.maxPrevValues = 50
+        self.maxPrevValues = 400
         self.prevHotendTemps = []
         self.prevBedTemps = []
         
@@ -250,7 +250,7 @@ class TemperatureController:
             else:
                 self.enableHotendControl()
                 #TODO: Temporarily just set target to whatever is in target box
-                self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
+                #self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
         elif (heater == "bed"):
             if (self.bedTempCtrlEnabled):
                 self.disableBedControl()
@@ -258,7 +258,7 @@ class TemperatureController:
             else:
                 self.enableBedControl()
                 #TODO: Temporarily just set target to whatever is in target box
-                self.setBedTargetTemp(float(self.root.bedTarget.get()))
+                #self.setBedTargetTemp(float(self.root.bedTarget.get()))
 
     # Used for setting a target temperature for the hotend
     def setHotendTargetTemp(self, targetTemp):
@@ -287,25 +287,28 @@ class TemperatureController:
     def enableHotendControl(self):
         self.hotendTempCtrlEnabled = True
         self.root.hotendCtrlButton.config(relief="ridge")
+        self.root.hotendHomeEnableButton.config(text="ON", command=self.disableHotendControl)
         self.root.terminalPrint("Hotend heater control enabled")
 
     # Disables temperature control for the hotend
     def disableHotendControl(self):
         self.hotendTempCtrlEnabled = False
         self.root.hotendCtrlButton.config(relief="raised")
-        
+        self.root.hotendHomeEnableButton.config(text="OFF", command=self.enableHotendControl)
         self.root.terminalPrint("Hotend heater control disabled")
 
     # Enables temperature control for the bed
     def enableBedControl(self):
         self.bedTempCtrlEnabled = True
         self.root.bedCtrlButton.config(relief="ridge")
+        self.root.bedHomeEnableButton.config(text="ON", command=self.disableBedControl)
         self.root.terminalPrint("Bed heater control enabled")
 
     # Disables temperature control for the bed
     def disableBedControl(self):
         self.bedTempCtrlEnabled = False
         self.root.bedCtrlButton.config(relief="raised")
+        self.root.bedHomeEnableButton.config(text="OFF", command=self.enableBedControl)
         self.root.terminalPrint("Bed heater control disabled")
     
     #endregion

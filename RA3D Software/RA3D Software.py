@@ -103,7 +103,7 @@ class TkWindow(Tk):
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
-        self.armController.moveSafe()
+        self.armController.moveSafe() # Move the arm to a safe position before shutting down
         self.ledThreadRunning = False
         # Release the GPIO pins from use
         GPIO.cleanup()

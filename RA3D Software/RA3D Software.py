@@ -901,10 +901,10 @@ class TkWindow(Tk):
                 self.currents[item] = Label(self.settingsFrame2, text=str(currentValue))
                 self.entries[item] = Entry(self.settingsFrame2,width=10)
             
-                #Place
-                settingLabel.grid(row=row+maxSettingsPerColumn, column=0)
-                self.currents[item].grid(row=row, column=2)
-                self.entries[item].grid(row=row, column=4,padx=5,pady=5)
+                #Place and adjust row number for second column
+                settingLabel.grid(row=row-maxSettingsPerColumn, column=0)
+                self.currents[item].grid(row=row-maxSettingsPerColumn, column=2)
+                self.entries[item].grid(row=row-maxSettingsPerColumn, column=4,padx=5,pady=5)
             row += 1
 
 

@@ -36,25 +36,12 @@ class SerialController:
             # If not, connect to the port currently selected in the port dropdown
             self.root.statusPrint("Attempting port connection")
             self.connectPort(self.root.portSelection.get())
-            self.root.statusPrint(f"Connection Status: {self.boardConnected}")
-
-            # Perform a check to see if board was actually connected to
-            if self.boardConnected:
-                self.root.connectButton.config(text="Disconnect") # Change button text
-                self.root.portDropdown.config(state="disabled") # Disable port dropdown
-                self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
-                self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
-
         else:
 
             # If so, disconnect from the port
             self.root.statusPrint("Disconnecting from port")
             self.disconnectPort()
-            self.root.statusPrint(f"Connection Status: {self.boardConnected}")
-            self.root.connectButton.config(text="Connect") # Change button text
-            self.root.portDropdown.config(state="readonly") # Enable port dropdown
-            self.root.refreshCOMButton.config(state="normal") # Enable refresh button
-            self.root.portStatusLabel.config(text="Status: Disconnected") # Change port status text
+          
 
     def connectPort(self, port):
         self.port = port
@@ -84,6 +71,15 @@ class SerialController:
         except SerialException:
             self.root.statusPrint(f"Failed to open port: {port}")
 
+        self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+
+        # Perform a check to see if board was actually connected to
+        if self.boardConnected:
+            self.root.connectButton.config(text="Disconnect") # Change button text
+            self.root.portDropdown.config(state="disabled") # Disable port dropdown
+            self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
+            self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
+
     def disconnectPort(self):
         if self.boardConnected == True:
             self.running = False #serial is no longer running
@@ -97,6 +93,12 @@ class SerialController:
             except:
                 pass
             self.boardConnected = False
+            
+        self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+        self.root.connectButton.config(text="Connect") # Change button text
+        self.root.portDropdown.config(state="readonly") # Enable port dropdown
+        self.root.refreshCOMButton.config(state="normal") # Enable refresh button
+        self.root.portStatusLabel.config(text="Status: Disconnected") # Change port status text
             
     # Repeatedly checks the serial port for new responses
     def serialReader(self):

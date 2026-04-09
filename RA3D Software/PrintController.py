@@ -63,7 +63,8 @@ class PrintController:
         BRCorner = Position(self.XEdge[0],self.YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
 
         #corners are absolute relative to the physical structure
-        #but z values will update to be the same as origin if the origin is changed in the UI
+        #but z values of calibration will update to be the same as origin if the origin is changed in the UI
+        #however calibration corners z remain unchanged after initialization
         self.calibrationCorners = [FRCorner,BRCorner,BLCorner,FLCorner]
         
         #---------- Setup variables---------------
@@ -731,9 +732,18 @@ class PrintController:
         self.checkFlag 
         #Height is assumed to be the height of the calibration corners
         if height is None:
-            height = self.calibrationCorners[0].z
-        moveOrder = [1,2,3,4,1,3,2,4]
+            height = self.plateHeight
+        
+        moveOrder = [2,3,4,1,3,2,4] #1 will always be first
         moveOrder= [x-1 for x in moveOrder] #adjust to 0 base index
+
+        pos = copy.deepcopy(self.calibrationCorners[0])
+        pos.z = height
+        self.root.cornerLabel.config(text=f"Current Corner: {1}")
+        moveParameters = copy.deepcopy(self.defaultPrintParameters)
+        moveParameters.wrist = "N"
+        #Move to first corner non linearly
+        self.root.armController.sendMJ(pos,moveParameters=moveParameters, timeout=20)
 
         for i in moveOrder:
             time.sleep(1)

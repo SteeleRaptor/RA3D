@@ -75,7 +75,7 @@ class SerialController:
 
         # Perform a check to see if board was actually connected to
         if self.boardConnected:
-            self.root.connectButton.config(text="Disconnect") # Change button text
+            self.root.connectButton.config(text="Disconnect", state="normal") # Change button text
             self.root.portDropdown.config(state="disabled") # Disable port dropdown
             self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
             self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
@@ -93,7 +93,7 @@ class SerialController:
             except:
                 pass
             self.boardConnected = False
-            
+
         self.root.statusPrint(f"Connection Status: {self.boardConnected}")
         self.root.connectButton.config(text="Connect") # Change button text
         self.root.portDropdown.config(state="readonly") # Enable port dropdown

@@ -1032,9 +1032,9 @@ class TkWindow(Tk):
         self.BlinkLED = True # Used to signal the update loop to start blinking the LED
         #Display a 2nd message based on ignoreflags
         message2 = ""
-        if self.printController.ignoreFlags:
+        if self.printController.ignoreFlags and self.printController.printing:
             message2 = "\nPressing ok will resume movement"
-        else:
+        elif self.printController.printing:
             message2 = "\nPrinting will stop"
         #show message
         messagebox.showinfo("Warning! ", message+message2)

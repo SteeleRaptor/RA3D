@@ -1094,6 +1094,7 @@ class ArmController:
         self.root.printController.flag = None
 
         running_threads = threading.enumerate() # Get a list of all running threads
+        print("Running threads:", [thread.name for thread in running_threads]) # Print the list of running threads for debugging
         killingThreads = False
         for thread in running_threads:
             if thread is not threading.current_thread() and thread not in self.root.unstoppableThreads:

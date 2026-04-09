@@ -46,7 +46,7 @@ class TkWindow(Tk):
         self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
         self.ledThreadRunning = True # Used to stop the LED thread
-        self.unstoppableThreads = ["Serial Thread", "Serial Sort Thread","LED Thread"] #Threads that will not be stopped on reset
+        self.unstoppableThreads = ["Serial Thread", "Serial Sort Thread","LED Thread", "Thread-1"] #Threads that will not be stopped on reset
         self.LEDPin = 36
         # Initialize the GPIO
         GPIO.setmode(GPIO.BOARD)

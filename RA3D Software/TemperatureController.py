@@ -276,14 +276,14 @@ class TemperatureController:
         self.root.hotendCtrlButton.config(relief="ridge")
         #User cannot enter a target temp, mainly to prevent confusion about temperature control and
         #and to show the print controller is controlling temperature
-        self.root.bedTarget.config(state="disabled") 
+        self.root.hotendTarget.config(state="disabled") 
         self.root.terminalPrint("Hotend heater control enabled")
 
     # Disables temperature control for the hotend
     def disableHotendControl(self):
         self.hotendTempCtrlEnabled = False
         self.root.hotendCtrlButton.config(relief="raised")
-        self.root.bedTarget.config(state="normal") #User can now enter a target temp
+        self.root.hotendTarget.config(state="normal") #User can now enter a target temp
         self.root.terminalPrint("Hotend heater control disabled")
 
     # Enables temperature control for the bed
@@ -292,14 +292,14 @@ class TemperatureController:
         self.root.bedCtrlButton.config(relief="ridge")
         #User cannot enter a target temp, mainly to prevent confusion about temperature control and
         #and to show the print controller is controlling temperature
-        self.root.bedTarget.config(state="normal")
+        self.root.bedTarget.config(state="disabled")
         self.root.terminalPrint("Bed heater control enabled")
 
     # Disables temperature control for the bed
     def disableBedControl(self):
         self.bedTempCtrlEnabled = False
         self.root.bedCtrlButton.config(relief="raised")
-        self.root.bedTarget.config(state="enabled") #User can now enter a target temp
+        self.root.bedTarget.config(state="normal") #User can now enter a target temp
         self.root.terminalPrint("Bed heater control disabled")
     
     #endregion

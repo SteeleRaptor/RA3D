@@ -179,7 +179,7 @@ float J6_BacklashFix_b = 0;
 
 float J2_BacklashFix_m = 0.01;
 float J3_BacklashFix_m = 0.01;
-float J5_BacklashFix_m = 0.001;
+float J5_BacklashFix_m = 0.116;
 
 int LastJ1dir = -1;
 int LastJ4dir = -1;

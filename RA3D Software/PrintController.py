@@ -493,11 +493,13 @@ class PrintController:
             return
         if self.root.armController.checkIfAllBusy(message="start print"):
             return
+        #Warning prints
         if self.ignoreFlags:
             self.root.warningPrint("Ignore flags is enabled\nFlags will be ignored. Disable in print controller")
         if not self.checkBoundaryTrue:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
-        
+        if self.root.coolendMode:
+            self.root.warningPrint("Printing in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
         #Print starts here if no problems
         self.root.LEDOn = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
 

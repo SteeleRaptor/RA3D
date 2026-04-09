@@ -12,6 +12,7 @@ class ArmController:
         #Default loop mode Closed
         # Arm calibration variables
         self.armCalibrated = False # Flag to signify if the arm has been calibrated
+        self.calibrationOverridden = False # Keeps track of if the calibration was overriden because it can be dangerous
         self.calibrationInProgress = False # Flag to signify if calibration is currently in progress
         # Contains current calibration step
         #  0 - N/A
@@ -207,7 +208,9 @@ class ArmController:
     #for debugging
     def overrideCalibration(self):
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
+        self.root.warningPrint("Calibration overridden. Only use if you know that arm is calibrated")
         self.armCalibrated = True
+        self.calibrationOverridden = True
         
     #calibrate indvidual joints
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False, single=True):
@@ -594,10 +597,13 @@ class ArmController:
     #For extrusion without movement
     #timeoutMultiplier is how much extra time per expected second is needed
     def extrude(self,extrudeRate,moveParameters=None,relative=True,timeoutMultiplier=3):
-        if not self.root.temperatureController.HotendTargetReached():
+        if not self.root.temperatureController.HotendTargetReached() and not self.root.coolendMode:
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.root.printController.flag = "Hotend target temperature not reached"
             return
+        elif self.root.coolendMode:
+            self.root.warningPrint("Extruding in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
+
         timeoutMin = 8 #minimum timeout
         if moveParameters is None:
             moveParameters = self.defaultExtrudeParameters
@@ -786,8 +792,8 @@ class ArmController:
             self.root.printController.flag = "Arm busy"
             return
         
-        #Check if extruding and hotend temp is reached
-        if not self.root.temperatureController.HotendTargetReached() and extrudeRate != 0:
+        #Check if extruding and hotend temp is reached if extrusion is requested
+        if not self.root.temperatureController.HotendTargetReached() and not self.root.coolendMode and extrudeRate != 0:
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.root.printController.flag = "Hotend target temperature not reached"
             return
@@ -1086,8 +1092,26 @@ class ArmController:
         self.root.printController.cornerSweeping = False
         self.root.serialController.clearQueue()
         self.root.printController.flag = None
-        self.root.warningPrint("if threads have not finished, reset may break things")
 
+        running_threads = threading.enumerate() # Get a list of all running threads
+        killingThreads = False
+        for thread in running_threads:
+            if thread is not threading.current_thread() and thread not in self.root.unstoppableThreads:
+                killingThreads = True
+                break
+
+        if killingThreads:
+            self.root.statusPrint("Attempting to kill threads. Please wait...")
+            self.root.serialController.RaiseError("Reset")
+            for thread in running_threads:
+                if thread is not threading.current_thread() and thread not in self.root.unstoppableThreads:
+                    self.root.terminalPrint(f"Killing thread: {thread.name}")
+                    self.root.join(thread)
+                    self.root.terminalPrint(f"Thread {thread.name} killed")
+            self.root.statusPrint("Reset complete")
+        else:
+            self.root.statusPrint("No Threads Running. Reset complete")
+        
     #cancel all actions except moveresponse so moves can terminate properly
     def cancelActions(self):
         self.calibrationInProgress = False

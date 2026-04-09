@@ -75,8 +75,8 @@ class SerialController:
             self.boardConnected = True
             self.responseQueue = queue.Queue()
 
-            self.serialThread = threading.Thread(target=self.serialReader, daemon=True)
-            self.sortThread = threading.Thread(target=self.processResponses, daemon=True)
+            self.serialThread = threading.Thread(target=self.serialReader, daemon=True, name="serialThread")
+            self.sortThread = threading.Thread(target=self.processResponses, daemon=True, name="sortThread")
             self.running = True #Keeps threads running, must be true before starting serialthread
             self.serialThread.start()
             self.sortThread.start()
@@ -177,8 +177,11 @@ class SerialController:
         self.root.printController.flag = error
         self.root.terminalPrint(f"Error {error} occured")
         self.ErrorRaised = True
-        time.sleep(2) #Allow other threads to process error
+        #Allow other threads to process error
+        while self.waiting_responses: 
+            time.sleep(0.01)
         self.ErrorRaised = False
+        self.root.terminalPrint("Error processed, resuming normal operation")
         self.clearQueue() #Clear queue of any responses that may have come in during error
         
     #Advances the response queue every .01 seconds    

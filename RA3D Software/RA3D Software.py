@@ -46,8 +46,7 @@ class TkWindow(Tk):
         self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
         self.ledThreadRunning = True # Used to stop the LED thread
-        
-        # Pin declaration for the LED
+        self.unstoppableThreads = ["Serial Thread", "Serial Sort Thread","LED Thread"] #Threads that will not be stopped on reset
         self.LEDPin = 36
         # Initialize the GPIO
         GPIO.setmode(GPIO.BOARD)
@@ -80,30 +79,30 @@ class TkWindow(Tk):
         self.createTabs()
         if self.DebugMode:
             self.root.terminalPrint("GUI created")
+
         self.serialController.refreshCOMPorts()
        
         
-        #TODO remove these eventually
-        self.timeoutStartedCal = False
-        #self.timeoutStartedMove = False
-
         self.root.protocol("WM_DELETE_WINDOW", self.shutdownProgram)
 
         self.printThreadStarted = False
         #Set origin last so everything is in place
         self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
-         # Set up a call to the update function after updateDelay milliseconds
-        #updateThread = threading.Thread(target=self.update)
-        #updateThread.start()
-        self.ledThread = threading.Thread(target=self.updateLED, daemon=True)
+         
+        self.ledThread = threading.Thread(target=self.updateLED, daemon=True,name="ledThread")
         self.ledThread.start()
+        # Set up a call to the update function after updateDelay milliseconds
         self.update()
+
     #endregion init
 
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
-        self.armController.moveSafe() # Move the arm to a safe position before shutting down
+        # Move the arm to a safe position before shutting down, will not move safe if not calibrated
+        # This is necessary because if the arm is not calibrated
+        if not self.armController.calibrationOverridden:
+            self.armController.moveSafe()
         self.ledThreadRunning = False
         # Release the GPIO pins from use
         GPIO.cleanup()
@@ -728,16 +727,17 @@ class TkWindow(Tk):
         self.J7CoordEntry2.grid(row=1, column=1, padx=(0, 5), pady=5)
         self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrudeButton)
         self.extrudeButton.grid(row=2, column=0,padx=(0, 5), pady=5)
+        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
+        self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
+
         self.loadButton = Button(self.extruderFrame, text = "Load", command=self.armController.loadFilament)
         self.loadButton.grid(row=3, column=0,padx=(0, 5), pady=5)
         self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament)
-        self.unloadButton.grid(row=4, column=0,padx=(0, 5), pady=5)
-        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
-        self.zeroJ7Button.grid(row=5,column=1,padx=(0, 5), pady=5)
+        self.unloadButton.grid(row=3, column=1,padx=(0, 5), pady=5)
         self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")
         self.currentJ7Label2.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
         self.currentJ72 = Label(self.extruderFrame,text="0 mm")
-        self.currentJ72.grid(row=7,column=1, padx=5, pady=5, sticky=N+S)
+        self.currentJ72.grid(row=6,column=1, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):

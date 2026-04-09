@@ -663,13 +663,15 @@ class ArmController:
         self.waitForResponseAndProcess("POSZ7",15,message="Zero J7",setFlag=False)
     
     def waitForResponseAndProcess(self,prefix,timeout=15,message="", setFlag = True):
+        #Wait for the response from the serial controller with the given prefix and timeout
         response = self.root.serialController.waitForResponse(prefix,timeout)
-        #If the response error rather than timed out
-        if response[:5] == "Error":
-            self.root.printController.flag = response
-            self.root.terminalPrint(response + " stopped serial response processing")
-            return
+        
         if response is not None:
+            #If the response error rather than timed out
+            if response[:5] == "Error":
+                self.root.printController.flag = response
+                self.root.terminalPrint(response + " stopped serial response processing")
+                return
             self.processPosition(response)
             if self.root.DebugMode:
                 self.root.terminalPrint(response)

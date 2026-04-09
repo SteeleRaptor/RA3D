@@ -824,14 +824,14 @@ class TkWindow(Tk):
         self.settingsFrame.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
         self.settingsFrame2 = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
         self.settingsFrame2.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
+        maxSettingsPerColumn = 15
 
-
-        if len(self.settingsDict) <= 8:
+        if len(self.settingsDict) <= maxSettingsPerColumn:
             self.settingsLength1 = len(self.settingsDict)
             self.settingsLength2 = 0
         else:
-            self.settingsLength1 = 8
-            self.settingsLength2 = len(self.settingsDict) - 8
+            self.settingsLength1 = maxSettingsPerColumn
+            self.settingsLength2 = len(self.settingsDict) - maxSettingsPerColumn
 
         # Headers for all settings
         header1 = Label(self.settingsFrame, text="Setting",padx=5)
@@ -888,7 +888,7 @@ class TkWindow(Tk):
                 case "self":
                     object = self
             currentValue = getattr(object,attr)
-            if row < 10:
+            if row < maxSettingsPerColumn + 2: #if there is still room in the first column
                 settingLabel = Label(self.settingsFrame, text=item)
                 self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
                 self.entries[item] = Entry(self.settingsFrame,width=10)
@@ -896,13 +896,14 @@ class TkWindow(Tk):
                 settingLabel = Label(self.settingsFrame2, text=item)
                 self.currents[item] = Label(self.settingsFrame2, text=str(currentValue))
                 self.entries[item] = Entry(self.settingsFrame2,width=10)
-                row = 2 #reset row for second column
             
             #Place
             settingLabel.grid(row=row, column=0)
             self.currents[item].grid(row=row, column=2)
             self.entries[item].grid(row=row, column=4,padx=5,pady=5)
             row += 1
+            if row == maxSettingsPerColumn + 2: #switch to second frame after maxSettingsPerColumn settings
+                row = 2 #reset row for second column
 
         self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings)
         self.setAllSettingsButton.grid(row=row+2,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom

@@ -712,14 +712,14 @@ class PrintController:
         posStep.z += self.bedCalibrateHeight
         moveParameters = copy.deepcopy(self.defaultPrintParameters)
         moveParameters.wrist = "N"
-        self.root.armController.sendMJ(posStep,moveParameters=moveParameters)
+        self.root.armController.sendMJ(posStep,moveParameters=moveParameters,timeout=self.timeoutExtra)
         self.checkFlag()
         #Move halfway
-        self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters)
+        self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters,timeout=self.timeoutExtra)
         posStep.z -= self.bedCalibrateHeight/2
 
         #Move to corner to touch plate
-        self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters)
+        self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters,timeout=self.timeoutExtra)
         self.checkFlag()
         self.root.statusPrint(f"Corner {self.bedCalStep} calibration complete")
         self.bedCalStep += 1
@@ -743,7 +743,7 @@ class PrintController:
         moveParameters = copy.deepcopy(self.defaultPrintParameters)
         moveParameters.wrist = "N"
         #Move to first corner non linearly
-        self.root.armController.sendMJ(pos,moveParameters=moveParameters, timeout=20)
+        self.root.armController.sendMJ(pos,moveParameters=moveParameters, timeout=self.timeoutExtra)
 
         for i in moveOrder:
             time.sleep(1)
@@ -751,7 +751,7 @@ class PrintController:
             pos.z = height
             self.root.cornerLabel.config(text=f"Current Corner: {i+1}")
             if self.cornerSweeping:
-                self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=20)
+                self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=self.timeoutExtra)
             #dont continue if no longer sweeping
             else:
                 return

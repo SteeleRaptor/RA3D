@@ -34,7 +34,8 @@ class TkWindow(Tk):
             "Printing Timeout Extra": ("timeoutExtra","PC"),
             "Hard code printer speed to default": ("hardCodePrinterSpeed","PC"),
             "Solid LED": ("LEDOn","self"),
-            "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC")
+            "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC"),
+            "Coolend Mode": ("coolendMode","self")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates

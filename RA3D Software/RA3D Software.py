@@ -824,7 +824,7 @@ class TkWindow(Tk):
         self.settingsFrame.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
         self.settingsFrame2 = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
         self.settingsFrame2.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
-        maxSettingsPerColumn = 15
+        maxSettingsPerColumn = 13
 
         if len(self.settingsDict) <= maxSettingsPerColumn:
             self.settingsLength1 = len(self.settingsDict)
@@ -906,7 +906,7 @@ class TkWindow(Tk):
                 row = 2 #reset row for second column
 
         self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings)
-        self.setAllSettingsButton.grid(row=row+2,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
+        self.setAllSettingsButton.grid(row=maxSettingsPerColumn+2,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
 
     #endregion Tabs
     #Set settings

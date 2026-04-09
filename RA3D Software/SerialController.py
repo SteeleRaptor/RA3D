@@ -214,6 +214,7 @@ class SerialController:
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
+    #This function mainly serves as a backup for processing responses and should NOT be used for normal processing of a response
     def sortResponse(self, sortResponse):
         #shorthand for ease
         PC = self.root.printController
@@ -332,8 +333,15 @@ class SerialController:
             except (queue.Empty, IndexError):
                 time.sleep(0.01)
                 pass
+        
+        #Signifies error stopped the waiting for response
+        if self.ErrorRaised:
+            #Discard unique code because no longer waiting
+            self.waiting_responses.discard(uniqueCode) #discard after checking error raised
+            return "Error"
         #Discard unique code because no longer waiting
         self.waiting_responses.discard(uniqueCode)
+        #Signifies timeout occurred
         return None
     
     # Sends a string over serial to the connected port

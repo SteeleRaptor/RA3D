@@ -93,6 +93,7 @@ class TkWindow(Tk):
         self.ledThread.start()
         # Set up a call to the update function after updateDelay milliseconds
         self.update()
+        self.serialController.connectPort('/dev/ttyACM0')
 
     #endregion init
 

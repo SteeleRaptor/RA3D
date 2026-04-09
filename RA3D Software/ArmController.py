@@ -664,6 +664,11 @@ class ArmController:
     
     def waitForResponseAndProcess(self,prefix,timeout=15,message="", setFlag = True):
         response = self.root.serialController.waitForResponse(prefix,timeout)
+        #If the response error rather than timed out
+        if response[:5] == "Error":
+            self.root.printController.flag = response
+            self.root.terminalPrint(response + " stopped serial response processing")
+            return
         if response is not None:
             self.processPosition(response)
             if self.root.DebugMode:
@@ -1080,38 +1085,53 @@ class ArmController:
     
     #This should reset everything in check if all busy
     def reset(self):
+        #Reset all flags
         self.awaitingMoveResponse = False
-        #self.serialController.waitingForResponse = False
         self.calibrationInProgress = False
         self.awaitingPosResponse = False
         self.testingLimitSwitches = False
         self.testingEncoders = False
+        #Pause print if printing
         if self.root.printController.printing:
             self.root.printController.pausePrint()
         self.root.printController.bedCalibration = False
         self.root.printController.cornerSweeping = False
-        self.root.serialController.clearQueue()
-        self.root.printController.flag = None
+        
+        time.sleep(0.5) # Small delay to ensure all flags are reset before killing threads
 
         running_threads = threading.enumerate() # Get a list of all running threads
-        print("Running threads:", [thread.name for thread in running_threads]) # Print the list of running threads for debugging
-        killingThreads = False
+        #Print thread for debugging
+        self.root.terminalPrint("Running threads:", [thread.name for thread in running_threads]) # Print the list of running threads for debugging
+        
+        killingThreads = False #whether there are threads to kill
+        #For each running thread
         for thread in running_threads:
+            #if the thread is not the current thread and is not in the list of unstoppable threads, join it (kill it)
             if thread is not threading.current_thread() and thread.name not in self.root.unstoppableThreads:
                 killingThreads = True
                 break
 
         if killingThreads:
-            self.root.statusPrint("Attempting to kill threads. Please wait...")
+            #Notify user to not interrupt the reset process because threads are being killed
+            self.root.warningPrint("Attempting to kill threads. Press ok then please wait")
+            self.root.statusPrint("Please wait...")
+            #This is what actually kills the threads, it will raise an error to stop waiting for serial
+            #The only way it can truly kill thread is to stop serial waiting otherwise it will just wait for it to finish
             self.root.serialController.RaiseError("Reset")
             for thread in running_threads:
                 if thread is not threading.current_thread() and thread.name not in self.root.unstoppableThreads:
                     self.root.terminalPrint(f"Killing thread: {thread.name}")
+                    #wait for thread to finish
                     self.root.join(thread)
                     self.root.terminalPrint(f"Thread {thread.name} killed")
             self.root.statusPrint("Reset complete")
         else:
             self.root.statusPrint("No Threads Running. Reset complete")
+        
+        #Clear queue because response from arm will not matter if things were cancelled
+        self.root.serialController.clearQueue()
+        #Reset the printer flag
+        self.root.printController.flag = None
         
     #cancel all actions except moveresponse so moves can terminate properly
     def cancelActions(self):

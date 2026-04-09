@@ -46,7 +46,7 @@ class TkWindow(Tk):
         self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
         self.ledThreadRunning = True # Used to stop the LED thread
-        self.unstoppableThreads = ["Serial Thread", "Serial Sort Thread","LED Thread", "Thread-1"] #Threads that will not be stopped on reset
+        self.unstoppableThreads = ["Serial Read Thread", "Serial Sort Thread","LED Thread","MainThread", "Thread-1"] #Threads that will not be stopped on reset
         self.LEDPin = 36
         # Initialize the GPIO
         GPIO.setmode(GPIO.BOARD)
@@ -89,7 +89,7 @@ class TkWindow(Tk):
         #Set origin last so everything is in place
         self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
          
-        self.ledThread = threading.Thread(target=self.updateLED, daemon=True,name="ledThread")
+        self.ledThread = threading.Thread(target=self.updateLED, daemon=True,name="LED Thread")
         self.ledThread.start()
         # Set up a call to the update function after updateDelay milliseconds
         self.update()
@@ -972,7 +972,7 @@ class TkWindow(Tk):
         # ==========| PrintController |==========
         #Each print loop runs in the thread so that it can "wait" and not halt the UI
         if self.printController.printing and not self.printThreadStarted and not self.printController.printPaused:
-                printThread = threading.Thread(target=self.printController.printLoop)
+                printThread = threading.Thread(target=self.printController.printLoop, name = "Print Loop Thread")
                 printThread.start()
                 #Variable to signal when the thread finishes
                 self.printThreadStarted = True

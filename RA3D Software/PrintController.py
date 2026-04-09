@@ -580,7 +580,7 @@ class PrintController:
             self.root.statusPrint("Bed calibration not started")
         self.checkFlag()
         if self.bedCalibrationInProgress == True:
-            bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep)
+            bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep, name= "Bed Calibration Thread")
             bedCalibrationThread.start()
         
     def startCornerSweep(self):
@@ -592,7 +592,7 @@ class PrintController:
         else:
             self.cornerSweeping = True
         self.root.serialController.clearQueue() #clear queue so it is not backed up
-        cornerSweepThread = threading.Thread(target=self.cornerSweep)
+        cornerSweepThread = threading.Thread(target=self.cornerSweep, name="Corner Sweep Thread")
         cornerSweepThread.start()
 
     #corner sweep and move up one level at a time
@@ -604,14 +604,14 @@ class PrintController:
         else:
             self.cornerSweeping = True
         self.root.serialController.clearQueue() #clear queue so it is not backed up
-        cornerSweepThread = threading.Thread(target=self.fullCornerSweep)
+        cornerSweepThread = threading.Thread(target=self.fullCornerSweep, name="Full Corner Sweep Thread")
         cornerSweepThread.start()
 
     #will cancel any related printing setup functions
     def cancelAny(self):
         if self.printing:
             self.cancelPrint()
-        threading.Thread(target=self.endSweepOrCal).start() #On thread because move command is on there
+        threading.Thread(target=self.endSweepOrCal, name="End Sweep or Calibration Thread").start() #On thread because move command is on there
         #just in case someone thinks this will cancel the print
         
 

@@ -75,8 +75,8 @@ class SerialController:
             self.boardConnected = True
             self.responseQueue = queue.Queue()
 
-            self.serialThread = threading.Thread(target=self.serialReader, daemon=True, name="serialThread")
-            self.sortThread = threading.Thread(target=self.processResponses, daemon=True, name="sortThread")
+            self.serialThread = threading.Thread(target=self.serialReader, daemon=True, name="Serial Read Thread")
+            self.sortThread = threading.Thread(target=self.processResponses, daemon=True, name="Serial Sort Thread")
             self.running = True #Keeps threads running, must be true before starting serialthread
             self.serialThread.start()
             self.sortThread.start()

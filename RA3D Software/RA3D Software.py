@@ -892,21 +892,24 @@ class TkWindow(Tk):
                 settingLabel = Label(self.settingsFrame, text=item)
                 self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
                 self.entries[item] = Entry(self.settingsFrame,width=10)
+                #Place
+                settingLabel.grid(row=row, column=0)
+                self.currents[item].grid(row=row, column=2)
+                self.entries[item].grid(row=row, column=4,padx=5,pady=5)
             else:
                 settingLabel = Label(self.settingsFrame2, text=item)
                 self.currents[item] = Label(self.settingsFrame2, text=str(currentValue))
                 self.entries[item] = Entry(self.settingsFrame2,width=10)
             
-            #Place
-            settingLabel.grid(row=row, column=0)
-            self.currents[item].grid(row=row, column=2)
-            self.entries[item].grid(row=row, column=4,padx=5,pady=5)
+                #Place
+                settingLabel.grid(row=row+maxSettingsPerColumn, column=0)
+                self.currents[item].grid(row=row, column=2)
+                self.entries[item].grid(row=row, column=4,padx=5,pady=5)
             row += 1
-            if row == maxSettingsPerColumn + 2: #switch to second frame after maxSettingsPerColumn settings
-                row = 2 #reset row for second column
+
 
         self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings)
-        self.setAllSettingsButton.grid(row=maxSettingsPerColumn+2,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
+        self.setAllSettingsButton.grid(row=maxSettingsPerColumn+4,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
 
     #endregion Tabs
     #Set settings

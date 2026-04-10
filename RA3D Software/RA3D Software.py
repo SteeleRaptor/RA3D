@@ -1153,14 +1153,6 @@ class TkWindow(Tk):
             self.hotendTargetLine = self.thermalPlot.axhline(y=self.temperatureController.hotendTargetTemp, color='r', linestyle='--')
             self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
             self.thermalCanvas.draw()
-        # If the target temperature entries are deselected, periodically read the target temperature from there and update
-        try:
-            if self.root.focus_get() != self.hotendHomeTarget:
-                self.temperatureController.setHotendTargetTemp(float(self.hotendHomeTarget.get()))
-            if self.root.focus_get() != self.bedHomeTarget:
-                self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()))
-        except Exception:
-            pass
         
         # Arm Info
         if self.serialController.boardConnected:
@@ -1206,10 +1198,10 @@ class TkWindow(Tk):
         # Check if our current focus is a specific entry widget and if the new focus is different
         # If so we unfocus the entry and do some other stuff if needed
         if self.root.focus_get() == self.hotendHomeTarget and event.widget != self.hotendHomeTarget:
-            self.temperatureController.setHotendTargetTemp(float(self.hotendHomeTarget.get()))
+            self.temperatureController.setHotendTargetTemp(float(self.hotendHomeTarget.get()), False)
             self.root.focus_set()
         elif self.root.focus_get() == self.bedHomeTarget and event.widget != self.bedHomeTarget:
-            self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()))
+            self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()), False)
             self.root.focus_set()
 
     def windowDimensions(self, event):

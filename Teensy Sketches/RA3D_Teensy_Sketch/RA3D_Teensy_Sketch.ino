@@ -171,15 +171,15 @@ float J9StepDeg = 14.2857;
 //Backlash fix variables
 //Linear offset for backlash fix
 float J1_BacklashFix_b = 0;
-float J2_BacklashFix_b = 3;
-float J3_BacklashFix_b = 2;
+float J2_BacklashFix_b = 0;
+float J3_BacklashFix_b = 0;
 float J4_BacklashFix_b = 0;
-float J5_BacklashFix_b = 1;
+float J5_BacklashFix_b = -1;
 float J6_BacklashFix_b = 0;
 
-float J2_BacklashFix_m = 0.01;
-float J3_BacklashFix_m = 0.01;
-float J5_BacklashFix_m = 0.116;
+float J2_BacklashFix_m = 0;// 0.01;
+float J3_BacklashFix_m = 0;// 0.01;
+float J5_BacklashFix_m = 0;//0.01;
 
 int LastJ1dir = -1;
 int LastJ4dir = -1;
@@ -243,7 +243,7 @@ float J1calBaseOff = -1;
 float J2calBaseOff = 1.5;
 float J3calBaseOff = 4.1+4.5; //Added 4.5 based on observations
 float J4calBaseOff = -2;
-float J5calBaseOff = 3.1+14.1; //Added 14 based on obesrvations
+float J5calBaseOff = 3.1+16.1; //Added 14 based on obesrvations
 float J6calBaseOff = -.5;
 float J7calBaseOff = 0;
 float J8calBaseOff = 0;

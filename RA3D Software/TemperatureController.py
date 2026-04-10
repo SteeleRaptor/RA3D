@@ -262,7 +262,7 @@ class TemperatureController:
                 #self.setBedTargetTemp(float(self.root.bedTarget.get()))
 
     # Used for setting a target temperature for the hotend
-    def setHotendTargetTemp(self, targetTemp):
+    def setHotendTargetTemp(self, targetTemp, fromGcode=True):
         if (targetTemp < 0):
             self.root.terminalPrint("Provided target temperature is less than zero (hotend)")
             return
@@ -272,14 +272,16 @@ class TemperatureController:
             self.root.hotendHomeTarget.insert(0, "0")
             return
         self.hotendTargetTemp = targetTemp
-
-        # Update the target temp displayed if it was set from the gcode
-        self.root.hotendTarget.delete(0, 'end') #delte whatever is currently in the entry box
-        self.root.hotendTarget.insert(0,f"{targetTemp}") #insert target temp
+        
+        if fromGcode:
+            # Update the target temp displayed if it was set from the gcode
+            self.root.hotendHomeTarget.delete(0, 'end') #delte whatever is currently in the entry box
+            self.root.hotendHomeTarget.insert(0,f"{targetTemp}") #insert target temp
+        
         self.root.terminalPrint(f"Hotend target temperature set to {targetTemp}°C")
 
     # Used for setting a target temperature for the bed
-    def setBedTargetTemp(self, targetTemp):
+    def setBedTargetTemp(self, targetTemp, fromGcode=True):
         if (targetTemp < 0):
             self.root.terminalPrint("Provided target temperature is less than zero (bed)")
         if (targetTemp > self.bedTempHardLimit):
@@ -288,9 +290,9 @@ class TemperatureController:
             self.root.bedHomeTarget.insert(0, "0")
             return
         # Update the target temp displayed if it was set from the gcode
-        self.root.bedTarget.delete(0, 'end') #delte whatever is currently in the entry box
-        self.root.bedTarget.insert(0,f"{targetTemp}") #insert target temp
-
+        if fromGcode:
+            self.root.bedHomeTarget.delete(0, 'end') #delte whatever is currently in the entry box
+            self.root.bedHomeTarget.insert(0,f"{targetTemp}") #insert target temp
         self.bedTargetTemp = targetTemp
 
     # Enables temperature control for the hotend

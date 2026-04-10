@@ -1,3 +1,4 @@
+# NOTE: This file is not currently used, but may be useful in the future for converting between different rotation representations
 import math
 import numpy as np
 class RotationSolver: 

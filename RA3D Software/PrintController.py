@@ -715,6 +715,7 @@ class PrintController:
         #set label
         currentCornerPos = self.calibrationCorners[self.bedCalStep-1]
         self.root.cornerLabel.config(text=f"Current Corner: {self.bedCalStep}")
+        self.root.cornerLabelHome.config(text=f"Current Corner: {self.bedCalStep}")
 
         #For better positioning move home than origin so J4 starts at 0 rather than 180
         #self.root.armController.moveHome()
@@ -754,6 +755,7 @@ class PrintController:
             pos = copy.deepcopy(self.calibrationCorners[i])
             pos.z = height
             self.root.cornerLabel.config(text=f"Current Corner: {i+1}")
+            self.root.cornerLabelHome.config(text=f"Current Corner: {i+1}")
             if self.cornerSweeping:
                 self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=20)
             #dont continue if no longer sweeping
@@ -773,6 +775,7 @@ class PrintController:
         self.bedCalibrationInProgress=False
         self.bedCalStep == 0
         self.root.cornerLabel.config(text=f"Current Corner: N/A")
+        self.root.cornerLabelHome.config(text=f"Current Corner: N/A")
         #Wait until move finishes to send move home command
         
         if move:

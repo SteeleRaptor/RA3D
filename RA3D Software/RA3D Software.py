@@ -65,8 +65,8 @@ class TkWindow(Tk):
         # self.attributes('-topmost', True)
         self.updateDelay = 150 # Delay between update function calls in milliseconds
         # Set the window dimensions and position on screen
-        w = 1400 # Window width
-        h = 600 # Window height
+        w = 1190 # Window width
+        h = 710 # Window height
         ws = self.winfo_screenwidth() # Get screen width
         hs = self.winfo_screenheight() # Get screen height
         x = int((ws/2) - (w/2)) # Calculate x position for window to be in the center of the screen
@@ -164,6 +164,7 @@ class TkWindow(Tk):
         # Print status label (Printing, paused, etc.)
         self.printStatusHomeLabel = Label(self.printInfoHomeFrame, text="IDLING...", font=("Magneto", 30, "bold"))
         self.printStatusHomeLabel.grid(row=0, column=0, columnspan=3, rowspan=2, padx=5, pady=5, sticky=N+W)
+        self.printStatusHomeLabel.bind("<Button-1>", self.windowDimensions)
         # Start button
         self.startPrintHomeButton = Button(self.printInfoHomeFrame, text="Start", width=10, height=2, command=self.printController.startPrint, state="disabled")
         self.startPrintHomeButton.grid(row=0, column=3, padx=5, pady=5, sticky=E)
@@ -191,48 +192,54 @@ class TkWindow(Tk):
         self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=350)
         self.thermalsHomeFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
         self.thermalsHomeLabel = Label(self.thermalsHomeFrame, text="Thermals")
-        self.thermalsHomeLabel.grid(row=0, column=0, columnspan=4, sticky=W+N+S, padx=5, pady=5)
-        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=4, sticky=W+E)
+        self.thermalsHomeLabel.grid(row=0, column=0, columnspan=2, sticky=W+N+S, padx=5, pady=5)
+        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=6, sticky=W+E)
         self.thermalNameLabel = Label(self.thermalsHomeFrame, text="Name")
-        self.thermalNameLabel.grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        self.thermalNameLabel.grid(row=2, column=0, columnspan=2, sticky=W, padx=5, pady=5)
         self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual")
-        self.thermalActualLabel.grid(row=2, column=1, sticky=E, padx=5, pady=5)
+        self.thermalActualLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
         self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target")
-        self.thermalTargetLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
+        self.thermalTargetLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
         self.thermalEnabledLabel = Label(self.thermalsHomeFrame, text="Enabled")
-        self.thermalEnabledLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
-        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=3, column=0, columnspan=4, sticky=W+E)
+        self.thermalEnabledLabel.grid(row=2, column=4, sticky=E, padx=5, pady=5)
+        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=3, column=0, columnspan=6, sticky=W+E)
         # Hotend temp info
         self.hotendHomeLabel = Label(self.thermalsHomeFrame, text="Hotend")
         self.hotendHomeLabel.grid(row=4, column=0, sticky=W, padx=5, pady=5)
         self.hotendHomeActual = Label(self.thermalsHomeFrame, text="xxx")
-        self.hotendHomeActual.grid(row=4, column=1, sticky=E, padx=5, pady=5)
+        self.hotendHomeActual.grid(row=4, column=2, sticky=E, padx=5, pady=5)
         #self.hotendHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
         self.hotendHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
         self.hotendHomeTarget.insert(0, "0")
-        self.hotendHomeTarget.grid(row=4, column=2, sticky=E, padx=5, pady=5)
+        self.hotendHomeTarget.grid(row=4, column=3, sticky=E, padx=5, pady=5)
         self.hotendHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableHotendControl)
-        self.hotendHomeEnableButton.grid(row=4, column=3, sticky=E, padx=5, pady=5)
+        self.hotendHomeEnableButton.grid(row=4, column=4, sticky=E, padx=5, pady=5)
+        self.hotendHomeLegend = Label(self.thermalsHomeFrame, text=" ", bg="#FF0000", width=2)
+        self.hotendHomeLegend.grid(row=4, column=5, padx=5, pady=5, sticky=W)
+
         # Bed temp info
         self.bedHomeLabel = Label(self.thermalsHomeFrame, text="Bed")
         self.bedHomeLabel.grid(row=5, column=0, sticky=W, padx=5, pady=5)
         self.bedHomeActual = Label(self.thermalsHomeFrame, text="xxx")
-        self.bedHomeActual.grid(row=5, column=1, sticky=E, padx=5, pady=5)
+        self.bedHomeActual.grid(row=5, column=2, sticky=E, padx=5, pady=5)
         #self.bedHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
         self.bedHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
         self.bedHomeTarget.insert(0, "0")
-        self.bedHomeTarget.grid(row=5, column=2, sticky=E, padx=5, pady=5)
+        self.bedHomeTarget.grid(row=5, column=3, sticky=E, padx=5, pady=5)
         self.bedHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableBedControl)
-        self.bedHomeEnableButton.grid(row=5, column=3, sticky=E, padx=5, pady=5)
+        self.bedHomeEnableButton.grid(row=5, column=4, sticky=E, padx=5, pady=5)
+        self.bedHomeLegend = Label(self.thermalsHomeFrame, text=" ", bg="#0000FF", width=2)
+        self.bedHomeLegend.grid(row=5, column=5, padx=5, pady=5, sticky=W)
+        
 
         # Live temperatures plot
-        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=6, column=0, columnspan=4, sticky=W+E)
+        ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=6, column=0, columnspan=6, sticky=W+E)
         self.thermalFig = Figure(figsize=(5, 2.5), dpi=100)
         self.thermalPlot = self.thermalFig.add_subplot(111)
         self.thermalHotendLine, = self.thermalPlot.plot([], [], 'r-', label="Hotend")
         self.thermalBedLine, = self.thermalPlot.plot([], [], 'b-', label="Bed")
         self.thermalCanvas = FigureCanvasTkAgg(self.thermalFig, master=self.thermalsHomeFrame)
-        self.thermalCanvas.get_tk_widget().grid(row=7, column=0, columnspan=4, sticky=W+E+N+S, padx=5, pady=5)
+        self.thermalCanvas.get_tk_widget().grid(row=7, column=0, columnspan=6, sticky=W+E+N+S, padx=5, pady=5)
         self.thermalPlot.set_ylabel("Temperature (C)")
         self.thermalPlot.set_xlabel("Time (s)")
         self.thermalPlot.margins(x=0.1, y=0.05)
@@ -244,13 +251,44 @@ class TkWindow(Tk):
         self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
         self.yMax = 100 # Used for y-axis scaling of the plot
 
-        # ==========| Calibration Frame |==========
-        self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=200)
-        self.thermalsHomeFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
-
         # ==========| Arm Info Frame |==========
-        self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=200)
-        self.thermalsHomeFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
+        self.armInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=200)
+        self.armInfoHomeFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
+        Label(self.armInfoHomeFrame, text="Arm Info").grid(row=0, column=0, columnspan=2, sticky=W+N+S, padx=5, pady=5)
+        ttk.Separator(self.armInfoHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=4, sticky=W+E)
+        self.connectedStatusHome = Label(self.armInfoHomeFrame, text="Arm Disconnected", width=30, justify=LEFT, anchor=W)
+        self.connectedStatusHome.grid(row=2, column=0, padx=5, pady=5, sticky=W)
+        self.calibrationStatusHome = Label(self.armInfoHomeFrame, text="Arm NOT Calibrated", width=30, justify=LEFT, anchor=W)
+        self.calibrationStatusHome.grid(row=3, column=0, rowspan=2, padx=5, pady=5, sticky=W)
+        self.calibrationHomeButton = Button(self.armInfoHomeFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10)
+        self.calibrationHomeButton.grid(row=5, column=0, padx=5, pady=5, sticky=W)
+
+        ttk.Separator(self.armInfoHomeFrame, orient='vertical').grid(row=2, column=1, rowspan=5, sticky=N+S)
+        Label(self.armInfoHomeFrame, text="Bed Leveling").grid(row=2, column=2, columnspan=2, sticky=W+N+E, padx=5, pady=5)
+        ttk.Separator(self.armInfoHomeFrame, orient='horizontal').grid(row=3, column=2, columnspan=2, sticky=W+E)
+        self.startLevelHome = Button(self.armInfoHomeFrame, text="Start Level", width=12, command=self.printController.startPrintBedCalibration)
+        self.startLevelHome.grid(row=4, column=2, padx=5, pady=5)
+        self.nextLevelHome = Button(self.armInfoHomeFrame, text= "Next Corner", width=12, command=self.printController.nextBedCalibration)
+        self.nextLevelHome.grid(row=4, column=3, padx=5, pady=5)
+        self.sweepCornersHome = Button(self.armInfoHomeFrame, text= "Sweep Corners", width=12, command=self.printController.startCornerSweep)
+        self.sweepCornersHome.grid(row=5, column=2, padx=5, pady=5)
+        self.cornerLabelHome = Label(self.armInfoHomeFrame, text="Current corner: N/A")
+        self.cornerLabelHome.grid(row=5, column=3, padx=5, pady=5)
+        self.sweepCornersFullHome = Button(self.armInfoHomeFrame, text= "Full Corner Sweep", width=15, command=self.printController.startFullCornerSweep)
+        self.sweepCornersFullHome.grid(row=6, column=2, padx=5, pady=5)
+        self.cancelAnyHome = Button(self.armInfoHomeFrame, text= "Cancel Any", width=10, command=self.printController.cancelAny)
+        self.cancelAnyHome.grid(row=6, column=3, padx=5, pady=5)
+
+        # ==========| Credits Frame |==========
+        self.creditsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=200)
+        self.creditsHomeFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
+        Label(self.creditsHomeFrame,text="RA3D",font=("Magneto", 20, "bold")).grid(row=0,column=0,sticky=EW)
+        CreditsText1 = "Designed and implemented by the RA3D Team (Robotic Arm 3D)"
+        CreditsText2 = "Team Members: Justin Fauson, Cody Blough, Jon Dinan,\n Jonathan Pederson, and Mateo Osorio"
+        CreditsText3 = "Sponsor: Dr. Sezer Ozerinc"
+        Label(self.creditsHomeFrame,text=CreditsText1).grid(row=1,column=0,sticky=W, padx=5)
+        Label(self.creditsHomeFrame,text=CreditsText2,justify="left").grid(row=2,column=0,sticky=W, padx=5)
+        Label(self.creditsHomeFrame, text=CreditsText3,justify="left").grid(row=3,column=0,sticky=W, padx=5)
 
     def fillPrintTab(self):
         # ==========| File Selection Frame |==========
@@ -1054,6 +1092,8 @@ class TkWindow(Tk):
         self.temperatureController.updateTemp()
 
         # ==========| Home Tab |==========
+
+        # Thermals
         hotendData = self.temperatureController.prevHotendTemps
         bedData = self.temperatureController.prevBedTemps
         if ((len(hotendData) == len(bedData) > 0) and (len(hotendData) > 1)):
@@ -1084,6 +1124,16 @@ class TkWindow(Tk):
                 self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()))
         except Exception:
             pass
+        
+        # Arm Info
+        if self.serialController.boardConnected:
+            self.connectedStatusHome.config(text="Arm Connected", fg="#00FF00")
+        else:
+            self.connectedStatusHome.config(text="Arm Disconnected", fg="#FF0000")
+        if self.armController.armCalibrated:
+            self.calibrationStatusHome.config(text="Arm Calibrated", fg="#00FF00")
+        else:
+            self.calibrationStatusHome.config(text="Arm NOT Calibrated", fg="#FF0000")
 
         # Set up another call to the update function after updateDelay milliseconds
         self.after(self.updateDelay, self.update)
@@ -1124,7 +1174,13 @@ class TkWindow(Tk):
         elif self.root.focus_get() == self.bedHomeTarget and event.widget != self.bedHomeTarget:
             self.temperatureController.setBedTargetTemp(float(self.bedHomeTarget.get()))
             self.root.focus_set()
+
+    def windowDimensions(self, event):
+        # Used for debugging purposes but it simply prints the window width and height
+        print(f"{self.winfo_width()}x{self.winfo_height()}")
     #endregion other functions
+
+
     #region Print Functions
     # Used to print to the in window terminal
     def terminalPrint(self, message):

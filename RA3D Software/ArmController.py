@@ -1103,7 +1103,7 @@ class ArmController:
 
         running_threads = threading.enumerate() # Get a list of all running threads
         #Print thread for debugging
-        self.root.terminalPrint("Running threads:", [thread.name for thread in running_threads]) # Print the list of running threads for debugging
+        self.root.terminalPrint("Running threads:"+ ", ".join([thread.name for thread in running_threads])) # Print the list of running threads for debugging
         
         killingThreads = False #whether there are threads to kill
         #For each running thread

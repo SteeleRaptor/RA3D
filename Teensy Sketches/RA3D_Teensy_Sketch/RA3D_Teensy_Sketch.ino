@@ -241,9 +241,9 @@ int J6TargetStep = 0;
 //degrees from limit switch to offset calibration
 float J1calBaseOff = -1;
 float J2calBaseOff = 1.5;
-float J3calBaseOff = 4.1;
+float J3calBaseOff = 4.1+4.5; //Added 4.5 based on observations
 float J4calBaseOff = -2;
-float J5calBaseOff = 3.1;
+float J5calBaseOff = 3.1+14.1; //Added 14 based on obesrvations
 float J6calBaseOff = -.5;
 float J7calBaseOff = 0;
 float J8calBaseOff = 0;

@@ -258,12 +258,14 @@ class PrintController:
             self.root.terminalPrint("Waiting for hotend to reach target temperature...")
             while not self.root.temperatureController.HotendTargetReached():
                 time.sleep(1) # Wait for 1 second before checking again
+            self.root.terminalPrint("Hotend reached target temperature")
             return ""
         #Wait for Bed Temperature
         elif lineToConvert[:4] == "M190":
             self.root.terminalPrint("Waiting for bed to reach target temperature...")
             while not self.root.temperatureController.BedTargetReached():
                 time.sleep(1) # Wait for 1 second before checking again
+            self.root.terminalPrint("Bed reached target temperature")
             return ""
         elif lineToConvert[:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]

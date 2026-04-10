@@ -96,6 +96,8 @@ class PrintController:
 
         #Flag variable for errors
         self.flag = None
+
+        self.autoSelectFile("/home/ra3d/Desktop/RA3D/Programming Experiments/Gcode Files/one_layer.gcode") #for testing purposes, can change to None to not auto select
     
         
     #endregion init
@@ -424,7 +426,7 @@ class PrintController:
         return ""
     
     #Function used when end of print is reached or when print is cancelled to end any related processes
-    def endPrint(self):
+    def endPrint(self, moveHome = True):
         self.root.temperatureController.disableHotendControl()
         self.root.temperatureController.disableBedControl()
         self.root.LEDOn = False # Turn off LED to signify print is cancelled
@@ -439,7 +441,7 @@ class PrintController:
     #region ================| GUI Buttons |===================
     #These functions will relate to the buttons in the GUI
     #TODO add busy check for any user implementation and add more flags if needed
-    def selectFile(self):
+    def selectFile(self,userSelect = True, filepath = None):
         # TODO: Needs some form of garbage collection as Python holds onto the memory allocated when opening a file
         # TODO: One possibility is utilizing "yield" command (or other methods) to only read one line at a time
         
@@ -449,7 +451,11 @@ class PrintController:
             ("All Files", "*.*")
         ]
         # Have user select a file
-        self.selectedFilepath = filedialog.askopenfilename(filetypes=filetypes)
+        if userSelect:
+            self.selectedFilepath = filedialog.askopenfilename(filetypes=filetypes)
+        else:
+            self.selectedFilepath = filepath
+        
         # Check if user actually selected a file
         if (self.selectedFilepath == ""):
             self.root.statusPrint("No file selected")
@@ -497,6 +503,14 @@ class PrintController:
         self.root.startPrintHomeButton.config(state="normal")
         self.root.pausePrintHomeButton.config(state="normal")
         self.root.stopPrintHomeButton.config(state="normal")
+
+    def autoSelectFile(self, filepath):
+        try:
+            self.selectFile(userSelect=False, filepath=filepath)
+            self.root.terminalPrint(f"Automatically selected file: {filepath}")
+        except:
+            self.root.terminalPrint(f"Failed to automatically select file: {filepath}")
+    
 
     def startPrint(self):
         
@@ -561,8 +575,8 @@ class PrintController:
         self.root.printStatusHomeLabel.config(text="PAUSED...")
         self.printPaused = True
 
-    def cancelPrint(self):
-        self.endPrint() #Do any necessary processes to end the print
+    def cancelPrint(self,moveHome = True):
+        self.endPrint(moveHome=moveHome) #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
         self.root.printStatusHomeLabel.config(text="IDLING...")
         pass

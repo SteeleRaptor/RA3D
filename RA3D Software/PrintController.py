@@ -22,7 +22,7 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 264 #Change bed height relative to pen
+        self.plateHeight = 245 #Change bed height relative to pen
         self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
@@ -36,7 +36,7 @@ class PrintController:
         #These boundaries are to prevent dangeous movement
         self.maxBoundaryX = [270,530]
         self.maxBoundaryY = [-130,130]
-        self.maxBoundaryZ = [250,900]
+        self.maxBoundaryZ = [200,900]
         self.bufferBoundary = 10 # Warning pops up if this boundary is entered from the max boundaries
         self.bedCalibrateHeight = 50 #Height moved up for calibration
 
@@ -44,7 +44,7 @@ class PrintController:
         self.maxHotEndTempSetting = 300 #Max hotend temp that can be set from gcode
         self.maxBedTempSetting = 120 #Max bed temp that can be set from gcode
         
-        self.backlashAngleOffset = 5.55 #offset to account for backlash
+        self.backlashAngleOffset = 0 #5.55 #offset to account for backlash
         #Could add another safeguard within the temperatur controller
         #------End important variables-------
         self.defaultAngle = 90 - self.backlashAngleOffset
@@ -63,7 +63,8 @@ class PrintController:
         BRCorner = Position(self.XEdge[0],self.YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
 
         #corners are absolute relative to the physical structure
-        #but z values will update to be the same as origin if the origin is changed in the UI
+        #but z values of calibration will update to be the same as origin if the origin is changed in the UI
+        #however calibration corners z remain unchanged after initialization
         self.calibrationCorners = [FRCorner,BRCorner,BLCorner,FLCorner]
         
         #---------- Setup variables---------------
@@ -132,8 +133,8 @@ class PrintController:
             #Read gcode line and convert, handle rare messages inside
             message = self.interpretGcode(lineToConvert) # Convert line and updates printPos
         
-        #Display gcode lines for debugging
-        if self.root.PrintDebugMode:
+        #Display gcode lines for debugging and if a lineToConvert exists
+        if lineToConvert and self.root.PrintDebugMode:
             self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
         
         #region -----------Message Processing--------
@@ -154,8 +155,6 @@ class PrintController:
             #TODO when turn hazard encountered,
             # printer moves home than to position with normal wrist condition
             #Execute move command
-           
-
             moveParameters = copy.deepcopy(self.defaultPrintParameters)
             if not self.hardCodePrinterSpeed:
                 if self.feedRate != None and self.feedRate != 0:
@@ -188,6 +187,7 @@ class PrintController:
                     else:
                         # Send the command to the arm, will wait for a response
                         self.root.armController.sendML(self.printPos, moveParameters=moveParameters, extrudeRate=self.extrudeRate,timeout=timeout, RelativeExtrude = self.relativeExtrusion)
+        
         elif message == "Extrusion Only":
             self.root.terminalPrint(f"Extruding {self.extrudeRate} without moving")
             #Must be at hotened before extruding
@@ -506,11 +506,13 @@ class PrintController:
             return
         if self.root.armController.checkIfAllBusy(message="start print"):
             return
+        #Warning prints
         if self.ignoreFlags:
             self.root.warningPrint("Ignore flags is enabled\nFlags will be ignored. Disable in print controller")
         if not self.checkBoundaryTrue:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
-        
+        if self.root.coolendMode:
+            self.root.warningPrint("Printing in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
         #Print starts here if no problems
         self.root.LEDOn = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
 
@@ -594,7 +596,7 @@ class PrintController:
             self.root.statusPrint("Bed calibration not started")
         self.checkFlag()
         if self.bedCalibrationInProgress == True:
-            bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep)
+            bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep, name= "Bed Calibration Thread")
             bedCalibrationThread.start()
         
     def startCornerSweep(self):
@@ -606,7 +608,7 @@ class PrintController:
         else:
             self.cornerSweeping = True
         self.root.serialController.clearQueue() #clear queue so it is not backed up
-        cornerSweepThread = threading.Thread(target=self.cornerSweep)
+        cornerSweepThread = threading.Thread(target=self.cornerSweep, name="Corner Sweep Thread")
         cornerSweepThread.start()
 
     #corner sweep and move up one level at a time
@@ -618,14 +620,14 @@ class PrintController:
         else:
             self.cornerSweeping = True
         self.root.serialController.clearQueue() #clear queue so it is not backed up
-        cornerSweepThread = threading.Thread(target=self.fullCornerSweep)
+        cornerSweepThread = threading.Thread(target=self.fullCornerSweep, name="Full Corner Sweep Thread")
         cornerSweepThread.start()
 
     #will cancel any related printing setup functions
     def cancelAny(self):
         if self.printing:
             self.cancelPrint()
-        threading.Thread(target=self.endSweepOrCal).start() #On thread because move command is on there
+        threading.Thread(target=self.endSweepOrCal, name="End Sweep or Calibration Thread").start() #On thread because move command is on there
         #just in case someone thinks this will cancel the print
         
 
@@ -726,14 +728,14 @@ class PrintController:
         posStep.z += self.bedCalibrateHeight
         moveParameters = copy.deepcopy(self.defaultPrintParameters)
         moveParameters.wrist = "N"
-        self.root.armController.sendMJ(posStep,moveParameters=moveParameters)
+        self.root.armController.sendMJ(posStep,moveParameters=moveParameters,timeout=self.timeoutExtra)
         self.checkFlag()
         #Move halfway
-        self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters)
+        self.root.armController.sendMJ(posStep,moveParameters=self.defaultPrintParameters,timeout=self.timeoutExtra)
         posStep.z -= self.bedCalibrateHeight/2
 
         #Move to corner to touch plate
-        self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters)
+        self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters,timeout=self.timeoutExtra)
         self.checkFlag()
         self.root.statusPrint(f"Corner {self.bedCalStep} calibration complete")
         self.bedCalStep += 1
@@ -746,9 +748,18 @@ class PrintController:
         self.checkFlag 
         #Height is assumed to be the height of the calibration corners
         if height is None:
-            height = self.calibrationCorners[0].z
-        moveOrder = [1,2,3,4,1,3,2,4]
+            height = self.plateHeight
+        
+        moveOrder = [2,3,4,1,3,2,4] #1 will always be first
         moveOrder= [x-1 for x in moveOrder] #adjust to 0 base index
+
+        pos = copy.deepcopy(self.calibrationCorners[0])
+        pos.z = height
+        self.root.cornerLabel.config(text=f"Current Corner: {1}")
+        moveParameters = copy.deepcopy(self.defaultPrintParameters)
+        moveParameters.wrist = "N"
+        #Move to first corner non linearly
+        self.root.armController.sendMJ(pos,moveParameters=moveParameters, timeout=self.timeoutExtra)
 
         for i in moveOrder:
             time.sleep(1)
@@ -757,7 +768,7 @@ class PrintController:
             self.root.cornerLabel.config(text=f"Current Corner: {i+1}")
             self.root.cornerLabelHome.config(text=f"Current Corner: {i+1}")
             if self.cornerSweeping:
-                self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=20)
+                self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=self.timeoutExtra)
             #dont continue if no longer sweeping
             else:
                 return

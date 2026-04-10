@@ -37,7 +37,8 @@ class TkWindow(Tk):
             "Printing Timeout Extra": ("timeoutExtra","PC"),
             "Hard code printer speed to default": ("hardCodePrinterSpeed","PC"),
             "Solid LED": ("LEDOn","self"),
-            "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC")
+            "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC"),
+            "Coolend Mode": ("coolendMode","self")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
@@ -49,8 +50,7 @@ class TkWindow(Tk):
         self.BlinkLED = False #Blink the LED when there is a problem
         self.LEDOn = False #LED stays On, signifies in progress, overridden by blinkLED
         self.ledThreadRunning = True # Used to stop the LED thread
-        
-        # Pin declaration for the LED
+        self.unstoppableThreads = ["Serial Read Thread", "Serial Sort Thread","LED Thread","MainThread", "Thread-1"] #Threads that will not be stopped on reset
         self.LEDPin = 36
         # Initialize the GPIO
         GPIO.setmode(GPIO.BOARD)
@@ -83,31 +83,33 @@ class TkWindow(Tk):
         self.createTabs()
         if self.DebugMode:
             self.root.terminalPrint("GUI created")
+
         self.serialController.refreshCOMPorts()
        
         
-        #TODO remove these eventually
-        self.timeoutStartedCal = False
-        #self.timeoutStartedMove = False
-
         self.root.protocol("WM_DELETE_WINDOW", self.shutdownProgram)
 
         self.printThreadStarted = False
         #Set origin last so everything is in place
         self.armController.setOrigin(origin=self.root.printController.recommendedOrigin)
-         # Set up a call to the update function after updateDelay milliseconds
-        #updateThread = threading.Thread(target=self.update)
-        #updateThread.start()
-        self.ledThread = threading.Thread(target=self.updateLED, daemon=True)
+         
+        self.ledThread = threading.Thread(target=self.updateLED, daemon=True,name="LED Thread")
         self.ledThread.start()
         self.serialController.autoConnect()
         self.root.bind("<Button-1>", self.clearEntryFocus)
+        # Set up a call to the update function after updateDelay milliseconds
         self.update()
+        self.serialController.connectPort('/dev/ttyACM0')
+
     #endregion init
 
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
+        # Move the arm to a safe position before shutting down, will not move safe if not calibrated
+        # This is necessary because if the arm is not calibrated
+        if not self.armController.calibrationOverridden:
+            self.armController.moveSafe()
         self.ledThreadRunning = False
         # Release the GPIO pins from use
         GPIO.cleanup()
@@ -870,16 +872,17 @@ class TkWindow(Tk):
         self.J7CoordEntry2.grid(row=1, column=1, padx=(0, 5), pady=5)
         self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrudeButton)
         self.extrudeButton.grid(row=2, column=0,padx=(0, 5), pady=5)
+        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
+        self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
+
         self.loadButton = Button(self.extruderFrame, text = "Load", command=self.armController.loadFilament)
         self.loadButton.grid(row=3, column=0,padx=(0, 5), pady=5)
         self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament)
-        self.unloadButton.grid(row=4, column=0,padx=(0, 5), pady=5)
-        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
-        self.zeroJ7Button.grid(row=5,column=1,padx=(0, 5), pady=5)
+        self.unloadButton.grid(row=3, column=1,padx=(0, 5), pady=5)
         self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")
         self.currentJ7Label2.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
         self.currentJ72 = Label(self.extruderFrame,text="0 mm")
-        self.currentJ72.grid(row=7,column=1, padx=5, pady=5, sticky=N+S)
+        self.currentJ72.grid(row=6,column=1, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):
@@ -963,6 +966,16 @@ class TkWindow(Tk):
         #NOTE these frames and labels don't need self if they're never accessed after setup
         self.settingsFrame = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
         self.settingsFrame.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
+        self.settingsFrame2 = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
+        self.settingsFrame2.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
+        maxSettingsPerColumn = 13
+
+        if len(self.settingsDict) <= maxSettingsPerColumn:
+            self.settingsLength1 = len(self.settingsDict)
+            self.settingsLength2 = 0
+        else:
+            self.settingsLength1 = maxSettingsPerColumn
+            self.settingsLength2 = len(self.settingsDict) - maxSettingsPerColumn
 
         # Headers for all settings
         header1 = Label(self.settingsFrame, text="Setting",padx=5)
@@ -976,9 +989,26 @@ class TkWindow(Tk):
         header2.grid(row=0, column=2,pady=(5,0))
         header3.grid(row=0, column=4,pady=(5,0))
         horizontalLine1.grid(row=1,column=0,columnspan=5,sticky=EW)
-        horizontalLine2.grid(row=len(self.settingsDict)+2,column=0,columnspan=5,pady=5,sticky=EW)
-        verticalLine1.grid(row=0,column=1,rowspan=len(self.settingsDict)+3,sticky=NS,pady=(0,5))
-        verticalLine2.grid(row=0,column=3,rowspan=len(self.settingsDict)+3,sticky=NS,pady=(0,5))
+        horizontalLine2.grid(row=self.settingsLength1+2,column=0,columnspan=5,pady=5,sticky=EW)
+        verticalLine1.grid(row=0,column=1,rowspan=self.settingsLength1+3,sticky=NS,pady=(0,5))
+        verticalLine2.grid(row=0,column=3,rowspan=self.settingsLength1+3,sticky=NS,pady=(0,5))
+        
+        if self.settingsLength2 > 0:
+            # Headers for all settings
+            header1_1 = Label(self.settingsFrame2, text="Setting",padx=5)
+            header2_1 = Label(self.settingsFrame2, text="Current",padx=5)
+            header3_1 = Label(self.settingsFrame2, text="Change To",padx=5)
+            horizontalLine1_1 = ttk.Separator(self.settingsFrame2,orient="horizontal")
+            verticalLine1_1 = ttk.Separator(self.settingsFrame2,orient="vertical")
+            verticalLine2_1 = ttk.Separator(self.settingsFrame2,orient="vertical")
+            horizontalLine2_1 = ttk.Separator(self.settingsFrame2,orient="horizontal")
+            header1_1.grid(row=0, column=0,pady=(5,0))
+            header2_1.grid(row=0, column=2,pady=(5,0))
+            header3_1.grid(row=0, column=4,pady=(5,0))
+            horizontalLine1_1.grid(row=1,column=0,columnspan=5,sticky=EW)
+            horizontalLine2_1.grid(row=self.settingsLength2+2,column=0,columnspan=5,pady=5,sticky=EW)
+            verticalLine1_1.grid(row=0,column=1,rowspan=self.settingsLength2+3,sticky=NS,pady=(0,5))
+            verticalLine2_1.grid(row=0,column=3,rowspan=self.settingsLength2+3,sticky=NS,pady=(0,5))
         
         #Stores the label and entry objects
         self.entries = {}
@@ -1002,20 +1032,28 @@ class TkWindow(Tk):
                 case "self":
                     object = self
             currentValue = getattr(object,attr)
-
-            settingLabel = Label(self.settingsFrame, text=item)
-
-            self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
-            self.entries[item] = Entry(self.settingsFrame,width=10)
+            if row < maxSettingsPerColumn + 2: #if there is still room in the first column
+                settingLabel = Label(self.settingsFrame, text=item)
+                self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
+                self.entries[item] = Entry(self.settingsFrame,width=10)
+                #Place
+                settingLabel.grid(row=row, column=0)
+                self.currents[item].grid(row=row, column=2)
+                self.entries[item].grid(row=row, column=4,padx=5,pady=5)
+            else:
+                settingLabel = Label(self.settingsFrame2, text=item)
+                self.currents[item] = Label(self.settingsFrame2, text=str(currentValue))
+                self.entries[item] = Entry(self.settingsFrame2,width=10)
             
-            #Place
-            settingLabel.grid(row=row, column=0)
-            self.currents[item].grid(row=row, column=2)
-            self.entries[item].grid(row=row, column=4,padx=5,pady=5)
+                #Place and adjust row number for second column
+                settingLabel.grid(row=row-maxSettingsPerColumn, column=0)
+                self.currents[item].grid(row=row-maxSettingsPerColumn, column=2)
+                self.entries[item].grid(row=row-maxSettingsPerColumn, column=4,padx=5,pady=5)
             row += 1
 
+
         self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings)
-        self.setAllSettingsButton.grid(row=row+2,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
+        self.setAllSettingsButton.grid(row=maxSettingsPerColumn+4,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
 
     #endregion Tabs
     #Set settings
@@ -1083,7 +1121,7 @@ class TkWindow(Tk):
         # ==========| PrintController |==========
         #Each print loop runs in the thread so that it can "wait" and not halt the UI
         if self.printController.printing and not self.printThreadStarted and not self.printController.printPaused:
-                printThread = threading.Thread(target=self.printController.printLoop)
+                printThread = threading.Thread(target=self.printController.printLoop, name = "Print Loop Thread")
                 printThread.start()
                 #Variable to signal when the thread finishes
                 self.printThreadStarted = True
@@ -1202,9 +1240,9 @@ class TkWindow(Tk):
         self.BlinkLED = True # Used to signal the update loop to start blinking the LED
         #Display a 2nd message based on ignoreflags
         message2 = ""
-        if self.printController.ignoreFlags:
+        if self.printController.ignoreFlags and self.printController.printing:
             message2 = "\nPressing ok will resume movement"
-        else:
+        elif self.printController.printing:
             message2 = "\nPrinting will stop"
         #show message
         messagebox.showinfo("Warning! ", message+message2)

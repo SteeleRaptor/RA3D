@@ -12,6 +12,7 @@ class ArmController:
         #Default loop mode Closed
         # Arm calibration variables
         self.armCalibrated = False # Flag to signify if the arm has been calibrated
+        self.calibrationOverridden = False # Keeps track of if the calibration was overriden because it can be dangerous
         self.calibrationInProgress = False # Flag to signify if calibration is currently in progress
         # Contains current calibration step
         #  0 - N/A
@@ -80,7 +81,7 @@ class ArmController:
         self.extruder_deg_per_mm_cool = 10.90909
         self.heatedFilamentMultiplier = 0.378 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
-        self.loadLength = 300 #length of filament to load fst, determined experimentally
+        self.loadLength = 450 #length of filament to load fst, determined experimentally
         self.defaultExtrudeParameters = MoveParameters(30,10,10,30,0,'m')
         self.unloadParameters = MoveParameters(80,10,10,30,0,'p')
 
@@ -117,7 +118,7 @@ class ArmController:
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
 
         # Call the calibration update function
-        calibrationThread = threading.Thread(target=self.calibrateArm)
+        calibrationThread = threading.Thread(target=self.calibrateArm, name="Arm Calibration Thread")
         calibrationThread.start()
         
 
@@ -207,7 +208,9 @@ class ArmController:
     #for debugging
     def overrideCalibration(self):
         self.setOrigin(origin=self.root.printController.recommendedOrigin)
+        self.root.warningPrint("Calibration overridden. Only use if you know that arm is calibrated")
         self.armCalibrated = True
+        self.calibrationOverridden = True
         
     #calibrate indvidual joints
     def calibrateJoints(self, calJ1=False, calJ2=False, calJ3=False, calJ4=False, calJ5=False, calJ6=False, single=True):
@@ -354,7 +357,7 @@ class ArmController:
         # nominal check
         if self.checkIfBusy(message="request position"):
             return
-        positionThread = threading.Thread(target=self.requestPositionAndWait)
+        positionThread = threading.Thread(target=self.requestPositionAndWait, name="Request Position Thread")
         positionThread.start()
     
     #position request is sent and recieved
@@ -387,7 +390,7 @@ class ArmController:
             self.root.statusPrint("Arm is busy with something else at the moment")
             return
         self.root.statusPrint("Beginning post calibration")
-        postCalibrateThread = threading.Thread(target=self.postCalibrateJoints, kwargs={"calJ1":calJ1,"calJ2":calJ2, "calJ3":calJ3, "calJ4":calJ4, "calJ5":calJ5, "calJ6":calJ6})
+        postCalibrateThread = threading.Thread(target=self.postCalibrateJoints, kwargs={"calJ1":calJ1,"calJ2":calJ2, "calJ3":calJ3, "calJ4":calJ4, "calJ5":calJ5, "calJ6":calJ6}, name="Post Calibration Thread")
         postCalibrateThread.start()
         #self.postCalibrateJoints(calJ1=calJ1, calJ2=calJ2, calJ3=calJ3, calJ4=calJ4, calJ5=calJ5, calJ6=calJ6)
 
@@ -402,7 +405,7 @@ class ArmController:
             self.root.statusPrint("Arm is busy with something else at the moment")
             return
         self.root.statusPrint("Beginning arm calibration")
-        specificCalibrationThread = threading.Thread(target=self.calibrateJoints, kwargs={"calJ1":calJ1,"calJ2":calJ2, "calJ3":calJ3, "calJ4":calJ4, "calJ5":calJ5, "calJ6":calJ6}).start()
+        specificCalibrationThread = threading.Thread(target=self.calibrateJoints, kwargs={"calJ1":calJ1,"calJ2":calJ2, "calJ3":calJ3, "calJ4":calJ4, "calJ5":calJ5, "calJ6":calJ6}, name="Specific Calibration Thread")
         specificCalibrationThread.start()
 
     #getxyz
@@ -481,7 +484,7 @@ class ArmController:
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending RJ command")
             #TODO start sendRJ as a thread so that 
-            RJThread = threading.Thread(target=self.sendRJ, args=[[J1, J2, J3, J4, J5, J6], self.moveParameters])
+            RJThread = threading.Thread(target=self.sendRJ, args=[[J1, J2, J3, J4, J5, J6], self.moveParameters], name="RJ Command Thread")
             RJThread.start()
         else:
             self.root.terminalPrint("RJ command not sent due to a value not being a number")
@@ -534,7 +537,7 @@ class ArmController:
             commandPos = Position(x,y,z,Rx,Ry,Rz,None)
             self.root.statusPrint("Sending ML command")
             #Thread so that command doesn't interupt UI
-            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.moveParameters], kwargs={"extrudeRate":J7,"RelativeExtrude":True})
+            MLThread = threading.Thread(target=self.sendML, args=[commandPos, self.moveParameters], kwargs={"extrudeRate":J7,"RelativeExtrude":True}, name="ML Command Thread")
             MLThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
@@ -579,7 +582,7 @@ class ArmController:
             commandPos = Position(float(x),float(y),float(z),float(Rx),float(Ry),float(Rz),None)
             self.root.statusPrint("Sending ML command")
             #Thread so that command doesn't interupt UI
-            MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.moveParameters])
+            MJThread = threading.Thread(target=self.sendMJ, args=[commandPos, self.moveParameters], name="MJ Command Thread")
             MJThread.start()
         else:
             self.root.statusPrint("ML command not sent due to a value not being a number")
@@ -594,10 +597,13 @@ class ArmController:
     #For extrusion without movement
     #timeoutMultiplier is how much extra time per expected second is needed
     def extrude(self,extrudeRate,moveParameters=None,relative=True,timeoutMultiplier=3):
-        if not self.root.temperatureController.HotendTargetReached():
+        if not self.root.temperatureController.HotendTargetReached() and not self.root.coolendMode:
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.root.printController.flag = "Hotend target temperature not reached"
             return
+        elif self.root.coolendMode:
+            self.root.warningPrint("Extruding in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
+
         timeoutMin = 8 #minimum timeout
         if moveParameters is None:
             moveParameters = self.defaultExtrudeParameters
@@ -618,7 +624,7 @@ class ArmController:
             lengthToLoad = self.loadLength/self.heatedFilamentMultiplier
         else:
             lengthToLoad = self.loadLength
-        loadThread = threading.Thread(target=self.extrude, args=[lengthToLoad], kwargs={"timeoutMultiplier":5})
+        loadThread = threading.Thread(target=self.extrude, args=[lengthToLoad], kwargs={"timeoutMultiplier":5},name="Load Filament Thread")
         loadThread.start()
 
     def unloadFilament(self):
@@ -630,7 +636,7 @@ class ArmController:
             lengthToLoad = self.loadLength/self.heatedFilamentMultiplier
         else:
             lengthToLoad = self.loadLength
-        unloadThread = threading.Thread(target=self.extrude, args=[-lengthToLoad], kwargs={"timeoutMultiplier":5,"moveParameters":self.unloadParameters})
+        unloadThread = threading.Thread(target=self.extrude, args=[-lengthToLoad], kwargs={"timeoutMultiplier":5,"moveParameters":self.unloadParameters}, name="Unload Filament Thread")
         unloadThread.start()
 
     def extrudeButton(self):
@@ -646,7 +652,7 @@ class ArmController:
         
         if allValuesNumeric:
             self.root.terminalPrint("All values numeric, sending extrude command")
-            extrudeThread = threading.Thread(target=self.extrude, args=[float(extrudeRate)])
+            extrudeThread = threading.Thread(target=self.extrude, args=[float(extrudeRate)], name="Extrude Thread")
             extrudeThread.start()
 
         else:
@@ -657,8 +663,15 @@ class ArmController:
         self.waitForResponseAndProcess("POSZ7",15,message="Zero J7",setFlag=False)
     
     def waitForResponseAndProcess(self,prefix,timeout=15,message="", setFlag = True):
+        #Wait for the response from the serial controller with the given prefix and timeout
         response = self.root.serialController.waitForResponse(prefix,timeout)
+        
         if response is not None:
+            #If the response error rather than timed out
+            if response[:5] == "Error":
+                self.root.printController.flag = response
+                self.root.terminalPrint(response + " stopped serial response processing")
+                return
             self.processPosition(response)
             if self.root.DebugMode:
                 self.root.terminalPrint(response)
@@ -708,27 +721,25 @@ class ArmController:
         if self.checkIfAllBusy(message="Home"):
             return
         #start thread
-        moveHomeThread = threading.Thread(target=self.moveHome)
+        moveHomeThread = threading.Thread(target=self.moveHome, name="Move Home Thread")
         moveHomeThread.start()
     
     #Move to the position where the arm rests on itself
     def prepMoveSafe(self):
-        #This is important because move safe will not move safe if arm is not calibrated
-        if self.serialController.boardConnected is False or self.armCalibrated is False:
-            self.root.statusPrint("Failed to move to safe positiion, Board not connected")
-            return
         #start thread
-        moveSafeThread = threading.Thread(target=self.moveSafe)
+        moveSafeThread = threading.Thread(target=self.moveSafe, name="Move Safe Thread")
         moveSafeThread.start()
 
     #set move parameters to open loop
     def setOpenLoop(self):
         self.moveParameters.setLoopMode(1)
+        self.root.printController.defaultPrintParameters.setLoopMode(1)
         self.root.loopStatus.config(text="Open Loop")
 
     #set move parameters to closed loop
     def setClosedLoop(self):
         self.moveParameters.setLoopMode(0)
+        self.root.printController.defaultPrintParameters.setLoopMode(0)
         self.root.loopStatus.config(text="Closed Loop")
     
     #endregion GUI
@@ -788,12 +799,12 @@ class ArmController:
             self.root.printController.flag = "Arm busy"
             return
         
-        #Convert extrudeRate to change in motor angle
-        if self.root.temperatureController.HotendTargetReached():
+        #Check if extruding and hotend temp is reached if extrusion is requested
+        if not self.root.temperatureController.HotendTargetReached() and not self.root.coolendMode and extrudeRate != 0:
             self.root.statusPrint("Cannot extrude. Hotend target temperature not reached.")
             self.root.printController.flag = "Hotend target temperature not reached"
             return
-        
+        #Convert extrudeRate to change in motor angle
         J7 = extrudeRate*self.extruder_deg_per_mm #convert from mm to deg
         # Create the command
         command = MoveCommand("ML",pos, moveParameters, J7=J7, J7Rel=RelativeExtrude)
@@ -853,6 +864,10 @@ class ArmController:
     # Cancels everything, ignore flags, and just sends the serial command
     # timeout is large because movesafe can be held in the teensy queue
     def moveSafe(self,timeout=60):
+        #This is important because move safe will not move safe if arm is not calibrated
+        if self.serialController.boardConnected is False or self.armCalibrated is False:
+            self.root.statusPrint("Failed to move to safe positiion, Board not connected")
+            return
         #Pause print so everything stops moving
         #It is assume the user will want the print paused if pressing this button
         self.root.printController.pauseAll()
@@ -902,7 +917,7 @@ class ArmController:
             self.testingLimitSwitches = True # set the flag
             self.root.limitTestButton.configure(relief="ridge") # Make the button look toggled
             self.root.statusPrint("Starting limit switch test")
-            limitSwitchThread = threading.Thread(target = self.limitTest)
+            limitSwitchThread = threading.Thread(target = self.limitTest, name="Limit Switch Test Thread")
             limitSwitchThread.start()
 
     def limitTest(self):
@@ -948,7 +963,7 @@ class ArmController:
             # The "Set Encoder" instruction returns a "Done" except it is done with a print instead of println
             # which makes it so the serial can only be read by a "read" instead of "readline".
             # Therefore, we forcibly tell the serialController that it isn't waiting for a response
-            encoderTestThread = threading.Thread(target=self.encoderTest)
+            encoderTestThread = threading.Thread(target=self.encoderTest, name="Encoder Test Thread")
             encoderTestThread.start()
 
     def encoderTest(self):
@@ -1072,20 +1087,54 @@ class ArmController:
     
     #This should reset everything in check if all busy
     def reset(self):
+        #Reset all flags
         self.awaitingMoveResponse = False
-        #self.serialController.waitingForResponse = False
         self.calibrationInProgress = False
         self.awaitingPosResponse = False
         self.testingLimitSwitches = False
         self.testingEncoders = False
+        #Pause print if printing
         if self.root.printController.printing:
             self.root.printController.pausePrint()
         self.root.printController.bedCalibration = False
         self.root.printController.cornerSweeping = False
-        self.root.serialController.clearQueue()
-        self.root.printController.flag = None
-        self.root.warningPrint("if threads have not finished, reset may break things")
+        
+        time.sleep(0.5) # Small delay to ensure all flags are reset before killing threads
 
+        running_threads = threading.enumerate() # Get a list of all running threads
+        #Print thread for debugging
+        self.root.terminalPrint("Running threads:", [thread.name for thread in running_threads]) # Print the list of running threads for debugging
+        
+        killingThreads = False #whether there are threads to kill
+        #For each running thread
+        for thread in running_threads:
+            #if the thread is not the current thread and is not in the list of unstoppable threads, join it (kill it)
+            if thread is not threading.current_thread() and thread.name not in self.root.unstoppableThreads:
+                killingThreads = True
+                break
+
+        if killingThreads:
+            #Notify user to not interrupt the reset process because threads are being killed
+            self.root.warningPrint("Attempting to kill threads. Press ok then please wait")
+            self.root.statusPrint("Please wait...")
+            #This is what actually kills the threads, it will raise an error to stop waiting for serial
+            #The only way it can truly kill thread is to stop serial waiting otherwise it will just wait for it to finish
+            self.root.serialController.RaiseError("Reset")
+            for thread in running_threads:
+                if thread is not threading.current_thread() and thread.name not in self.root.unstoppableThreads:
+                    self.root.terminalPrint(f"Killing thread: {thread.name}")
+                    #wait for thread to finish
+                    self.root.join(thread)
+                    self.root.terminalPrint(f"Thread {thread.name} killed")
+            self.root.statusPrint("Reset complete")
+        else:
+            self.root.statusPrint("No Threads Running. Reset complete")
+        
+        #Clear queue because response from arm will not matter if things were cancelled
+        self.root.serialController.clearQueue()
+        #Reset the printer flag
+        self.root.printController.flag = None
+        
     #cancel all actions except moveresponse so moves can terminate properly
     def cancelActions(self):
         self.calibrationInProgress = False
@@ -1138,7 +1187,7 @@ class ArmController:
         self.root.zDeltaOrigin.config(text=deltaZ)
 
     def moveRecommendedOrigin(self):
-        threading.Thread(target=self.sendMJ, args=(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters)).start()
+        threading.Thread(target=self.sendMJ, args=(self.root.printController.recommendedOriginPosition, self.defaultMoveParameters),name= "Move Default Origin Thread").start()
 
     #endregion origin
 

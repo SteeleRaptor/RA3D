@@ -24,7 +24,7 @@ class SerialController:
         
         self.waiting_responses = set()
         self.sendingSerial = False#Keep track to send serial so a response is not sorted while sending
-        self.Errors = ["Estop", "ER","EL"] #Error codes
+        self.Errors = ["Es", "ER","EL"] #Error codes
         self.ErrorRaised = False #Flag to indicate if an error was raised, used to stop waiting for responses if an error is raised
         #Everything that will not be processed if immediately received
         self.WaitToProcess = ["PO","TL","RE"] #currently these can only be 2 characters
@@ -67,6 +67,7 @@ class SerialController:
             self.root.refreshCOMButton.config(state="normal") # Enable refresh button
             self.root.portStatusLabel.config(text="Status: Disconnected") # Change port status text
             return 0
+          
 
     def connectPort(self, port):
         self.port = port
@@ -87,14 +88,23 @@ class SerialController:
             self.boardConnected = True
             self.responseQueue = queue.Queue()
 
-            self.serialThread = threading.Thread(target=self.serialReader, daemon=True)
-            self.sortThread = threading.Thread(target=self.processResponses, daemon=True)
+            self.serialThread = threading.Thread(target=self.serialReader, daemon=True, name="Serial Read Thread")
+            self.sortThread = threading.Thread(target=self.processResponses, daemon=True, name="Serial Sort Thread")
             self.running = True #Keeps threads running, must be true before starting serialthread
             self.serialThread.start()
             self.sortThread.start()
             
         except SerialException:
             self.root.statusPrint(f"Failed to open port: {port}")
+
+        self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+
+        # Perform a check to see if board was actually connected to
+        if self.boardConnected:
+            self.root.connectButton.config(text="Disconnect", state="normal") # Change button text
+            self.root.portDropdown.config(state="disabled") # Disable port dropdown
+            self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
+            self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
 
     def disconnectPort(self):
         if self.boardConnected == True:
@@ -109,6 +119,12 @@ class SerialController:
             except:
                 pass
             self.boardConnected = False
+
+        self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+        self.root.connectButton.config(text="Connect") # Change button text
+        self.root.portDropdown.config(state="readonly") # Enable port dropdown
+        self.root.refreshCOMButton.config(state="normal") # Enable refresh button
+        self.root.portStatusLabel.config(text="Status: Disconnected") # Change port status text
             
     # Repeatedly checks the serial port for new responses
     def serialReader(self):
@@ -172,7 +188,7 @@ class SerialController:
             #for each item in queue
             for item in list(self.responseQueue.queue):
                 #if an error
-                if item in self.Errors:
+                if item[:2] in self.Errors:
                     #remove item from queue
                     self.sortResponse(item)
                     self.responseQueue.queue.remove(item)
@@ -189,8 +205,11 @@ class SerialController:
         self.root.printController.flag = error
         self.root.terminalPrint(f"Error {error} occured")
         self.ErrorRaised = True
-        time.sleep(2) #Allow other threads to process error
+        #Allow other threads to process error
+        while self.waiting_responses: 
+            time.sleep(0.01)
         self.ErrorRaised = False
+        self.root.terminalPrint("Error processed, resuming normal operation")
         self.clearQueue() #Clear queue of any responses that may have come in during error
         
     #Advances the response queue every .01 seconds    
@@ -223,14 +242,13 @@ class SerialController:
 
     #Function process response because correct response is not guaranteed for a command
     #reponse must be passed back to some functions because the response is out of the queue
+    #This function mainly serves as a backup for processing responses and should NOT be used for normal processing of a response
     def sortResponse(self, sortResponse):
         #shorthand for ease
         PC = self.root.printController
         AC = self.root.armController
         R = self.root
         flag = None
-        # TODO: Add in a message/action for every response and edit teensy to send more information
-        # TODO I will change this so that only unexpected responses or errors are processed here
         
         #self.root.terminalPrint(f"Received Response: {sortResponse}")
         self.root.terminalPrint("Warning! Sorting response\nReponses handled by sorting signfy a problem")
@@ -239,7 +257,7 @@ class SerialController:
             flag = "Estop"
             PC.pauseAll() #This will pause the program regardless if ignore flags is on
             R.warningPrint("Estop pushed, stopping print")
-            self.cleanQueue("Estop")
+            #self.cleanQueue("Estop")
 
         if sortResponse[:2]== "ER":
             R.statusPrint(f"Kinematic Error: {sortResponse[2:]}")
@@ -259,6 +277,7 @@ class SerialController:
             self.root.warningPrint(f"Turn Hazard Encountered. Stopping Print")
             flag = "Turn Hazard"
             AC.awaitingMoveResponse = False
+
         elif sortResponse[:13] == "Limit Pressed":
             self.root.statusPrint(f"Limits switch: {sortResponse[2:]}")
             self.root.warningPrint(f"Limit switch pressed")
@@ -342,8 +361,15 @@ class SerialController:
             except (queue.Empty, IndexError):
                 time.sleep(0.01)
                 pass
+        
+        #Signifies error stopped the waiting for response
+        if self.ErrorRaised:
+            #Discard unique code because no longer waiting
+            self.waiting_responses.discard(uniqueCode) #discard after checking error raised
+            return "Error"
         #Discard unique code because no longer waiting
         self.waiting_responses.discard(uniqueCode)
+        #Signifies timeout occurred
         return None
     
     # Sends a string over serial to the connected port

@@ -167,19 +167,19 @@ float J7StepDeg = 11.111;
 float J8StepDeg = 14.2857;
 float J9StepDeg = 14.2857;
 
-
+//Important
 //Backlash fix variables
 //Linear offset for backlash fix
 float J1_BacklashFix_b = 0;
 float J2_BacklashFix_b = 3;
-float J3_BacklashFix_b = 0;
+float J3_BacklashFix_b = 2;
 float J4_BacklashFix_b = 0;
 float J5_BacklashFix_b = 1;
 float J6_BacklashFix_b = 0;
 
-float J2_BacklashFix_m = 0;
-float J3_BacklashFix_m = 0;
-float J5_BacklashFix_m = 0;
+float J2_BacklashFix_m = 0.01;
+float J3_BacklashFix_m = 0.01;
+float J5_BacklashFix_m = 0.116;
 
 int LastJ1dir = -1;
 int LastJ4dir = -1;
@@ -2298,7 +2298,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     }
     //Backlash fix for gravity
     //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
-    J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b
+    J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
     //This could be changed to be dependent on J2
     J3stepDif -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
     J5stepDif -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
@@ -4740,7 +4740,7 @@ void loop() {
       }
       //Backlash fix for gravity
       //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
-      J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b
+      J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
       //This could be changed to be dependent on J2
       J3stepDif -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
       J5stepDif -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
@@ -5247,7 +5247,7 @@ void loop() {
           }
           //Backlash fix for gravity
           //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
-          J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b
+          J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
           //This could be changed to be dependent on J2
           J3stepDif -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
           J5stepDif -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;

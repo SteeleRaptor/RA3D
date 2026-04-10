@@ -97,7 +97,6 @@ class PrintController:
         #Flag variable for errors
         self.flag = None
 
-        self.autoSelectFile("/home/ra3d/Desktop/RA3D/Programming Experiments/Gcode Files/one_layer.gcode") #for testing purposes, can change to None to not auto select
     
         
     #endregion init

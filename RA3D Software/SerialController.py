@@ -29,6 +29,14 @@ class SerialController:
         #Everything that will not be processed if immediately received
         self.WaitToProcess = ["PO","TL","RE"] #currently these can only be 2 characters
 
+    def autoConnect(self):
+        self.root.statusPrint("Attempting automatic port connection")
+        self.root.portSelection.set("/dev/ttyACM0")
+        # Attempt the connection and if failed...
+        if self.serialConnect() == 0:
+            self.root.statusPrint("Failed to automatically connect to port")
+            self.root.portSelection.set("Select Port")
+
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):
         # Check if the serial controller is already connected to a board
@@ -36,11 +44,29 @@ class SerialController:
             # If not, connect to the port currently selected in the port dropdown
             self.root.statusPrint("Attempting port connection")
             self.connectPort(self.root.portSelection.get())
+            self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+
+            # Perform a check to see if board was actually connected to
+            if self.boardConnected:
+                self.root.connectButton.config(text="Disconnect") # Change button text
+                self.root.portDropdown.config(state="disabled") # Disable port dropdown
+                self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
+                self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
+                return 1
+            else:
+                return 0
+
         else:
 
             # If so, disconnect from the port
             self.root.statusPrint("Disconnecting from port")
             self.disconnectPort()
+            self.root.statusPrint(f"Connection Status: {self.boardConnected}")
+            self.root.connectButton.config(text="Connect") # Change button text
+            self.root.portDropdown.config(state="readonly") # Enable port dropdown
+            self.root.refreshCOMButton.config(state="normal") # Enable refresh button
+            self.root.portStatusLabel.config(text="Status: Disconnected") # Change port status text
+            return 0
           
 
     def connectPort(self, port):

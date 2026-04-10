@@ -1,4 +1,5 @@
 
+from tkinter import *
 import smbus
 import math
 import RPi.GPIO as GPIO
@@ -73,6 +74,9 @@ class TemperatureController:
         #Used so that room temperature is not considered an acceptable temperature for extrusion,
         #which could cause damage to the extruder if it attempted to extrude without the hotend heating up first
         self.minExtrusionTemp = 170        # Minimum hotend temperature for extrusion of any plastic to occur
+        self.maxPrevValues = 400
+        self.prevHotendTemps = []
+        self.prevBedTemps = []
         
         # Set up the config register according to default values stated earlier
         self.setConfigReg()
@@ -166,7 +170,14 @@ class TemperatureController:
         if (self.measurementState == 0):
                 # Handle reading and calculating hotend temperature
                 adcVal = self.readADC()
+                # Calculate the temperature
                 self.calculateHotendTemp(adcVal)
+                # Save the temperature to list of previous temperatures
+                self.prevHotendTemps.append(self.hotendTempCelsius)
+                # Restrict length of list
+                if len(self.prevHotendTemps) > self.maxPrevValues:
+                    self.prevHotendTemps.pop(0)
+                # Configure GUI element
                 self.root.hotendActual.config(text=f"{round(self.hotendTempCelsius, 2)}°C")
                 # Change the ADC channel to A1 (Bed)
                 self.selectADCChannel(1)
@@ -174,7 +185,14 @@ class TemperatureController:
         else:
                 # Handle reading and calculating bed temperature
                 adcVal = self.readADC()
+                # Calculate the temperature
                 self.calculateBedTemp(adcVal)
+                # Save the temperature to list of previous temperatures
+                self.prevBedTemps.append(self.bedTempCelsius)
+                # Restrict length of list
+                if len(self.prevBedTemps) > self.maxPrevValues:
+                    self.prevBedTemps.pop(0)
+                # Configure GUI element
                 self.root.bedActual.config(text=f"{round(self.bedTempCelsius, 2)}°C")
                 # Change the ADC channel to A0 (Hotend)
                 self.selectADCChannel(0)
@@ -232,7 +250,7 @@ class TemperatureController:
             else:
                 self.enableHotendControl()
                 #TODO: Temporarily just set target to whatever is in target box
-                self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
+                #self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
         elif (heater == "bed"):
             if (self.bedTempCtrlEnabled):
                 
@@ -241,7 +259,7 @@ class TemperatureController:
             else:
                 self.enableBedControl()
                 #TODO: Temporarily just set target to whatever is in target box
-                self.setBedTargetTemp(float(self.root.bedTarget.get()))
+                #self.setBedTargetTemp(float(self.root.bedTarget.get()))
 
     # Used for setting a target temperature for the hotend
     def setHotendTargetTemp(self, targetTemp):
@@ -250,6 +268,8 @@ class TemperatureController:
             return
         if (targetTemp > self.hotendTempHardLimit):
             self.root.warningPrint(f"Hotend temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
+            self.root.hotendHomeTarget.delete(0, END)
+            self.root.hotendHomeTarget.insert(0, "0")
             return
         self.hotendTargetTemp = targetTemp
 
@@ -264,6 +284,9 @@ class TemperatureController:
             self.root.terminalPrint("Provided target temperature is less than zero (bed)")
         if (targetTemp > self.bedTempHardLimit):
             self.root.warningPrint(f"Bed temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
+            self.root.bedHomeTarget.delete(0, END)
+            self.root.bedHomeTarget.insert(0, "0")
+            return
         # Update the target temp displayed if it was set from the gcode
         self.root.bedTarget.delete(0, 'end') #delte whatever is currently in the entry box
         self.root.bedTarget.insert(0,f"{targetTemp}") #insert target temp
@@ -274,6 +297,7 @@ class TemperatureController:
     def enableHotendControl(self):
         self.hotendTempCtrlEnabled = True
         self.root.hotendCtrlButton.config(relief="ridge")
+        self.root.hotendHomeEnableButton.config(text="ON", command=self.disableHotendControl)
         #User cannot enter a target temp, mainly to prevent confusion about temperature control and
         #and to show the print controller is controlling temperature
         self.root.hotendTarget.config(state="disabled") 
@@ -283,6 +307,7 @@ class TemperatureController:
     def disableHotendControl(self):
         self.hotendTempCtrlEnabled = False
         self.root.hotendCtrlButton.config(relief="raised")
+        self.root.hotendHomeEnableButton.config(text="OFF", command=self.enableHotendControl)
         self.root.hotendTarget.config(state="normal") #User can now enter a target temp
         self.root.terminalPrint("Hotend heater control disabled")
 
@@ -290,6 +315,7 @@ class TemperatureController:
     def enableBedControl(self):
         self.bedTempCtrlEnabled = True
         self.root.bedCtrlButton.config(relief="ridge")
+        self.root.bedHomeEnableButton.config(text="ON", command=self.disableBedControl)
         #User cannot enter a target temp, mainly to prevent confusion about temperature control and
         #and to show the print controller is controlling temperature
         self.root.bedTarget.config(state="disabled")
@@ -299,6 +325,7 @@ class TemperatureController:
     def disableBedControl(self):
         self.bedTempCtrlEnabled = False
         self.root.bedCtrlButton.config(relief="raised")
+        self.root.bedHomeEnableButton.config(text="OFF", command=self.enableBedControl)
         self.root.bedTarget.config(state="normal") #User can now enter a target temp
         self.root.terminalPrint("Bed heater control disabled")
     

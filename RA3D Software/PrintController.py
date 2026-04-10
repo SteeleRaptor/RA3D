@@ -127,7 +127,9 @@ class PrintController:
             #Update progress bar
             self.currentInstruction += 1 # Increment currentInstruction
             self.root.progressBar["value"] = (self.currentInstruction / len(self.gcodeLines)) * 100 # Update progress bar to match
-            
+            self.root.printProgressBarHome['value'] = (self.currentInstruction / len(self.gcodeLines)) * 100 # Update home progress bar to match
+            self.root.progressHomeLabel.config(text=f"{(self.currentInstruction / len(self.gcodeLines)) * 100}%")
+
             #Read gcode line and convert, handle rare messages inside
             message = self.interpretGcode(lineToConvert) # Convert line and updates printPos
         
@@ -450,6 +452,7 @@ class PrintController:
         if (self.selectedFilepath == ""):
             self.root.statusPrint("No file selected")
             self.root.selectedFileLabel.config(text="No file selected")
+            self.root.selectedFileHomeLabel.config(text="Please select a file")
             self.root.textBox.config(state="normal")
             self.root.textBox.delete("1.0", END) # Clear text box
             self.root.textBox.config(state="disabled")
@@ -460,10 +463,15 @@ class PrintController:
             self.root.stepPrintButton.config(state="disabled")
             self.root.pausePrintButton.config(state="disabled")
             self.root.cancelPrintButton.config(state="disabled")
+            # Home tab buttons
+            self.root.startPrintHomeButton.config(state="disabled")
+            self.root.pausePrintHomeButton.config(state="disabled")
+            self.root.stopPrintHomeButton.config(state="disabled")
             return
         # Change selectedFileLabel to have filename
         self.root.statusPrint(f"Selected \"{os.path.basename(self.selectedFilepath)}\"")
         self.root.selectedFileLabel.config(text=os.path.basename(self.selectedFilepath))
+        self.root.selectedFileHomeLabel.config(text=os.path.basename(self.selectedFilepath))
         self.fileOpen = True
         self.currentInstruction = 0 # Reset the currentInstruction counter
 
@@ -483,6 +491,10 @@ class PrintController:
         self.root.stepPrintButton.config(state="normal")
         self.root.pausePrintButton.config(state="normal")
         self.root.cancelPrintButton.config(state="normal")
+        # Home tab buttons
+        self.root.startPrintHomeButton.config(state="normal")
+        self.root.pausePrintHomeButton.config(state="normal")
+        self.root.stopPrintHomeButton.config(state="normal")
 
     def startPrint(self):
         
@@ -531,6 +543,7 @@ class PrintController:
         self.lastE = 0.0
         self.printing = True
         self.root.statusPrint("Starting print...")
+        self.root.printStatusHomeLabel.config(text="PRINTING...")
 
     def stepPrint(self):
         if self.checkIfPrinterBusy():
@@ -543,11 +556,13 @@ class PrintController:
     def pausePrint(self):
         self.root.LEDOn = False # Turn off LED to signify print is paused
         self.root.terminalPrint("Pausing Print")
+        self.root.printStatusHomeLabel.config(text="PAUSED...")
         self.printPaused = True
 
     def cancelPrint(self):
         self.endPrint() #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
+        self.root.printStatusHomeLabel.config(text="IDLING...")
         pass
 
     # Bed Calibration and sweeps ==========================
@@ -702,6 +717,7 @@ class PrintController:
         #set label
         currentCornerPos = self.calibrationCorners[self.bedCalStep-1]
         self.root.cornerLabel.config(text=f"Current Corner: {self.bedCalStep}")
+        self.root.cornerLabelHome.config(text=f"Current Corner: {self.bedCalStep}")
 
         #For better positioning move home than origin so J4 starts at 0 rather than 180
         #self.root.armController.moveHome()
@@ -750,6 +766,7 @@ class PrintController:
             pos = copy.deepcopy(self.calibrationCorners[i])
             pos.z = height
             self.root.cornerLabel.config(text=f"Current Corner: {i+1}")
+            self.root.cornerLabelHome.config(text=f"Current Corner: {i+1}")
             if self.cornerSweeping:
                 self.root.armController.sendML(pos,moveParameters=self.defaultPrintParameters, timeout=self.timeoutExtra)
             #dont continue if no longer sweeping
@@ -769,6 +786,7 @@ class PrintController:
         self.bedCalibrationInProgress=False
         self.bedCalStep == 0
         self.root.cornerLabel.config(text=f"Current Corner: N/A")
+        self.root.cornerLabelHome.config(text=f"Current Corner: N/A")
         #Wait until move finishes to send move home command
         
         if move:

@@ -39,7 +39,8 @@ class TkWindow(Tk):
             "Solid LED": ("LEDOn","self"),
             "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC"),
             "Coolend Mode": ("coolendMode","self"),
-            "Drop Height": ("dropHeight","PC")
+            "Drop Height": ("dropHeight","PC"),
+            "Default Angle": ("defaultAngle","PC")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates

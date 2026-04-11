@@ -174,7 +174,7 @@ float J1_BacklashFix_b = 0;
 float J2_BacklashFix_b = 0;
 float J3_BacklashFix_b = 0;
 float J4_BacklashFix_b = 0;
-float J5_BacklashFix_b = -5;
+float J5_BacklashFix_b = 0;
 float J6_BacklashFix_b = 0;
 
 float J2_BacklashFix_m = 0.0;

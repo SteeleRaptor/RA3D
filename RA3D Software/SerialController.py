@@ -34,8 +34,11 @@ class SerialController:
         self.root.portSelection.set("/dev/ttyACM0")
         # Attempt the connection and if failed...
         if self.serialConnect() == 0:
-            self.root.statusPrint("Failed to automatically connect to port")
-            self.root.portSelection.set("Select Port")
+            self.root.statusPrint("Failed to automatically connect to port /dev/ttyACM0. Attempting /dev/ttyACM1")
+            self.root.portSelection.set("/dev/ttyACM0")
+            if self.serialConnect() == 0:
+                self.root.statusPrint("Failed to automatically connect to port")
+                self.root.portSelection.set("Select Port")
 
     # Handles the "Connect/Disconnect" button being pressed to connect or disconnect the port
     def serialConnect(self):

@@ -177,8 +177,6 @@ class TemperatureController:
                 # Restrict length of list
                 if len(self.prevHotendTemps) > self.maxPrevValues:
                     self.prevHotendTemps.pop(0)
-                # Configure GUI element
-                self.root.hotendActual.config(text=f"{round(self.hotendTempCelsius, 2)}°C")
                 # Change the ADC channel to A1 (Bed)
                 self.selectADCChannel(1)
                 self.measurementState = 1 # Toggle measurement state
@@ -192,8 +190,6 @@ class TemperatureController:
                 # Restrict length of list
                 if len(self.prevBedTemps) > self.maxPrevValues:
                     self.prevBedTemps.pop(0)
-                # Configure GUI element
-                self.root.bedActual.config(text=f"{round(self.bedTempCelsius, 2)}°C")
                 # Change the ADC channel to A0 (Hotend)
                 self.selectADCChannel(0)
                 self.measurementState = 0 # Toggle measurement state
@@ -242,93 +238,92 @@ class TemperatureController:
     #endregion
 
     #region Temperature Control
-    #toggle control for UI
+    # Used for toggling control of a heating element by UI elements
     def toggleControl(self, heater):
+        # Check which heating element was specified to be toggled
         if (heater == "hotend"):
+            # Toggle the hotend
             if (self.hotendTempCtrlEnabled):
                 self.disableHotendControl()
             else:
                 self.enableHotendControl()
-                #TODO: Temporarily just set target to whatever is in target box
-                #self.setHotendTargetTemp(float(self.root.hotendTarget.get()))
         elif (heater == "bed"):
+            # Toggle the bed
             if (self.bedTempCtrlEnabled):
-                
                 self.disableBedControl()
-                
             else:
                 self.enableBedControl()
-                #TODO: Temporarily just set target to whatever is in target box
-                #self.setBedTargetTemp(float(self.root.bedTarget.get()))
 
     # Used for setting a target temperature for the hotend
     def setHotendTargetTemp(self, targetTemp, fromGcode=True):
+        # Check if the target temperature was set as a negative value
         if (targetTemp < 0):
-            self.root.terminalPrint("Provided target temperature is less than zero (hotend)")
+            # If so, warn user and force the target entry field to the previous target temperature
+            self.root.warningPrint("Provided target temperature is less than zero (hotend)")
+            self.root.hotendHomeTarget.delete(0, END)
+            self.root.hotendHomeTarget.insert(0, self.hotendTargetTemp)
             return
+        # Check if the target temperature exceeds the hard limit
         if (targetTemp > self.hotendTempHardLimit):
+            # If so, warn user and force the target entry fields to the previous target temperature
             self.root.warningPrint(f"Hotend temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
             self.root.hotendHomeTarget.delete(0, END)
-            self.root.hotendHomeTarget.insert(0, "0")
+            self.root.hotendHomeTarget.insert(0, self.hotendTargetTemp)
             return
-        self.hotendTargetTemp = targetTemp
-        
+        # Update the target temp entry if it was set from the gcode
         if fromGcode:
-            # Update the target temp displayed if it was set from the gcode
             self.root.hotendHomeTarget.delete(0, 'end') #delte whatever is currently in the entry box
             self.root.hotendHomeTarget.insert(0,f"{targetTemp}") #insert target temp
-        
+        # If no errors with the new target, save it
+        self.hotendTargetTemp = targetTemp
         self.root.terminalPrint(f"Hotend target temperature set to {targetTemp}°C")
 
     # Used for setting a target temperature for the bed
     def setBedTargetTemp(self, targetTemp, fromGcode=True):
+        # Check if the target temperature was set as a negative value
         if (targetTemp < 0):
-            self.root.terminalPrint("Provided target temperature is less than zero (bed)")
+            # If so, warn user and force the target entry field to the previous target temperature
+            self.root.warningPrint("Provided target temperature is less than zero (bed)")
+            self.root.bedHomeTarget.delete(0, END)
+            self.root.bedHomeTarget.insert(0, self.bedTargetTemp)
+            return
+        # Check if the target temperature exceeds the hard limit
         if (targetTemp > self.bedTempHardLimit):
+            # If so, warn user and force the target entry fields to the previous target temperature
             self.root.warningPrint(f"Bed temperature attempted to be set higher than hard limit (targetTemp={targetTemp})")
             self.root.bedHomeTarget.delete(0, END)
-            self.root.bedHomeTarget.insert(0, "0")
+            self.root.bedHomeTarget.insert(0, self.bedTargetTemp)
             return
-        # Update the target temp displayed if it was set from the gcode
+        # Update the target temp entry if it was set from the gcode
         if fromGcode:
             self.root.bedHomeTarget.delete(0, 'end') #delte whatever is currently in the entry box
             self.root.bedHomeTarget.insert(0,f"{targetTemp}") #insert target temp
+        # If no errors with the new target, save it
         self.bedTargetTemp = targetTemp
+        self.root.terminalPrint(f"Bed target temperature set to {targetTemp}°C")
 
     # Enables temperature control for the hotend
     def enableHotendControl(self):
         self.hotendTempCtrlEnabled = True
-        self.root.hotendCtrlButton.config(relief="ridge")
         self.root.hotendHomeEnableButton.config(text="ON", command=self.disableHotendControl)
-        #User cannot enter a target temp, mainly to prevent confusion about temperature control and
-        #and to show the print controller is controlling temperature
-        self.root.hotendTarget.config(state="disabled") 
         self.root.terminalPrint("Hotend heater control enabled")
 
     # Disables temperature control for the hotend
     def disableHotendControl(self):
         self.hotendTempCtrlEnabled = False
-        self.root.hotendCtrlButton.config(relief="raised")
         self.root.hotendHomeEnableButton.config(text="OFF", command=self.enableHotendControl)
-        self.root.hotendTarget.config(state="normal") #User can now enter a target temp
         self.root.terminalPrint("Hotend heater control disabled")
 
     # Enables temperature control for the bed
     def enableBedControl(self):
         self.bedTempCtrlEnabled = True
-        self.root.bedCtrlButton.config(relief="ridge")
         self.root.bedHomeEnableButton.config(text="ON", command=self.disableBedControl)
-        #User cannot enter a target temp, mainly to prevent confusion about temperature control and
-        #and to show the print controller is controlling temperature
-        self.root.bedTarget.config(state="disabled")
         self.root.terminalPrint("Bed heater control enabled")
 
     # Disables temperature control for the bed
     def disableBedControl(self):
         self.bedTempCtrlEnabled = False
-        self.root.bedCtrlButton.config(relief="raised")
         self.root.bedHomeEnableButton.config(text="OFF", command=self.enableBedControl)
-        self.root.bedTarget.config(state="normal") #User can now enter a target temp
         self.root.terminalPrint("Bed heater control disabled")
     
     #endregion
@@ -337,10 +332,10 @@ class TemperatureController:
     # These functions are used for the print controller to check if target temperatures have been reached for the M109 and M190 gcode commands
     def HotendTargetReached(self):
         if self.hotendTempCelsius > self.minExtrusionTemp:
-            return self.hotendTempCelsius >= self.hotendTargetTemp-self.targetTolerance
+            return self.hotendTempCelsius >= self.hotendTargetTemp - self.targetTolerance
         else:
             return False
     def BedTargetReached(self):
-        return self.bedTempCelsius >= self.bedTargetTemp-self.targetTolerance
+        return self.bedTempCelsius >= self.bedTargetTemp - self.targetTolerance
     
     #endregion

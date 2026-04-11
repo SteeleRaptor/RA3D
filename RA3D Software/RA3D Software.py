@@ -101,7 +101,7 @@ class TkWindow(Tk):
         self.root.bind("<Button-1>", self.clearEntryFocus)
         # Set up a call to the update function after updateDelay milliseconds
         self.update()
-        self.printController.autoSelectFile("/home/ra3d/Desktop/RA3D/Programming Experiments/Gcode Files/one_layer.gcode") #for testing purposes, can change to None to not auto select
+        self.printController.autoSelectFile("../Programming Experiments/Gcode Files/one_layer.gcode") #for testing purposes, can change to None to not auto select
 
     #endregion init
 
@@ -131,28 +131,24 @@ class TkWindow(Tk):
         self.notebook.pack(fill="both", expand=True)
         # Create the tabs
         self.homeTab = Frame(self.notebook, bg="#00FFFF")
-        self.printTab = Frame(self.notebook, bg="#FF0000")
         self.armTab = Frame(self.notebook, bg="#00FF00")
         self.toolTab = Frame(self.notebook, bg="#5301AB")
         self.debugTab = Frame(self.notebook, bg="#0000FF")
         self.settingsTab = Frame(self.notebook, bg="#FFFF00")
         # Put the tabs on screen
         self.homeTab.pack(fill="both", expand=True)
-        self.printTab.pack(fill="both", expand=True)
         self.armTab.pack(fill="both", expand=True)
         self.toolTab.pack(fill="both", expand=True)
         self.debugTab.pack(fill="both", expand=True)
         self.settingsTab.pack(fill="both", expand=True)
         # Add the tabs to the notebook
         self.notebook.add(self.homeTab, text="Home")
-        self.notebook.add(self.printTab, text="Printing")
         self.notebook.add(self.armTab, text="Arm Control")
         self.notebook.add(self.toolTab, text="Extruder")
         self.notebook.add(self.debugTab, text="Debug")
         self.notebook.add(self.settingsTab, text="Settings")
         # Call the various functions for creating the widgets in each tab
         self.fillHomeTab()
-        self.fillPrintTab()
         self.fillArmTab()
         self.fillToolTab()
         self.fillDebugTab()
@@ -170,7 +166,7 @@ class TkWindow(Tk):
         self.printInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=printInfoWidth, height=350)
         self.printInfoHomeFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
         # Print status label (Printing, paused, etc.)
-        self.printStatusHomeLabel = Label(self.printInfoHomeFrame, text="IDLING...", font=("Magneto", 30, "bold"))
+        self.printStatusHomeLabel = Label(self.printInfoHomeFrame, text="IDLE...", font=("Magneto", 30, "bold"))
         self.printStatusHomeLabel.grid(row=0, column=0, columnspan=3, rowspan=2, padx=5, pady=5, sticky=N+W)
         self.printStatusHomeLabel.bind("<Button-1>", self.windowDimensions)
         # Start button
@@ -204,9 +200,9 @@ class TkWindow(Tk):
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=6, sticky=W+E)
         self.thermalNameLabel = Label(self.thermalsHomeFrame, text="Name")
         self.thermalNameLabel.grid(row=2, column=0, columnspan=2, sticky=W, padx=5, pady=5)
-        self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual")
+        self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual (°C)")
         self.thermalActualLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
-        self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target")
+        self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target (°C)")
         self.thermalTargetLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
         self.thermalEnabledLabel = Label(self.thermalsHomeFrame, text="Enabled")
         self.thermalEnabledLabel.grid(row=2, column=4, sticky=E, padx=5, pady=5)
@@ -297,132 +293,6 @@ class TkWindow(Tk):
         Label(self.creditsHomeFrame,text=CreditsText1).grid(row=1,column=0,sticky=W, padx=5)
         Label(self.creditsHomeFrame,text=CreditsText2,justify="left").grid(row=2,column=0,sticky=W, padx=5)
         Label(self.creditsHomeFrame, text=CreditsText3,justify="left").grid(row=3,column=0,sticky=W, padx=5)
-
-    def fillPrintTab(self):
-        # ==========| File Selection Frame |==========
-        self.fileSelFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000", width=250, height=80)
-        self.fileSelFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
-        self.fileSelFrame.grid_propagate(False)
-        # Select file button
-        self.selectFileButton = Button(self.fileSelFrame, text="Select File", width=10, command=self.printController.selectFile)
-        self.selectFileButton.grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        # Selected file label
-        self.selectedFileLabel = Label(self.fileSelFrame, text="Please select file")
-        self.selectedFileLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
-
-        # ==========| Print Control Frame |==========
-        self.printControlFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000", width=500, height=80)
-        self.printControlFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
-        self.printControlFrame.grid_propagate(False)
-        # Start button
-        self.startPrintButton = Button(self.printControlFrame, text="Start", width=10, command=self.printController.startPrint, state="disabled")
-        self.startPrintButton.grid(row=0, column=0, padx=5, pady=5, sticky=N+S)
-        # Step button
-        self.stepPrintButton = Button(self.printControlFrame, text="Step", width=10, command=self.printController.stepPrint, state="disabled")
-        self.stepPrintButton.grid(row=0, column=1, padx=5, pady=5, sticky=N+S)
-        # Pause button
-        self.pausePrintButton = Button(self.printControlFrame, text="Pause", width=10, command=self.printController.pausePrint, state="disabled")
-        self.pausePrintButton.grid(row=0, column=2, padx=5, pady=5, sticky=N+S)
-        # Cancel button
-        self.cancelPrintButton = Button(self.printControlFrame, text="Cancel", width=10, command=self.printController.cancelPrint, state="disabled")
-        self.cancelPrintButton.grid(row=0, column=3, padx=5, pady=5, sticky=N+S)
-        
-        # Might move this
-        self.currentJ7Label = Label(self.printControlFrame,text="Extruded:")
-        self.currentJ7Label.grid(row=1,column=0, padx=5, pady=5, sticky=N+S)
-        self.currentJ7 = Label(self.printControlFrame,text="0 mm")
-        self.currentJ7.grid(row=1,column=1, padx=5, pady=5, sticky=N+S)
-
-        # ==========| Temperatures Frame |==========
-        self.temperatureFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
-        self.temperatureFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
-        # Hotend temperature displays
-        self.hotendLabel = Label(self.temperatureFrame, text="Hotend:")
-        self.hotendLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        self.hotendTargetLabel = Label(self.temperatureFrame, text="Target:")
-        self.hotendTargetLabel.grid(row=1, column=0, padx=5, pady=5)
-        self.hotendTarget = Entry(self.temperatureFrame, width=5)
-        self.hotendTarget.insert(0, "0")
-        self.hotendTarget.grid(row=1, column=1, padx=5, pady=5)
-        self.hotendCtrlButton = Button(self.temperatureFrame, text="Control", width=10, command=lambda: self.temperatureController.toggleControl("hotend"))
-        self.hotendCtrlButton.grid(row=1, column=2, padx=5, pady=5)
-        self.hotendActualLabel = Label(self.temperatureFrame, text="Actual:")
-        self.hotendActualLabel.grid(row=2, column=0, padx=5, pady=5)
-        self.hotendActual = Label(self.temperatureFrame, text="xxx")
-        self.hotendActual.grid(row=2, column=1, padx=5, pady=5)
-
-        # Bed temperature displays
-        self.bedLabel = Label(self.temperatureFrame, text="Bed:")
-        self.bedLabel.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        self.bedTargetLabel = Label(self.temperatureFrame, text="Target:")
-        self.bedTargetLabel.grid(row=4, column=0, padx=5, pady=5)
-        self.bedTarget = Entry(self.temperatureFrame, width=5)
-        self.bedTarget.insert(0, "0")
-        self.bedTarget.grid(row=4, column=1, padx=5, pady=5)
-        self.bedCtrlButton = Button(self.temperatureFrame, text="Control", width=10, command=lambda: self.temperatureController.toggleControl("bed"))
-        self.bedCtrlButton.grid(row=4, column=2, padx=5, pady=5)
-        self.bedActualLabel = Label(self.temperatureFrame, text="Actual:")
-        self.bedActualLabel.grid(row=5, column=0, padx=5, pady=5)
-        self.bedActual = Label(self.temperatureFrame, text="xxx")
-        self.bedActual.grid(row=5, column=1, padx=5, pady=5)
-
-        # ==========| Monitoring Frame |==========
-        self.printMonitorFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
-        self.printMonitorFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
-        # Progress Label
-        self.progressLabel = Label(self.printMonitorFrame, text="Progress:")
-        self.progressLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        # Progress bar
-        self.progressBar = ttk.Progressbar(self.printMonitorFrame, orient=HORIZONTAL, length=400, mode="determinate")
-        self.progressBar.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
-        self.progressBar['value'] = 100
-
-        self.textScroll = Scrollbar(self.printMonitorFrame, orient="vertical")
-        self.textBox = Text(self.printMonitorFrame,
-                            wrap=NONE,
-                            width=49,
-                            height=18,
-                            yscrollcommand=self.textScroll.set,
-                            state="disabled"
-                            )
-        self.textScroll.config(command=self.textBox.yview)
-        self.textBox.grid(row=2, column=0, columnspan=1, padx=(5,0), pady=5)
-        self.textScroll.grid(row=2, column=1, padx=(0, 5), pady=5, sticky=N+S)
-
-        # ==========| Bed Calibration Frame | =========
-        self.bedCalibrationFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
-        self.bedCalibrationFrame.grid(row=0, column=2, padx=5, pady=5, sticky=W+E+N+S)
-
-        self.bedCalibrationLabel = Label(self.bedCalibrationFrame, text= "Bed Leveling")
-        self.bedCalibrationLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W+E)
-        self.startLevel = Button(self.bedCalibrationFrame, text="Start Level", width=12, command=self.printController.startPrintBedCalibration)
-        self.startLevel.grid(row=1, column=0, padx=5, pady=5, sticky=W+E)
-        self.nextLevel = Button(self.bedCalibrationFrame, text= "Next Corner", width=12, command=self.printController.nextBedCalibration)
-        self.nextLevel.grid(row=1, column=1, padx=5, pady=5, sticky=W+E)
-        self.sweepCorners = Button(self.bedCalibrationFrame, text= "Sweep Corners", width=12, command=self.printController.startCornerSweep)
-        self.sweepCorners.grid(row=2, column=0, padx=5, pady=5, sticky=W+E)
-        self.sweepCornersFull = Button(self.bedCalibrationFrame, text= "Full Corner Sweep", width=15, command=self.printController.startFullCornerSweep)
-        self.sweepCornersFull.grid(row=3, column=0, padx=5, pady=5, sticky=W+E)
-        self.cornerLabel = Label(self.bedCalibrationFrame, text="Current corner: N/A")
-        self.cornerLabel.grid(row=2, column=1, padx=5, pady=5, sticky=W)
-        self.cancelAny = Button(self.bedCalibrationFrame, text= "Cancel Any", width=10, command=self.printController.cancelAny)
-        self.cancelAny.grid(row=3, column=1, padx=5, pady=5, sticky=W+E)
-
-        # ============= Credits Frame ===============
-        self.creditsFrame = Frame(self.printTab, highlightthickness=2, highlightbackground="#000000")
-        self.creditsFrame.grid(row=1,column=2,padx=5, pady=5, sticky=W+E+N+S)
-        RA3DLabel = Label(self.creditsFrame,text="RA3D",font=("Magneto", 20, "bold"))
-        RA3DLabel.grid(row=0,column=0,sticky=EW)
-        CreditsText1 = "Designed and implemented by the RA3D Team (Robotic Arm 3D)"
-        CreditsText2 = "Team Members: Justin Fauson, Cody Blough, Jon Dinan,\n Jonathan Pederson, and Mateo Osorio"
-        CreditsText3 = "Sponsor: Dr. Sezer Ozerinc"
-        Credits1 = Label(self.creditsFrame,text=CreditsText1)
-        Credits1.grid(row=1,column=0,sticky=W)
-        TeamMembers = Label(self.creditsFrame,text=CreditsText2,justify="left")
-        TeamMembers.grid(row=2,column=0,sticky=W)
-        Sponsor = Label(self.creditsFrame, text=CreditsText3,justify="left")
-        Sponsor.grid(row=3,column=0,sticky=W)
-
 
     def fillArmTab(self):
         # ==========| Serial Frame |==========

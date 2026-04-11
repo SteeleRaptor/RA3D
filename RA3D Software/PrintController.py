@@ -313,6 +313,12 @@ class PrintController:
             x = float(xMatch.group(1)) if xMatch else None
             y = float(yMatch.group(1)) if yMatch else None
             z = float(zMatch.group(1)) if zMatch else None
+
+            if z is not None: 
+                #Adjust for change
+                z = z - self.dropHeight
+                z = max(z,0) #don't allow negative z values
+    
             #Relative positioning
             if self.relativePositioning:
                 if x is not None:
@@ -341,7 +347,8 @@ class PrintController:
                     Rz,Ry,Rx = self.aer_to_euler_zyx(v,u,0) # 3 options for transformation
 
             NoMove = False #For some commands they only specify E
-
+            
+          
 
             if x == None and y==None and z==None:
                 NoMove = True
@@ -360,10 +367,7 @@ class PrintController:
                     self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
                 else:
                     self.printPos.SetRelative(x,y,z,0,self.defaultAngle,0)
-            if z is not None: 
-                #Adjust for change
-                z = z - self.dropHeight
-                z = max(z,0) #don't allow negative z values
+            
 
            
             #Do not extrude if not told to

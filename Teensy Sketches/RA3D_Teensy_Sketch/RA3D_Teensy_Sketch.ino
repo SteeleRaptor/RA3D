@@ -174,12 +174,12 @@ float J1_BacklashFix_b = 0;
 float J2_BacklashFix_b = 0;
 float J3_BacklashFix_b = 0;
 float J4_BacklashFix_b = 0;
-float J5_BacklashFix_b = -1;
+float J5_BacklashFix_b = -5;
 float J6_BacklashFix_b = 0;
 
-float J2_BacklashFix_m = 0;// 0.01;
-float J3_BacklashFix_m = 0;// 0.01;
-float J5_BacklashFix_m = 0;//0.01;
+float J2_BacklashFix_m = 0.0;
+float J3_BacklashFix_m = 0.0;
+float J5_BacklashFix_m = 0.0;
 
 int LastJ1dir = -1;
 int LastJ4dir = -1;
@@ -192,9 +192,9 @@ float J4_BacklashFixStep_b = J4_BacklashFix_b*J4StepDeg;//
 float J5_BacklashFixStep_b = J5_BacklashFix_b*J5StepDeg;//
 float J6_BacklashFixStep_b = J6_BacklashFix_b*J6StepDeg;//
 
-float J2_BacklashFixStep_m = J2_BacklashFix_m*J2StepDeg;//
-float J3_BacklashFixStep_m = J3_BacklashFix_m*J3StepDeg;//
-float J5_BacklashFixStep_m = J5_BacklashFix_m*J5StepDeg;//
+float J2_BacklashFixStep_m = J2_BacklashFix_m;//
+float J3_BacklashFixStep_m = J3_BacklashFix_m;//
+float J5_BacklashFixStep_m = J5_BacklashFix_m;//
 
 //steps full movement of each axis
 int J1StepLim = J1axisLim * J1StepDeg;
@@ -243,7 +243,7 @@ float J1calBaseOff = -1;
 float J2calBaseOff = 1.5;
 float J3calBaseOff = 4.1+4.5; //Added 4.5 based on observations
 float J4calBaseOff = -2;
-float J5calBaseOff = 3.1+16.1; //Added 14 based on obesrvations
+float J5calBaseOff = 3.1+26.1; //Added 26.1 based on obesrvations
 float J6calBaseOff = -.5;
 float J7calBaseOff = 0;
 float J8calBaseOff = 0;
@@ -294,7 +294,7 @@ String speedViolation = "0";
 //----------IMPORTANT------------
 float minSpeedDelay = 200;//determines maximum motor speed
 float maxMMperSec = 192;
-float linWayDistSP = .1; //determines
+float linWayDistSP = 1; //determines how far apart waypoint are
 String debug = "";
 String flag = "";
 const int TRACKrotdir = 0;
@@ -1428,9 +1428,9 @@ void updatePos() {
     int dir = (LastJ6dir == 1) ? 1 : -1; //convert from 0,1 to -1,1
     J6StepTemp = (J6StepM+J6_BacklashFixStep_b*dir)-J6zeroStep;
   }
-  J2StepTemp += J2_BacklashFixStep_m*(J2StepM-J2zeroStep) + J2_BacklashFixStep_b;
-  J3StepTemp += J3_BacklashFixStep_m*(J3StepM-J3zeroStep) + J3_BacklashFixStep_b;
-  J5StepTemp += J5_BacklashFixStep_m*(J5StepM-J5zeroStep) + J5_BacklashFixStep_b;
+  J2StepTemp -= J2_BacklashFixStep_m*(J2StepM-J2zeroStep) + J2_BacklashFixStep_b;
+  J3StepTemp -= J3_BacklashFixStep_m*(J3StepM-J3zeroStep) + J3_BacklashFixStep_b;
+  J5StepTemp -= J5_BacklashFixStep_m*(J5StepM-J5zeroStep) + J5_BacklashFixStep_b;
 
   JointAnglePreKin[0] = (J1StepTemp) / J1StepDeg;
   JointAnglePreKin[1] = (J2StepTemp) / J2StepDeg;
@@ -2242,6 +2242,13 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
   int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
   int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
   int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
+  //Backlash fix for gravity
+  //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
+  J2futStepM += J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
+  //This could be changed to be dependent on J2
+  J3futStepM += J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
+  J5futStepM += J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
+
   J1TargetStep = J1futStepM;
   J2TargetStep = J2futStepM;
   J3TargetStep = J3futStepM;
@@ -2296,12 +2303,7 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
     if (J6dir != LastJ6dir && LastJ6dir >=0){
       J6stepDif -= J6_BacklashFixStep_b*J6stepDif/abs(J6stepDif);
     }
-    //Backlash fix for gravity
-    //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
-    J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
-    //This could be changed to be dependent on J2
-    J3stepDif -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
-    J5stepDif -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
+    
 
     LastJ1dir = J1dir;
     LastJ4dir = J4dir;
@@ -4695,6 +4697,15 @@ void loop() {
       int J7futStepM = (J7_In + J7axisLimNeg) * J7StepDeg;
       int J8futStepM = (J8_In + J8axisLimNeg) * J8StepDeg;
       int J9futStepM = (J9_In + J9axisLimNeg) * J9StepDeg;
+
+      //Backlash fix for gravity
+      //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
+      J2futStepM -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
+      //This could be changed to be dependent on J2
+      J3futStepM -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
+      J5futStepM -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
+
+
       J1TargetStep = J1futStepM;
       J2TargetStep = J2futStepM;
       J3TargetStep = J3futStepM;
@@ -4738,13 +4749,7 @@ void loop() {
       if (J6dir != LastJ6dir && LastJ6dir >=0){
         J6stepDif -= J6_BacklashFixStep_b*J6stepDif/abs(J6stepDif);
       }
-      //Backlash fix for gravity
-      //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
-      J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
-      //This could be changed to be dependent on J2
-      J3stepDif -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
-      J5stepDif -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
-
+      
       LastJ1dir = J1dir;
       LastJ4dir = J4dir;
       LastJ6dir = J6dir;
@@ -5217,6 +5222,12 @@ void loop() {
           int J4futStepM = (JointAnglePostKin[3] + J4axisLimNeg) * J4StepDeg;
           int J5futStepM = (JointAnglePostKin[4] + J5axisLimNeg) * J5StepDeg;
           int J6futStepM = (JointAnglePostKin[5] + J6axisLimNeg) * J6StepDeg;
+          //Backlash fix for gravity
+          //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
+          J2futStepM -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
+          //This could be changed to be dependent on J2
+          J3futStepM -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
+          J5futStepM -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
 
           //calc delta from current to destination
           int J1stepDif = J1StepM - J1futStepM;
@@ -5225,6 +5236,7 @@ void loop() {
           int J4stepDif = J4StepM - J4futStepM;
           int J5stepDif = J5StepM - J5futStepM;
           int J6stepDif = J6StepM - J6futStepM;
+          
 
           //determine motor directions
           J1dir = (J1stepDif <= 0) ? 1 : 0;
@@ -5245,12 +5257,6 @@ void loop() {
           if (J6dir != LastJ6dir && LastJ6dir >=0){
             J6stepDif -= J6_BacklashFixStep_b*J6stepDif/abs(J6stepDif);
           }
-          //Backlash fix for gravity
-          //y=mx+b, y = backlash adjustment, m = backlash fix per degree, x = future step in degrees, b = min backlash fix
-          J2stepDif -= J2_BacklashFixStep_m*(J2futStepM-J2zeroStep) + J2_BacklashFixStep_b;
-          //This could be changed to be dependent on J2
-          J3stepDif -= J3_BacklashFixStep_m*(J3futStepM-J3zeroStep) + J3_BacklashFixStep_b;
-          J5stepDif -= J5_BacklashFixStep_m*(J5futStepM-J5zeroStep) + J5_BacklashFixStep_b;
 
           LastJ1dir = J1dir;
           LastJ4dir = J4dir;
@@ -5287,8 +5293,8 @@ void loop() {
           //IMPORTANT
           float turnTolerance = 250; //max degrees that can be moved to avoid hazard turn
           //This should only affect if one waypoint jumps angles not the entire move
-          if (abs(J4stepDif) > turnTolerance || abs(J5stepDif) > turnTolerance || abs(J6stepDif) > turnTolerance){
-            Alarm = "Turn Hazard: J4:" + String(J4stepDif) + " J5:" + String(J5stepDif) + " J6:" + String(J6stepDif);
+          if (fabs((float)J4stepDif/J4StepDeg) > turnTolerance || fabs((float)J6stepDif/J6StepDeg) > turnTolerance){
+            Alarm = "Turn Hazard: J4:" + String(fabs((float)J4stepDif/J4StepDeg)) + " J5:" + String(fabs((float)J5stepDif/J5StepDeg)) + " J6:" + String(fabs((float)J6stepDif/J6StepDeg));
             Serial.println(Alarm);
             break;
           }

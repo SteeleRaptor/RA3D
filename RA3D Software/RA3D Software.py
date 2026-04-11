@@ -38,7 +38,8 @@ class TkWindow(Tk):
             "Hard code printer speed to default": ("hardCodePrinterSpeed","PC"),
             "Solid LED": ("LEDOn","self"),
             "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC"),
-            "Coolend Mode": ("coolendMode","self")
+            "Coolend Mode": ("coolendMode","self"),
+            "Drop Height": ("dropHeight","PC")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
@@ -106,15 +107,19 @@ class TkWindow(Tk):
     #region Shutdown
     # This function is meant to do various shutdown tasks so the program doesn't break anything
     def shutdownProgram(self):
-        # Move the arm to a safe position before shutting down, will not move safe if not calibrated
-        # This is necessary because if the arm is not calibrated
-        if not self.armController.calibrationOverridden:
-            self.armController.moveSafe()
-        self.ledThreadRunning = False
-        # Release the GPIO pins from use
-        GPIO.cleanup()
-        # Close the window
-        self.root.destroy()
+        try:
+            # Move the arm to a safe position before shutting down, will not move safe if not calibrated
+            # This is necessary because if the arm is not calibrated
+            if not self.armController.calibrationOverridden:
+                self.armController.moveSafe()
+            self.ledThreadRunning = False
+            # Release the GPIO pins from use
+            GPIO.cleanup()
+            # Close the window
+            self.root.destroy()
+        except:
+            #if failed then destroy the window anyway, we don't want it to be stuck
+            self.root.destroy()
     #endregion
 
     #region Tabs

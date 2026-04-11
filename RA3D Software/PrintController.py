@@ -23,7 +23,7 @@ class PrintController:
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
         self.plateHeight = 280 #Change bed height relative to pen
-        self.dropHeight = 0.5 #mm, drop all layers by amount, z will not go negative
+        self.dropHeight = 0.0 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
         self.YEdge = [-100,100] #These values were adjusted carefully, should not change

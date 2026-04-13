@@ -192,6 +192,9 @@ class TkWindow(Tk):
         self.printProgressBarHome.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky=W+E)
         self.printProgressBarHome['value'] = 0
 
+        self.currentJ7 = Label(self.printInfoHomeFrame,text="Extruded: 0 mm")
+        self.currentJ7.grid(row=4,column=0, padx=5, pady=5, sticky=N+S)
+
         # ==========| Thermals Frame |==========
         self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=350)
         self.thermalsHomeFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
@@ -755,10 +758,8 @@ class TkWindow(Tk):
         self.loadButton.grid(row=3, column=0,padx=(0, 5), pady=5)
         self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament)
         self.unloadButton.grid(row=3, column=1,padx=(0, 5), pady=5)
-        self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")
-        self.currentJ7Label2.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
-        self.currentJ72 = Label(self.extruderFrame,text="0 mm")
-        self.currentJ72.grid(row=6,column=1, padx=5, pady=5, sticky=N+S)
+        self.currentJ72 = Label(self.extruderFrame,text="Extruded: 0 mm")
+        self.currentJ72.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):

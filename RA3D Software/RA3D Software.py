@@ -193,7 +193,7 @@ class TkWindow(Tk):
         self.printProgressBarHome['value'] = 0
 
         self.currentJ7 = Label(self.printInfoHomeFrame,text="Extruded: 0 mm")
-        self.currentJ7.grid(row=4,column=0, padx=5, pady=5, sticky=N+S)
+        self.currentJ7.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
 
         # ==========| Thermals Frame |==========
         self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=350)

@@ -27,7 +27,7 @@ class PrintController:
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
         self.YEdge = [-50,50] #These values were adjusted carefully, should not change
-        self.XEdge = [300,400]
+        self.XEdge = [400,500]
 
         self.hardCodePrinterSpeed = False #Will obey the print parameters and not the gcode feed rate
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete

@@ -49,7 +49,7 @@ class PrintController:
         #------End important variables-------
         
         #recomended Origin for move set at middle of calibration corners
-        self.recommendedOriginPosition = Position((self.XEdge[0]+self.XEdge[1])/2,0,self.plateHeight,0,self.defaultAngle,0,None)
+        self.recommendedOriginPosition = Position((self.XEdge[0]+self.XEdge[1])/2,0,self.plateHeight,0,90,0,None)
         #extract position to origin
         self.recommendedOrigin = self.recommendedOriginPosition.toOrigin()
         

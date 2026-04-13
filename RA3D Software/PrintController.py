@@ -367,7 +367,7 @@ class PrintController:
                 if self.axis5:
                     self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
                 else:
-                    self.printPos.SetRelative(x,y,z,0,self.calculateBacklashOffset(x),0)
+                    self.printPos.SetRelative(x,y,z,0,self.calculateBacklashOffset(x,relative=True),0)
             
 
            
@@ -701,10 +701,13 @@ class PrintController:
             return False
         return True
     
-    def calculateBacklashOffset(self, x):
+    def calculateBacklashOffset(self, x, relative=False):
         w1 = .1185
         w0 = -.0756
-        backlash = w0 + w1*(x - self.origin.x)
+        if not relative:
+            backlash = w0 + w1*(x - self.origin.x)
+        else:
+            backlash = w0 + w1*(x)
         return 90+backlash
 
     #endregion

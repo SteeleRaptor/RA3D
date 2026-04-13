@@ -22,7 +22,7 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 280 #Change bed height relative to pen
+        self.plateHeight = 261 #Change bed height relative to pen
         self.dropHeight = 0.0 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
@@ -732,6 +732,7 @@ class PrintController:
 
         #Move above
         posStep = copy.deepcopy(currentCornerPos)
+        posStep.z = self.plateHeight
         posStep.z += self.bedCalibrateHeight
         moveParameters = copy.deepcopy(self.defaultPrintParameters)
         moveParameters.wrist = "N"

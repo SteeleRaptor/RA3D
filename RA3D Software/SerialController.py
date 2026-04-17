@@ -55,7 +55,6 @@ class SerialController:
                 self.root.portDropdown.config(state="disabled") # Disable port dropdown
                 self.root.refreshCOMButton.config(state="disabled") # Disable refresh button
                 self.root.portStatusLabel.config(text="Status: Connected") # Change port status text
-                self.sendSerial("\n") #This is an attempt to fix that fact that the teensy ignores the first command when just flashed
                 #self.sendSerial("\n") #This is an attempt to fix that fact that the teensy ignores the first command when just flashed
                 return 1
             else:

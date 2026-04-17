@@ -986,7 +986,7 @@ class TkWindow(Tk):
             if object == "custom":
                 match attr:
                     case "J5BacklashFix":
-                        command = f"BFA{valueToSet*43.720}\n"
+                        command = f"BFA{float(valueToSet)*43.720}\n"
                         self.serialController.sendSerial(command)
                 continue
             match object:

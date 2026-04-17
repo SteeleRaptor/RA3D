@@ -48,6 +48,7 @@ class ArmController:
         self.curJ4 = None
         self.curJ5 = None
         self.curJ6 = None
+        self.curJ7 = 0
 
         #Orign variable
         #Note origin is different between arm controller and print controller
@@ -331,8 +332,8 @@ class ArmController:
         self.curJ7 = round(float(response[J7Idx+1:J8Idx].strip())/self.extruder_deg_per_mm,2)
 
         #There are 2 displays in the program
-        self.root.currentJ7.config(text=str(self.curJ7)+" mm")
-        self.root.currentJ72.config(text=str(self.curJ7)+" mm")
+        self.root.currentJ7.config(text=f"Extruded: {self.curJ7} mm")
+        self.root.currentJ72.config(text=f"Extruded: {self.curJ7} mm")
 
         # Display values on UI
         # XYZ

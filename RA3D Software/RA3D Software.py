@@ -222,6 +222,9 @@ class TkWindow(Tk):
         self.printProgressBarHome.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky=W+E)
         self.printProgressBarHome['value'] = 50
 
+        self.currentJ7 = Label(self.printInfoHomeFrame,text="Extruded: 0 mm")
+        self.currentJ7.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
+
         # ==========| Thermals Frame |==========
         self.thermalsHomeFrame = Frame(self.homeTab, width=printInfoWidth, height=350, bg=self.colorBG2)
         self.thermalsHomeFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
@@ -488,7 +491,7 @@ class TkWindow(Tk):
         self.calJ2Button = Button(self.indivCalFrame, text="Cal J2", command=lambda: self.armController.startSpecificCalibration(0, 1, 0, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calJ3Button = Button(self.indivCalFrame, text="Cal J3", command=lambda: self.armController.startSpecificCalibration(0, 0, 1, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calJ4Button = Button(self.indivCalFrame, text="Cal J4", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 1, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
-        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, state="disabled", bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calJ6Button = Button(self.indivCalFrame, text="Cal J6", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 0, 1), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         # Place buttons
         self.calJ1Button.grid(row=1, column=0, padx=5, pady=5,)
@@ -792,10 +795,8 @@ class TkWindow(Tk):
         self.loadButton.grid(row=3, column=0,padx=(0, 5), pady=5)
         self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.unloadButton.grid(row=3, column=1,padx=(0, 5), pady=5)
-        self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:", bg=self.colorBG2, fg=self.colorFG)
-        self.currentJ7Label2.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
-        self.currentJ72 = Label(self.extruderFrame,text="0 mm", bg=self.colorBG2, fg=self.colorFG)
-        self.currentJ72.grid(row=6,column=1, padx=5, pady=5, sticky=N+S)
+        self.currentJ72 = Label(self.extruderFrame,text="Extruded: 0 mm", bg=self.colorBG2, fg=self.colorFG)
+        self.currentJ72.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):

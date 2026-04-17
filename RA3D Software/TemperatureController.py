@@ -68,7 +68,7 @@ class TemperatureController:
         self.hotendTempHardLimit = 300     # Hard limit to not allow crossing over for the hotend
         self.bedTempHardLimit = 100        # Hard limit to not allow crossing over for the bed
         self.hotendTempAdjustment = 0      # Adjustment amount to counter the interference from heater current
-        self.bedTempAdjustment = 3.25      # Adjustment amount to counter the interference from heater current
+        self.bedTempAdjustment = 0         # Adjustment amount to counter the interference from heater current
         self.targetTolerance = 5           # Tolerance for target temperature in degrees Celsius. 
 
         #Used so that room temperature is not considered an acceptable temperature for extrusion,

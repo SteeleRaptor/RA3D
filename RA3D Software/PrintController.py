@@ -22,12 +22,12 @@ class PrintController:
         self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 280 #Change bed height relative to pen
+        self.plateHeight = 261 #Change bed height relative to pen
         self.dropHeight = 0.0 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
-        self.YEdge = [-100,100] #These values were adjusted carefully, should not change
-        self.XEdge = [300,500]
+        self.YEdge = [-50,50] #These values were adjusted carefully, should not change
+        self.XEdge = [400,500]
 
         self.hardCodePrinterSpeed = False #Will obey the print parameters and not the gcode feed rate
         self.axis5 = False #NOTE should be set to false because axis 5 implementation is incomplete
@@ -47,20 +47,22 @@ class PrintController:
         self.backlashAngleOffset = 0 #5.55 #offset to account for backlash
         #Could add another safeguard within the temperatur controller
         #------End important variables-------
-        self.defaultAngle = 90 - self.backlashAngleOffset
+        
         #recomended Origin for move set at middle of calibration corners
-        self.recommendedOriginPosition = Position((self.XEdge[0]+self.XEdge[1])/2,0,self.plateHeight,0,self.defaultAngle,0,None)
+        self.recommendedOriginPosition = Position((self.XEdge[0]+self.XEdge[1])/2,0,self.plateHeight,0,90,0,None)
         #extract position to origin
         self.recommendedOrigin = self.recommendedOriginPosition.toOrigin()
         
         #Assume origin is at recommended origin
         self.origin = self.recommendedOrigin
+        self.defaultAngle = self.calculateBacklashOffset((self.XEdge[0]+self.XEdge[1])/2)
+        self.recommendedOriginPosition.Ry = self.defaultAngle
 
         # Calibration corners
-        FLCorner = Position(self.XEdge[1],self.YEdge[0],self.plateHeight,0,self.defaultAngle,0,None)
-        FRCorner = Position(self.XEdge[1],self.YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
-        BLCorner = Position(self.XEdge[0],self.YEdge[0],self.plateHeight,0,self.defaultAngle,0,None)
-        BRCorner = Position(self.XEdge[0],self.YEdge[1],self.plateHeight,0,self.defaultAngle,0,None)
+        FLCorner = Position(self.XEdge[1],self.YEdge[0],self.plateHeight,0,self.calculateBacklashOffset(self.XEdge[1]),0,None)
+        FRCorner = Position(self.XEdge[1],self.YEdge[1],self.plateHeight,0,self.calculateBacklashOffset(self.XEdge[1]),0,None)
+        BLCorner = Position(self.XEdge[0],self.YEdge[0],self.plateHeight,0,self.calculateBacklashOffset(self.XEdge[0]),0,None)
+        BRCorner = Position(self.XEdge[0],self.YEdge[1],self.plateHeight,0,self.calculateBacklashOffset(self.XEdge[0]),0,None)
 
         #corners are absolute relative to the physical structure
         #but z values of calibration will update to be the same as origin if the origin is changed in the UI
@@ -365,7 +367,7 @@ class PrintController:
                 if self.axis5:
                     self.printPos.SetRelative(x,y,z,Rx,Ry,Rz)
                 else:
-                    self.printPos.SetRelative(x,y,z,0,self.defaultAngle,0)
+                    self.printPos.SetRelative(x,y,z,0,self.calculateBacklashOffset(x,relative=True),0)
             
 
            
@@ -530,9 +532,10 @@ class PrintController:
         
         #print(self.origin.z, "test2")
         self.printPos.origin = self.origin
-        self.printPos = self.origin.toPosition(angle=self.defaultAngle) #Reset print position to origin
+        self.printPos = self.origin.toPosition(angle=self.calculateBacklashOffset(self.origin.x)) #Reset print position to origin
         #Last position starts at origin
-        self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,self.defaultAngle,0,self.origin)
+        self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,self.calculateBacklashOffset(self.origin.x),0,self.origin)
+        
         #print(self.lastPos.z)
 
         #Reset feedrate and extruderate
@@ -698,6 +701,15 @@ class PrintController:
             return False
         return True
     
+    def calculateBacklashOffset(self, x, relative=False):
+        w1 = .1185
+        w0 = -.0756
+        if not relative:
+            backlash = w0 + w1*(x - self.origin.x)
+        else:
+            backlash = w0 + w1*(x)
+        return 90+backlash
+
     #endregion
     
     #region Calibration
@@ -723,6 +735,7 @@ class PrintController:
 
         #Move above
         posStep = copy.deepcopy(currentCornerPos)
+        posStep.z = self.plateHeight
         posStep.z += self.bedCalibrateHeight
         moveParameters = copy.deepcopy(self.defaultPrintParameters)
         moveParameters.wrist = "N"

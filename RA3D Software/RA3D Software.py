@@ -18,6 +18,7 @@ class TkWindow(Tk):
 
     # region init
     def __init__(self):
+        Tk.__init__(self)
         #All Settings
         #Maps each display setting to a variable
         #Simply add to this dictionary to add a setting
@@ -59,7 +60,35 @@ class TkWindow(Tk):
         # Initialize the LED
         GPIO.setup(self.LEDPin, GPIO.OUT)
 
-        Tk.__init__(self)
+        # Colors
+        # Taken from https://brand.uccs.edu/visual-guidelines/color on April 11th, 2026
+        self.colorCUBlack = "#000000"
+        self.colorCUGold = "#cfb87c"
+        self.colorDarkGray = "#565a5c"
+        self.colorLightGray = "#a2a4a3"
+        self.colorWhite = "#ffffff"
+        # Variables used to generalize colorations across the software
+        self.colorBG = self.colorCUBlack    # Background color
+        self.colorBG2 = self.colorDarkGray  # Background 2 color (used for backgrounds that should stick out more)
+        self.colorBG3 = self.colorLightGray # Background 3 color (used for even brighter backgrounds)
+        self.colorFG = self.colorWhite      # Foreground color (like text)
+        self.colorAccent = self.colorCUGold # Accent colors
+
+        # Style configurations
+        s = ttk.Style()
+        s.theme_use('default')
+        s.configure("TProgressbar", 
+                    thickness = 50,                 # Height of the bar
+                    background  = self.colorAccent, # Color of the bar that is filled in
+                    troughcolor = self.colorBG3,    # Color of the bar that isn't filled in
+                    pbarrelief = SOLID)
+        s.configure("TSeparator", background=self.colorBG2)
+        # s.configure("TCombobox",
+        #             foreground=self.colorFG,
+        #             background=self.colorBG2,
+        #             selectbackground=self.colorBG2,
+        #             fieldbackground=self.colorBG2)
+
         self.root = self
         # Set the window title
         self.title("RA3D Control Software")
@@ -67,13 +96,14 @@ class TkWindow(Tk):
         # self.attributes('-topmost', True)
         self.updateDelay = 150 # Delay between update function calls in milliseconds
         # Set the window dimensions and position on screen
-        w = 1190 # Window width
-        h = 710 # Window height
+        w = 1220 # Window width
+        h = 685 # Window height
         ws = self.winfo_screenwidth() # Get screen width
         hs = self.winfo_screenheight() # Get screen height
         x = int((ws/2) - (w/2)) # Calculate x position for window to be in the center of the screen
         y = int((hs/2) - (h/2)) # Calculate y position for window to be in the center of the screen
         self.geometry(f"{w}x{h}+{x}+{y}") # Set the width, height, x, and y values
+        self.root.config(bg=self.colorBG)
         
         # Instantiate objects for the various controller classes
         self.serialController      = SerialController(self.root)
@@ -130,11 +160,11 @@ class TkWindow(Tk):
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True)
         # Create the tabs
-        self.homeTab = Frame(self.notebook, bg="#00FFFF")
-        self.armTab = Frame(self.notebook, bg="#00FF00")
-        self.toolTab = Frame(self.notebook, bg="#5301AB")
-        self.debugTab = Frame(self.notebook, bg="#0000FF")
-        self.settingsTab = Frame(self.notebook, bg="#FFFF00")
+        self.homeTab = Frame(self.notebook, bg=self.colorBG)
+        self.armTab = Frame(self.notebook, bg=self.colorBG)
+        self.toolTab = Frame(self.notebook, bg=self.colorBG)
+        self.debugTab = Frame(self.notebook, bg=self.colorBG)
+        self.settingsTab = Frame(self.notebook, bg=self.colorBG)
         # Put the tabs on screen
         self.homeTab.pack(fill="both", expand=True)
         self.armTab.pack(fill="both", expand=True)
@@ -155,90 +185,89 @@ class TkWindow(Tk):
         self.fillSettingsTab()
 
         # Create a status label for immediate user response
-        self.statusBarFrame = Frame(self.root, height=20, bg="#FF0DEB")
+        self.statusBarFrame = Frame(self.root, height=20, bg=self.colorAccent)
         self.statusBarFrame.pack(fill="both", expand=True, side="bottom")
-        self.statusLabel = Label(self.statusBarFrame, text="Status: Example")
+        self.statusLabel = Label(self.statusBarFrame, text="Status: Example", bg=self.colorAccent, fg=self.colorBG)
         self.statusLabel.grid(row=0, column=0, sticky=W+N+S)
 
     def fillHomeTab(self):
         # ==========| Print Info Frame |==========
         printInfoWidth = 600
-        self.printInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=printInfoWidth, height=350)
+        self.printInfoHomeFrame = Frame(self.homeTab, bg=self.colorBG2, width=printInfoWidth, height=350)
         self.printInfoHomeFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
         # Print status label (Printing, paused, etc.)
-        self.printStatusHomeLabel = Label(self.printInfoHomeFrame, text="IDLE...", font=("Magneto", 30, "bold"))
+        self.printStatusHomeLabel = Label(self.printInfoHomeFrame, text="IDLE...", font=("TkDefaultFont", 30, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.printStatusHomeLabel.grid(row=0, column=0, columnspan=3, rowspan=2, padx=5, pady=5, sticky=N+W)
         self.printStatusHomeLabel.bind("<Button-1>", self.windowDimensions)
         # Start button
-        self.startPrintHomeButton = Button(self.printInfoHomeFrame, text="Start", width=10, height=2, command=self.printController.startPrint, state="disabled")
+        self.startPrintHomeButton = Button(self.printInfoHomeFrame, text="Start", width=10, height=2, command=self.printController.startPrint, state="disabled", bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.startPrintHomeButton.grid(row=0, column=3, padx=5, pady=5, sticky=E)
         # Pause button
-        self.pausePrintHomeButton = Button(self.printInfoHomeFrame, text="Pause", width=10, height=2, command=self.printController.pausePrint, state="disabled")
+        self.pausePrintHomeButton = Button(self.printInfoHomeFrame, text="Pause", width=10, height=2, command=self.printController.pausePrint, state="disabled", bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.pausePrintHomeButton.grid(row=1, column=3, padx=5, pady=5, sticky=E)
         # Stop button
-        self.stopPrintHomeButton = Button(self.printInfoHomeFrame, text="Stop", width=10, height=2, command=self.printController.cancelPrint, state="disabled")
+        self.stopPrintHomeButton = Button(self.printInfoHomeFrame, text="Stop", width=10, height=2, command=self.printController.cancelPrint, state="disabled", bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.stopPrintHomeButton.grid(row=2, column=3, padx=5, pady=5, sticky=E)
         # Select file button
-        self.selectFileHomeButton = Button(self.printInfoHomeFrame, text="Select File", width=10, command=self.printController.selectFile)
+        self.selectFileHomeButton = Button(self.printInfoHomeFrame, text="Select File", width=10, command=self.printController.selectFile, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.selectFileHomeButton.grid(row=4, column=0, padx=5, pady=5, sticky=W)
         # File name label
-        self.selectedFileHomeLabel = Label(self.printInfoHomeFrame, text="Please select a file")
+        self.selectedFileHomeLabel = Label(self.printInfoHomeFrame, text="Please select a file", bg=self.colorBG2, fg=self.colorFG)
         self.selectedFileHomeLabel.grid(row=4, column=1, padx=5, pady=5, sticky=W)
         # Progress label
-        self.progressHomeLabel = Label(self.printInfoHomeFrame, text="0%")
+        self.progressHomeLabel = Label(self.printInfoHomeFrame, text="0%", bg=self.colorBG2, fg=self.colorFG)
         self.progressHomeLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W+S)
         # Progress bar
         self.printProgressBarHome = ttk.Progressbar(self.printInfoHomeFrame, orient=HORIZONTAL, length=printInfoWidth - 20, mode="determinate")
         self.printProgressBarHome.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky=W+E)
-        self.printProgressBarHome['value'] = 0
+        self.printProgressBarHome['value'] = 50
 
         # ==========| Thermals Frame |==========
-        self.thermalsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=350)
+        self.thermalsHomeFrame = Frame(self.homeTab, width=printInfoWidth, height=350, bg=self.colorBG2)
         self.thermalsHomeFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
-        self.thermalsHomeLabel = Label(self.thermalsHomeFrame, text="Thermals")
+        self.thermalsHomeLabel = Label(self.thermalsHomeFrame, text="Thermals", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.thermalsHomeLabel.grid(row=0, column=0, columnspan=2, sticky=W+N+S, padx=5, pady=5)
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=6, sticky=W+E)
-        self.thermalNameLabel = Label(self.thermalsHomeFrame, text="Name")
+        self.thermalNameLabel = Label(self.thermalsHomeFrame, text="Name", bg=self.colorBG2, fg=self.colorFG)
         self.thermalNameLabel.grid(row=2, column=0, columnspan=2, sticky=W, padx=5, pady=5)
-        self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual (°C)")
+        self.thermalActualLabel = Label(self.thermalsHomeFrame, text="Actual (°C)", bg=self.colorBG2, fg=self.colorFG)
         self.thermalActualLabel.grid(row=2, column=2, sticky=E, padx=5, pady=5)
-        self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target (°C)")
+        self.thermalTargetLabel = Label(self.thermalsHomeFrame, text="Target (°C)", bg=self.colorBG2, fg=self.colorFG)
         self.thermalTargetLabel.grid(row=2, column=3, sticky=E, padx=5, pady=5)
-        self.thermalEnabledLabel = Label(self.thermalsHomeFrame, text="Enabled")
+        self.thermalEnabledLabel = Label(self.thermalsHomeFrame, text="Enabled", bg=self.colorBG2, fg=self.colorFG)
         self.thermalEnabledLabel.grid(row=2, column=4, sticky=E, padx=5, pady=5)
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=3, column=0, columnspan=6, sticky=W+E)
         # Hotend temp info
-        self.hotendHomeLabel = Label(self.thermalsHomeFrame, text="Hotend")
+        self.hotendHomeLabel = Label(self.thermalsHomeFrame, text="Hotend", bg=self.colorBG2, fg=self.colorFG)
         self.hotendHomeLabel.grid(row=4, column=0, sticky=W, padx=5, pady=5)
-        self.hotendHomeActual = Label(self.thermalsHomeFrame, text="xxx")
+        self.hotendHomeActual = Label(self.thermalsHomeFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG)
         self.hotendHomeActual.grid(row=4, column=2, sticky=E, padx=5, pady=5)
         #self.hotendHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
-        self.hotendHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
+        self.hotendHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right", bg=self.colorBG2, fg=self.colorFG)
         self.hotendHomeTarget.insert(0, "0")
         self.hotendHomeTarget.grid(row=4, column=3, sticky=E, padx=5, pady=5)
-        self.hotendHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableHotendControl)
+        self.hotendHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableHotendControl, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.hotendHomeEnableButton.grid(row=4, column=4, sticky=E, padx=5, pady=5)
         self.hotendHomeLegend = Label(self.thermalsHomeFrame, text=" ", bg="#FF0000", width=2)
         self.hotendHomeLegend.grid(row=4, column=5, padx=5, pady=5, sticky=W)
 
         # Bed temp info
-        self.bedHomeLabel = Label(self.thermalsHomeFrame, text="Bed")
+        self.bedHomeLabel = Label(self.thermalsHomeFrame, text="Bed", bg=self.colorBG2, fg=self.colorFG)
         self.bedHomeLabel.grid(row=5, column=0, sticky=W, padx=5, pady=5)
-        self.bedHomeActual = Label(self.thermalsHomeFrame, text="xxx")
+        self.bedHomeActual = Label(self.thermalsHomeFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG)
         self.bedHomeActual.grid(row=5, column=2, sticky=E, padx=5, pady=5)
         #self.bedHomeTarget = Label(self.thermalsHomeFrame, text="xxx")
-        self.bedHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right")
+        self.bedHomeTarget = Entry(self.thermalsHomeFrame, width=5, justify="right", bg=self.colorBG2, fg=self.colorFG)
         self.bedHomeTarget.insert(0, "0")
         self.bedHomeTarget.grid(row=5, column=3, sticky=E, padx=5, pady=5)
-        self.bedHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableBedControl)
+        self.bedHomeEnableButton = Button(self.thermalsHomeFrame, text="OFF", width=4, command=self.temperatureController.enableBedControl, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.bedHomeEnableButton.grid(row=5, column=4, sticky=E, padx=5, pady=5)
         self.bedHomeLegend = Label(self.thermalsHomeFrame, text=" ", bg="#0000FF", width=2)
         self.bedHomeLegend.grid(row=5, column=5, padx=5, pady=5, sticky=W)
         
-
         # Live temperatures plot
         ttk.Separator(self.thermalsHomeFrame, orient='horizontal').grid(row=6, column=0, columnspan=6, sticky=W+E)
-        self.thermalFig = Figure(figsize=(5, 2.5), dpi=100)
+        self.thermalFig = Figure(figsize=(5.75, 2.5), dpi=100)
         self.thermalPlot = self.thermalFig.add_subplot(111)
         self.thermalHotendLine, = self.thermalPlot.plot([], [], 'r-', label="Hotend")
         self.thermalBedLine, = self.thermalPlot.plot([], [], 'b-', label="Bed")
@@ -249,60 +278,69 @@ class TkWindow(Tk):
         self.thermalPlot.margins(x=0.1, y=0.05)
         self.thermalPlot.spines['right'].set_visible(False)
         self.thermalPlot.spines['top'].set_visible(False)
+        # Lots of color setting
         self.thermalFig.set_facecolor(self.thermalsHomeFrame.cget("bg"))
-        self.thermalPlot.grid(True)
+        self.thermalPlot.spines["left"].set_color(self.colorFG)
+        self.thermalPlot.spines["bottom"].set_color(self.colorFG)
+        self.thermalPlot.set_facecolor(self.colorBG3)
+        self.thermalPlot.tick_params(axis='x', colors=self.colorFG)
+        self.thermalPlot.tick_params(axis='y', colors=self.colorFG)
+        self.thermalPlot.xaxis.label.set_color(self.colorFG)
+        self.thermalPlot.yaxis.label.set_color(self.colorFG)
+        self.thermalPlot.grid(True) # Add a grid
         self.hotendTargetLine = self.thermalPlot.axhline(y=self.temperatureController.hotendTargetTemp, color='r', linestyle='--')
         self.bedTargetLine = self.thermalPlot.axhline(y=self.temperatureController.bedTargetTemp, color='b', linestyle='--')
         self.yMax = 100 # Used for y-axis scaling of the plot
+        self.thermalCanvas.get_tk_widget().bind("<Button-1>", self.clearEntryFocus)
 
         # ==========| Arm Info Frame |==========
-        self.armInfoHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=600, height=200)
+        self.armInfoHomeFrame = Frame(self.homeTab, width=600, height=200, bg=self.colorBG2)
         self.armInfoHomeFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
-        Label(self.armInfoHomeFrame, text="Arm Info").grid(row=0, column=0, columnspan=2, sticky=W+N+S, padx=5, pady=5)
+        Label(self.armInfoHomeFrame, text="Arm Info", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG).grid(row=0, column=0, columnspan=2, sticky=W+N+S, padx=5, pady=5)
         ttk.Separator(self.armInfoHomeFrame, orient='horizontal').grid(row=1, column=0, columnspan=4, sticky=W+E)
-        self.connectedStatusHome = Label(self.armInfoHomeFrame, text="Arm Disconnected", width=30, justify=LEFT, anchor=W)
+        self.connectedStatusHome = Label(self.armInfoHomeFrame, text="Arm Disconnected", width=30, justify=LEFT, anchor=W, bg=self.colorBG2)
         self.connectedStatusHome.grid(row=2, column=0, padx=5, pady=5, sticky=W)
-        self.calibrationStatusHome = Label(self.armInfoHomeFrame, text="Arm NOT Calibrated", width=30, justify=LEFT, anchor=W)
+        self.calibrationStatusHome = Label(self.armInfoHomeFrame, text="Arm NOT Calibrated", width=30, justify=LEFT, anchor=W, bg=self.colorBG2)
         self.calibrationStatusHome.grid(row=3, column=0, rowspan=2, padx=5, pady=5, sticky=W)
-        self.calibrationHomeButton = Button(self.armInfoHomeFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10)
+        self.calibrationHomeButton = Button(self.armInfoHomeFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calibrationHomeButton.grid(row=5, column=0, padx=5, pady=5, sticky=W)
 
         ttk.Separator(self.armInfoHomeFrame, orient='vertical').grid(row=2, column=1, rowspan=5, sticky=N+S)
-        Label(self.armInfoHomeFrame, text="Bed Leveling").grid(row=2, column=2, columnspan=2, sticky=W+N+E, padx=5, pady=5)
+        Label(self.armInfoHomeFrame, text="Bed Leveling", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG).grid(row=2, column=2, columnspan=2, sticky=W+N+E, padx=5, pady=5)
         ttk.Separator(self.armInfoHomeFrame, orient='horizontal').grid(row=3, column=2, columnspan=2, sticky=W+E)
-        self.startLevelHome = Button(self.armInfoHomeFrame, text="Start Level", width=12, command=self.printController.startPrintBedCalibration)
+        self.startLevelHome = Button(self.armInfoHomeFrame, text="Start Level", width=15, command=self.printController.startPrintBedCalibration, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.startLevelHome.grid(row=4, column=2, padx=5, pady=5)
-        self.nextLevelHome = Button(self.armInfoHomeFrame, text= "Next Corner", width=12, command=self.printController.nextBedCalibration)
+        self.nextLevelHome = Button(self.armInfoHomeFrame, text= "Next Corner", width=15, command=self.printController.nextBedCalibration, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.nextLevelHome.grid(row=4, column=3, padx=5, pady=5)
-        self.sweepCornersHome = Button(self.armInfoHomeFrame, text= "Sweep Corners", width=12, command=self.printController.startCornerSweep)
+        self.sweepCornersHome = Button(self.armInfoHomeFrame, text= "Sweep Corners", width=15, command=self.printController.startCornerSweep, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.sweepCornersHome.grid(row=5, column=2, padx=5, pady=5)
-        self.cornerLabelHome = Label(self.armInfoHomeFrame, text="Current corner: N/A")
+        self.cornerLabelHome = Label(self.armInfoHomeFrame, text="Current corner: N/A", bg=self.colorBG2, fg=self.colorFG)
         self.cornerLabelHome.grid(row=5, column=3, padx=5, pady=5)
-        self.sweepCornersFullHome = Button(self.armInfoHomeFrame, text= "Full Corner Sweep", width=15, command=self.printController.startFullCornerSweep)
+        self.sweepCornersFullHome = Button(self.armInfoHomeFrame, text= "Full Corner Sweep", width=15, command=self.printController.startFullCornerSweep, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.sweepCornersFullHome.grid(row=6, column=2, padx=5, pady=5)
-        self.cancelAnyHome = Button(self.armInfoHomeFrame, text= "Cancel Any", width=10, command=self.printController.cancelAny)
+        self.cancelAnyHome = Button(self.armInfoHomeFrame, text= "Cancel Any", width=15, command=self.printController.cancelAny, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.cancelAnyHome.grid(row=6, column=3, padx=5, pady=5)
 
         # ==========| Credits Frame |==========
-        self.creditsHomeFrame = Frame(self.homeTab, highlightthickness=2, highlightbackground="#000000", width=450, height=200)
+        self.creditsHomeFrame = Frame(self.homeTab, width=600, height=200, bg=self.colorBG2)
         self.creditsHomeFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
-        Label(self.creditsHomeFrame,text="RA3D",font=("Magneto", 20, "bold")).grid(row=0,column=0,sticky=EW)
+        Label(self.creditsHomeFrame,text="RA3D",font=("TkDefaultFont", 20, "bold"), bg=self.colorBG2, fg=self.colorFG).grid(row=0,column=0,sticky=EW)
         CreditsText1 = "Designed and implemented by the RA3D Team (Robotic Arm 3D)"
-        CreditsText2 = "Team Members: Justin Fauson, Cody Blough, Jon Dinan,\n Jonathan Pederson, and Mateo Osorio"
+        CreditsText2 = "Team Members: Justin Fauson, Cody Blough, Jonathan Dinan, Mateo Osorio, \n and Jonathan Pederson"
         CreditsText3 = "Sponsor: Dr. Sezer Ozerinc"
-        Label(self.creditsHomeFrame,text=CreditsText1).grid(row=1,column=0,sticky=W, padx=5)
-        Label(self.creditsHomeFrame,text=CreditsText2,justify="left").grid(row=2,column=0,sticky=W, padx=5)
-        Label(self.creditsHomeFrame, text=CreditsText3,justify="left").grid(row=3,column=0,sticky=W, padx=5)
+        Label(self.creditsHomeFrame,text=CreditsText1, bg=self.colorBG2, fg=self.colorFG).grid(row=1,column=0,sticky=W, padx=5)
+        Label(self.creditsHomeFrame,text=CreditsText2,justify="left", bg=self.colorBG2, fg=self.colorFG).grid(row=2,column=0,sticky=W, padx=5)
+        Label(self.creditsHomeFrame, text=CreditsText3,justify="left", bg=self.colorBG2, fg=self.colorFG).grid(row=3,column=0,sticky=W, padx=5)
 
     def fillArmTab(self):
         # ==========| Serial Frame |==========
-        self.serialFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.serialFrame = Frame(self.armTab, bg=self.colorBG2)
         self.serialFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+N+E+S)
         # Create label for Serial Frame
-        self.serialLabel = Label(self.serialFrame, text="Serial Frame")
+        self.serialLabel = Label(self.serialFrame, text="Serial Port", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.serialLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
         # Refresh button
-        self.refreshCOMButton = Button(self.serialFrame, text="⟳", command=self.serialController.refreshCOMPorts, width=2)
+        self.refreshCOMButton = Button(self.serialFrame, text="⟳", command=self.serialController.refreshCOMPorts, width=2, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.refreshCOMButton.grid(row=1, column=0, padx=5, pady=5)
         # Create dropdown list of all serial COM ports
         self.portList = [] # Start with blank list
@@ -313,40 +351,40 @@ class TkWindow(Tk):
         self.portDropdown.grid(row=1, column=1, padx=5, pady=5)
         
         # Create button for connecting to port
-        self.connectButton = Button(self.serialFrame, text="Connect", command=self.serialController.serialConnect, width=10, state="disabled")
+        self.connectButton = Button(self.serialFrame, text="Connect", command=self.serialController.serialConnect, width=10, state="disabled", bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.connectButton.grid(row=1, column=2, padx=5, pady=5)
         # Status label
-        self.portStatusLabel = Label(self.serialFrame, text="Status: Disconnected")
+        self.portStatusLabel = Label(self.serialFrame, text="Status: Disconnected", bg=self.colorBG2, fg=self.colorFG)
         self.portStatusLabel.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky=W)
         # Reset button
-        self.resetButton = Button(self.serialFrame, text="Reset", command=self.armController.reset, width=10)
+        self.resetButton = Button(self.serialFrame, text="Reset", command=self.armController.reset, width=10, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.resetButton.grid(row=3, column=1, padx=5, pady=5)
         # ==========| Reported Position Frame |==========
-        self.reportedPosFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.reportedPosFrame = Frame(self.armTab, bg=self.colorBG2)
         self.reportedPosFrame.grid(row=0, column=1, columnspan=2, padx=5, pady=5, sticky=W+N+E+S)
         # Reported Position label
-        self.reportedPosLabel = Label(self.reportedPosFrame, text="Reported Position:")
+        self.reportedPosLabel = Label(self.reportedPosFrame, text="Reported Position:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.reportedPosLabel.grid(row=0, column=0, columnspan=5, padx=5, pady=5, sticky=W)
         # Request position button
-        self.requestPosButton = Button(self.reportedPosFrame, text="Request Position", command=self.armController.requestPositionManual, width=15)
+        self.requestPosButton = Button(self.reportedPosFrame, text="Request Position", command=self.armController.requestPositionManual, width=15, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.requestPosButton.grid(row=0, column=1, padx=5, pady=5, sticky=E)
         # Reported position coordinate labels
         # XYZ
-        self.xyzPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground="#000000")
+        self.xyzPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground=self.colorFG, bg=self.colorBG2)
         self.xyzPosFrame.grid(row=1, column=0, padx=5, pady=5)
         # Create them
-        self.xCurCoordLabel = Label(self.xyzPosFrame, text="X:")
-        self.xCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
-        self.yCurCoordLabel = Label(self.xyzPosFrame, text="Y:")
-        self.yCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
-        self.zCurCoordLabel = Label(self.xyzPosFrame, text="Z:")
-        self.zCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
-        self.RxCurCoordLabel = Label(self.xyzPosFrame, text="Rx:")
-        self.RxCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
-        self.RyCurCoordLabel = Label(self.xyzPosFrame, text="Ry:")
-        self.RyCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
-        self.RzCurCoordLabel = Label(self.xyzPosFrame, text="Rz:")
-        self.RzCurCoord = Label(self.xyzPosFrame, text="xxx") # 'xxx' until value reported
+        self.xCurCoordLabel  = Label(self.xyzPosFrame, text="X:", bg=self.colorBG2, fg=self.colorFG)
+        self.xCurCoord       = Label(self.xyzPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.yCurCoordLabel  = Label(self.xyzPosFrame, text="Y:", bg=self.colorBG2, fg=self.colorFG)
+        self.yCurCoord       = Label(self.xyzPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.zCurCoordLabel  = Label(self.xyzPosFrame, text="Z:", bg=self.colorBG2, fg=self.colorFG)
+        self.zCurCoord       = Label(self.xyzPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.RxCurCoordLabel = Label(self.xyzPosFrame, text="Rx:", bg=self.colorBG2, fg=self.colorFG)
+        self.RxCurCoord      = Label(self.xyzPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.RyCurCoordLabel = Label(self.xyzPosFrame, text="Ry:", bg=self.colorBG2, fg=self.colorFG)
+        self.RyCurCoord      = Label(self.xyzPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.RzCurCoordLabel = Label(self.xyzPosFrame, text="Rz:", bg=self.colorBG2, fg=self.colorFG)
+        self.RzCurCoord      = Label(self.xyzPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
         # Display them
         self.xCurCoordLabel.grid(row=0, column=0, padx=5, pady=5)
         self.xCurCoord.grid(row=0, column=1, padx=5, pady=5)
@@ -362,21 +400,21 @@ class TkWindow(Tk):
         self.RzCurCoord.grid(row=1, column=1, padx=5, pady=5)
         
         # Angles
-        self.jointPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground="#000000")
+        self.jointPosFrame = Frame(self.reportedPosFrame, highlightthickness=1, highlightbackground=self.colorFG, bg=self.colorBG2)
         self.jointPosFrame.grid(row=1, column=1, padx=5, pady=5)
         # Create them
-        self.J1CurCoordLabel = Label(self.jointPosFrame, text="J1:")
-        self.J1CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
-        self.J2CurCoordLabel = Label(self.jointPosFrame, text="J2:")
-        self.J2CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
-        self.J3CurCoordLabel = Label(self.jointPosFrame, text="J3:")
-        self.J3CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
-        self.J4CurCoordLabel = Label(self.jointPosFrame, text="J4:")
-        self.J4CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
-        self.J5CurCoordLabel = Label(self.jointPosFrame, text="J5:")
-        self.J5CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
-        self.J6CurCoordLabel = Label(self.jointPosFrame, text="J6:")
-        self.J6CurCoord = Label(self.jointPosFrame, text="xxx") # 'xxx' until value reported
+        self.J1CurCoordLabel = Label(self.jointPosFrame, text="J1:", bg=self.colorBG2, fg=self.colorFG)
+        self.J1CurCoord      = Label(self.jointPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.J2CurCoordLabel = Label(self.jointPosFrame, text="J2:", bg=self.colorBG2, fg=self.colorFG)
+        self.J2CurCoord      = Label(self.jointPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.J3CurCoordLabel = Label(self.jointPosFrame, text="J3:", bg=self.colorBG2, fg=self.colorFG)
+        self.J3CurCoord      = Label(self.jointPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.J4CurCoordLabel = Label(self.jointPosFrame, text="J4:", bg=self.colorBG2, fg=self.colorFG)
+        self.J4CurCoord      = Label(self.jointPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.J5CurCoordLabel = Label(self.jointPosFrame, text="J5:", bg=self.colorBG2, fg=self.colorFG)
+        self.J5CurCoord      = Label(self.jointPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.J6CurCoordLabel = Label(self.jointPosFrame, text="J6:", bg=self.colorBG2, fg=self.colorFG)
+        self.J6CurCoord      = Label(self.jointPosFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
         # Display them
         self.J1CurCoordLabel.grid(row=0, column=0, padx=5, pady=5)
         self.J1CurCoord.grid(row=0, column=1, padx=5, pady=5)
@@ -392,32 +430,32 @@ class TkWindow(Tk):
         self.J6CurCoord.grid(row=1, column=5, padx=5, pady=5)
 
         # ==========| Calibration Frame |==========
-        self.calibrationFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.calibrationFrame = Frame(self.armTab, bg=self.colorBG2)
         self.calibrationFrame.grid(row=1, column=0, padx=5, pady=5)
         # Calibration label
-        self.calibrationLabel = Label(self.calibrationFrame, text="Calibration:")
+        self.calibrationLabel = Label(self.calibrationFrame, text="Calibration:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.calibrationLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W+N)
         # Full calibration button
-        self.calibrateButton = Button(self.calibrationFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10)
+        self.calibrateButton = Button(self.calibrationFrame, text="Calibrate", command=self.armController.startArmCalibration, width=10, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calibrateButton.grid(row=1, column=0, padx=5, pady=5, sticky=W+E)
         # Calibration offsets
-        self.calOffsetFrame = Frame(self.calibrationFrame)
+        self.calOffsetFrame = Frame(self.calibrationFrame, bg=self.colorBG2)
         self.calOffsetFrame.grid(row=2, column=0, padx=5, pady=5, sticky=W+E)
-        self.offsetLabel = Label(self.calOffsetFrame, text="Joint Offsets:")
+        self.offsetLabel = Label(self.calOffsetFrame, text="Joint Offsets:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.offsetLabel.grid(row=0, column=0, columnspan=5, padx=5, pady=5, sticky=W)
         # Make the widgets
-        self.J1OffsetLabel = Label(self.calOffsetFrame,text="J1:")
-        self.J1OffsetEntry = Entry(self.calOffsetFrame, width=4)
-        self.J2OffsetLabel = Label(self.calOffsetFrame,text="J2:")
-        self.J2OffsetEntry = Entry(self.calOffsetFrame, width=4)
-        self.J3OffsetLabel = Label(self.calOffsetFrame,text="J3:")
-        self.J3OffsetEntry = Entry(self.calOffsetFrame, width=4)
-        self.J4OffsetLabel = Label(self.calOffsetFrame,text="J4:")
-        self.J4OffsetEntry = Entry(self.calOffsetFrame, width=4)
-        self.J5OffsetLabel = Label(self.calOffsetFrame,text="J5:")
-        self.J5OffsetEntry = Entry(self.calOffsetFrame, width=4)
-        self.J6OffsetLabel = Label(self.calOffsetFrame,text="J6:")
-        self.J6OffsetEntry = Entry(self.calOffsetFrame, width=4)
+        self.J1OffsetLabel = Label(self.calOffsetFrame,text="J1:", bg=self.colorBG2, fg=self.colorFG)
+        self.J1OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
+        self.J2OffsetLabel = Label(self.calOffsetFrame,text="J2:", bg=self.colorBG2, fg=self.colorFG)
+        self.J2OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
+        self.J3OffsetLabel = Label(self.calOffsetFrame,text="J3:", bg=self.colorBG2, fg=self.colorFG)
+        self.J3OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
+        self.J4OffsetLabel = Label(self.calOffsetFrame,text="J4:", bg=self.colorBG2, fg=self.colorFG)
+        self.J4OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
+        self.J5OffsetLabel = Label(self.calOffsetFrame,text="J5:", bg=self.colorBG2, fg=self.colorFG)
+        self.J5OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
+        self.J6OffsetLabel = Label(self.calOffsetFrame,text="J6:", bg=self.colorBG2, fg=self.colorFG)
+        self.J6OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
         # Grid the widgets
         self.J1OffsetLabel.grid(row=1, column=0, padx=5, pady=5)
         self.J1OffsetEntry.grid(row=1, column=1, padx=5, pady=5)
@@ -440,18 +478,18 @@ class TkWindow(Tk):
         self.J6OffsetEntry.insert(0, "0")
 
         # Individual calibration buttons
-        self.indivCalFrame = Frame(self.calibrationFrame)
+        self.indivCalFrame = Frame(self.calibrationFrame, bg=self.colorBG2)
         self.indivCalFrame.grid(row=3, column=0, padx=5, pady=5, sticky=W+E)
         # Label
-        self.indivCalLabel = Label(self.indivCalFrame, text="Individual Calibrations:")
+        self.indivCalLabel = Label(self.indivCalFrame, text="Individual Calibrations:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.indivCalLabel.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=W)
         # Make the buttons
-        self.calJ1Button = Button(self.indivCalFrame, text="Cal J1", command=lambda: self.armController.startSpecificCalibration(1, 0, 0, 0, 0, 0), width=7)
-        self.calJ2Button = Button(self.indivCalFrame, text="Cal J2", command=lambda: self.armController.startSpecificCalibration(0, 1, 0, 0, 0, 0), width=7)
-        self.calJ3Button = Button(self.indivCalFrame, text="Cal J3", command=lambda: self.armController.startSpecificCalibration(0, 0, 1, 0, 0, 0), width=7)
-        self.calJ4Button = Button(self.indivCalFrame, text="Cal J4", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 1, 0, 0), width=7)
-        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, state="disabled")
-        self.calJ6Button = Button(self.indivCalFrame, text="Cal J6", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 0, 1), width=7)
+        self.calJ1Button = Button(self.indivCalFrame, text="Cal J1", command=lambda: self.armController.startSpecificCalibration(1, 0, 0, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ2Button = Button(self.indivCalFrame, text="Cal J2", command=lambda: self.armController.startSpecificCalibration(0, 1, 0, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ3Button = Button(self.indivCalFrame, text="Cal J3", command=lambda: self.armController.startSpecificCalibration(0, 0, 1, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ4Button = Button(self.indivCalFrame, text="Cal J4", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 1, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, state="disabled", bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ6Button = Button(self.indivCalFrame, text="Cal J6", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 0, 1), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         # Place buttons
         self.calJ1Button.grid(row=1, column=0, padx=5, pady=5,)
         self.calJ2Button.grid(row=1, column=1, padx=5, pady=5)
@@ -460,33 +498,33 @@ class TkWindow(Tk):
         self.calJ5Button.grid(row=2, column=1, padx=5, pady=5)
         self.calJ6Button.grid(row=2, column=2, padx=5, pady=5)
         # ==== Open Post Calibration ====
-        self.postCalibrationButton = Button(self.calibrationFrame, text="Post Calibration", command=self.createPostCalibration)
-        self.postCalibrationButton.grid(row=4,column=0)
+        self.postCalibrationButton = Button(self.calibrationFrame, text="Post Calibration", command=self.createPostCalibration, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.postCalibrationButton.grid(row=4,column=0, padx=5, pady=5)
         # ==========| Tests Frame |==========
-        self.armTestsFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.armTestsFrame = Frame(self.armTab, bg=self.colorBG2)
         self.armTestsFrame.grid(row=1, column=1, padx=5, pady=5, sticky=W+E+N+S)
         # Label
-        self.armTestsLabel = Label(self.armTestsFrame, text="Arm Tests:")
+        self.armTestsLabel = Label(self.armTestsFrame, text="Arm Tests:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.armTestsLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W+N)
 
         # Limit switch test
-        self.limitTestFrame = Frame(self.armTestsFrame)
+        self.limitTestFrame = Frame(self.armTestsFrame, bg=self.colorBG2)
         self.limitTestFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        self.limitTestButton = Button(self.limitTestFrame, text="Test Limit Switches", command=self.armController.toggleLimitTest)
+        self.limitTestButton = Button(self.limitTestFrame, text="Test Limit Switches", command=self.armController.toggleLimitTest, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.limitTestButton.grid(row=0, column=0, columnspan=6, sticky=W)
         # Create the widgets
-        self.J1LimLabel = Label(self.limitTestFrame, text="J1:")
-        self.J1LimState = Label(self.limitTestFrame, text="x")
-        self.J2LimLabel = Label(self.limitTestFrame, text="J2:")
-        self.J2LimState = Label(self.limitTestFrame, text="x")
-        self.J3LimLabel = Label(self.limitTestFrame, text="J3:")
-        self.J3LimState = Label(self.limitTestFrame, text="x")
-        self.J4LimLabel = Label(self.limitTestFrame, text="J4:")
-        self.J4LimState = Label(self.limitTestFrame, text="x")
-        self.J5LimLabel = Label(self.limitTestFrame, text="J5:")
-        self.J5LimState = Label(self.limitTestFrame, text="x")
-        self.J6LimLabel = Label(self.limitTestFrame, text="J6:")
-        self.J6LimState = Label(self.limitTestFrame, text="x")
+        self.J1LimLabel = Label(self.limitTestFrame, text="J1:", bg=self.colorBG2, fg=self.colorFG)
+        self.J1LimState = Label(self.limitTestFrame, text="x", bg=self.colorBG2, fg=self.colorFG)
+        self.J2LimLabel = Label(self.limitTestFrame, text="J2:", bg=self.colorBG2, fg=self.colorFG)
+        self.J2LimState = Label(self.limitTestFrame, text="x", bg=self.colorBG2, fg=self.colorFG)
+        self.J3LimLabel = Label(self.limitTestFrame, text="J3:", bg=self.colorBG2, fg=self.colorFG)
+        self.J3LimState = Label(self.limitTestFrame, text="x", bg=self.colorBG2, fg=self.colorFG)
+        self.J4LimLabel = Label(self.limitTestFrame, text="J4:", bg=self.colorBG2, fg=self.colorFG)
+        self.J4LimState = Label(self.limitTestFrame, text="x", bg=self.colorBG2, fg=self.colorFG)
+        self.J5LimLabel = Label(self.limitTestFrame, text="J5:", bg=self.colorBG2, fg=self.colorFG)
+        self.J5LimState = Label(self.limitTestFrame, text="x", bg=self.colorBG2, fg=self.colorFG)
+        self.J6LimLabel = Label(self.limitTestFrame, text="J6:", bg=self.colorBG2, fg=self.colorFG)
+        self.J6LimState = Label(self.limitTestFrame, text="x", bg=self.colorBG2, fg=self.colorFG)
         
         # Display the widgets
         self.J1LimLabel.grid(row=1, column=0)
@@ -503,23 +541,23 @@ class TkWindow(Tk):
         self.J6LimState.grid(row=2, column=5)
 
         # Encoder test
-        self.encoderTestFrame = Frame(self.armTestsFrame)
+        self.encoderTestFrame = Frame(self.armTestsFrame, bg=self.colorBG2)
         self.encoderTestFrame.grid(row=2, column=0, padx=5, pady=5, sticky=W)
-        self.encoderTestButton = Button(self.encoderTestFrame, text="Test Encoders", command=self.armController.toggleEncoderTest)
+        self.encoderTestButton = Button(self.encoderTestFrame, text="Test Encoders", command=self.armController.toggleEncoderTest, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.encoderTestButton.grid(row=0, column=0, columnspan=6, sticky=W)
         # Create the widgets
-        self.J1EncLabel = Label(self.encoderTestFrame, text="J1:")
-        self.J1EncState = Label(self.encoderTestFrame, text="xxxx")
-        self.J2EncLabel = Label(self.encoderTestFrame, text="J2:")
-        self.J2EncState = Label(self.encoderTestFrame, text="xxxx")
-        self.J3EncLabel = Label(self.encoderTestFrame, text="J3:")
-        self.J3EncState = Label(self.encoderTestFrame, text="xxxx")
-        self.J4EncLabel = Label(self.encoderTestFrame, text="J4:")
-        self.J4EncState = Label(self.encoderTestFrame, text="xxxx")
-        self.J5EncLabel = Label(self.encoderTestFrame, text="J5:")
-        self.J5EncState = Label(self.encoderTestFrame, text="xxxx")
-        self.J6EncLabel = Label(self.encoderTestFrame, text="J6:")
-        self.J6EncState = Label(self.encoderTestFrame, text="xxxx")
+        self.J1EncLabel = Label(self.encoderTestFrame, text="J1:", bg=self.colorBG2, fg=self.colorFG)
+        self.J1EncState = Label(self.encoderTestFrame, text="xxxx", bg=self.colorBG2, fg=self.colorFG)
+        self.J2EncLabel = Label(self.encoderTestFrame, text="J2:", bg=self.colorBG2, fg=self.colorFG)
+        self.J2EncState = Label(self.encoderTestFrame, text="xxxx", bg=self.colorBG2, fg=self.colorFG)
+        self.J3EncLabel = Label(self.encoderTestFrame, text="J3:", bg=self.colorBG2, fg=self.colorFG)
+        self.J3EncState = Label(self.encoderTestFrame, text="xxxx", bg=self.colorBG2, fg=self.colorFG)
+        self.J4EncLabel = Label(self.encoderTestFrame, text="J4:", bg=self.colorBG2, fg=self.colorFG)
+        self.J4EncState = Label(self.encoderTestFrame, text="xxxx", bg=self.colorBG2, fg=self.colorFG)
+        self.J5EncLabel = Label(self.encoderTestFrame, text="J5:", bg=self.colorBG2, fg=self.colorFG)
+        self.J5EncState = Label(self.encoderTestFrame, text="xxxx", bg=self.colorBG2, fg=self.colorFG)
+        self.J6EncLabel = Label(self.encoderTestFrame, text="J6:", bg=self.colorBG2, fg=self.colorFG)
+        self.J6EncState = Label(self.encoderTestFrame, text="xxxx", bg=self.colorBG2, fg=self.colorFG)
 
         # Display the widgets
         self.J1EncLabel.grid(row=1, column=0)
@@ -536,38 +574,38 @@ class TkWindow(Tk):
         self.J6EncState.grid(row=2, column=5)
 
         # ==========| Movement Frame |==========
-        self.moveFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.moveFrame = Frame(self.armTab, bg=self.colorBG2)
         self.moveFrame.grid(row=1, column=2, padx=5, pady=5, sticky=W+E+N+S)
         # ===| XYZ Move |===
-        self.linearMoveFrame = Frame(self.moveFrame, highlightthickness=1, highlightbackground="#000000")
+        self.linearMoveFrame = Frame(self.moveFrame, highlightthickness=1, highlightbackground=self.colorFG, bg=self.colorBG2)
         self.linearMoveFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W+E+N+S)
-        self.linearMoveLabel = Label(self.linearMoveFrame, text="XYZ Move:")
+        self.linearMoveLabel = Label(self.linearMoveFrame, text="XYZ Move:", bg=self.colorBG2, fg=self.colorFG)
         self.linearMoveLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
         # Populate xyz button
-        self.getXYZButton = Button(self.linearMoveFrame, text="Get XYZ", command = self.armController.populateMJ)
+        self.getXYZButton = Button(self.linearMoveFrame, text="Get XYZ", command = self.armController.populateMJ, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.getXYZButton.grid(row=0, column = 2, columnspan=2, padx=5, pady=5)
         # Send command button
-        self.linearMoveButton = Button(self.linearMoveFrame, text="Send MJ", command=self.armController.prepMJCommand)
+        self.linearMoveButton = Button(self.linearMoveFrame, text="Send MJ", command=self.armController.prepMJCommand, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.linearMoveButton.grid(row=0, column=4, columnspan=2, padx=5, pady=5, sticky=E)
-        self.linearMoveButton = Button(self.linearMoveFrame, text="Send ML", command=self.armController.prepMLCommand)
+        self.linearMoveButton = Button(self.linearMoveFrame, text="Send ML", command=self.armController.prepMLCommand, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.linearMoveButton.grid(row=0, column=6, columnspan=2, padx=5, pady=5, sticky=E)
 
         # Coordinate labels and text boxes
         # Create them
-        self.xCoordLabel = Label(self.linearMoveFrame, text="X:")
-        self.xCoordEntry = Entry(self.linearMoveFrame, width=6)
-        self.yCoordLabel = Label(self.linearMoveFrame, text="Y:")
-        self.yCoordEntry = Entry(self.linearMoveFrame, width=6)
-        self.zCoordLabel = Label(self.linearMoveFrame, text="Z:")
-        self.zCoordEntry = Entry(self.linearMoveFrame, width=6)
-        self.J7CoordLabel = Label(self.linearMoveFrame, text="J7:")
-        self.J7CoordEntry = Entry(self.linearMoveFrame, width=6)
-        self.RxCoordLabel = Label(self.linearMoveFrame, text="Rx:")
-        self.RxCoordEntry = Entry(self.linearMoveFrame, width=6)
-        self.RyCoordLabel = Label(self.linearMoveFrame, text="Ry:")
-        self.RyCoordEntry = Entry(self.linearMoveFrame, width=6)
-        self.RzCoordLabel = Label(self.linearMoveFrame, text="Rz:")
-        self.RzCoordEntry = Entry(self.linearMoveFrame, width=6)
+        self.xCoordLabel  = Label(self.linearMoveFrame, text="X:", bg=self.colorBG2, fg=self.colorFG)
+        self.xCoordEntry  = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.yCoordLabel  = Label(self.linearMoveFrame, text="Y:", bg=self.colorBG2, fg=self.colorFG)
+        self.yCoordEntry  = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.zCoordLabel  = Label(self.linearMoveFrame, text="Z:", bg=self.colorBG2, fg=self.colorFG)
+        self.zCoordEntry  = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.J7CoordLabel = Label(self.linearMoveFrame, text="J7:", bg=self.colorBG2, fg=self.colorFG)
+        self.J7CoordEntry = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.RxCoordLabel = Label(self.linearMoveFrame, text="Rx:", bg=self.colorBG2, fg=self.colorFG)
+        self.RxCoordEntry = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.RyCoordLabel = Label(self.linearMoveFrame, text="Ry:", bg=self.colorBG2, fg=self.colorFG)
+        self.RyCoordEntry = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.RzCoordLabel = Label(self.linearMoveFrame, text="Rz:", bg=self.colorBG2, fg=self.colorFG)
+        self.RzCoordEntry = Entry(self.linearMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
         # Display them
         self.xCoordLabel.grid(row=1, column=0, padx=(5, 0), pady=5)
         self.xCoordEntry.grid(row=1, column=1, padx=(0, 5), pady=5)
@@ -582,34 +620,33 @@ class TkWindow(Tk):
         self.RyCoordLabel.grid(row=2, column=2, padx=(5, 0), pady=5)
         self.RyCoordEntry.grid(row=2, column=3, padx=(0, 5), pady=5)
         self.RzCoordLabel.grid(row=2, column=0, padx=(5, 0), pady=5)
-        self.RzCoordEntry.grid(row=2, column=1, padx=(0, 5), pady=5) 
-        #Rz should go first because it is yaw
+        self.RzCoordEntry.grid(row=2, column=1, padx=(0, 5), pady=5)
 
         # ===| Joint move |===
-        self.jointMoveFrame = Frame(self.moveFrame, highlightthickness=1, highlightbackground="#000000")
+        self.jointMoveFrame = Frame(self.moveFrame, highlightthickness=1, highlightbackground=self.colorFG, bg=self.colorBG2)
         self.jointMoveFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E+N+S)
-        self.jointMoveLabel = Label(self.jointMoveFrame, text="Joint Move:")
+        self.jointMoveLabel = Label(self.jointMoveFrame, text="Joint Move:", bg=self.colorBG2, fg=self.colorFG)
         self.jointMoveLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
         # Get Joints
-        self.getJointsButton = Button(self.jointMoveFrame, text="Get Joints", command = self.armController.populateJoints)
+        self.getJointsButton = Button(self.jointMoveFrame, text="Get Joints", command = self.armController.populateJoints, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.getJointsButton.grid(row=0, column = 2, columnspan=2, padx=5, pady=5)
         # Send command button
-        self.jointMoveButton = Button(self.jointMoveFrame, text="Send RJ", command=self.armController.prepRJCommand)
+        self.jointMoveButton = Button(self.jointMoveFrame, text="Send RJ", command=self.armController.prepRJCommand, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.jointMoveButton.grid(row=0, column=4, columnspan=3, padx=5, pady=5)
         # Joint labels and text boxes
         # Create them
-        self.J1CoordLabel = Label(self.jointMoveFrame, text="J1:")
-        self.J1CoordEntry = Entry(self.jointMoveFrame, width=6)
-        self.J2CoordLabel = Label(self.jointMoveFrame, text="J2:")
-        self.J2CoordEntry = Entry(self.jointMoveFrame, width=6)
-        self.J3CoordLabel = Label(self.jointMoveFrame, text="J3:")
-        self.J3CoordEntry = Entry(self.jointMoveFrame, width=6)
-        self.J4CoordLabel = Label(self.jointMoveFrame, text="J4:")
-        self.J4CoordEntry = Entry(self.jointMoveFrame, width=6)
-        self.J5CoordLabel = Label(self.jointMoveFrame, text="J5:")
-        self.J5CoordEntry = Entry(self.jointMoveFrame, width=6)
-        self.J6CoordLabel = Label(self.jointMoveFrame, text="J6:")
-        self.J6CoordEntry = Entry(self.jointMoveFrame, width=6)
+        self.J1CoordLabel = Label(self.jointMoveFrame, text="J1:", bg=self.colorBG2, fg=self.colorFG)
+        self.J1CoordEntry = Entry(self.jointMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.J2CoordLabel = Label(self.jointMoveFrame, text="J2:", bg=self.colorBG2, fg=self.colorFG)
+        self.J2CoordEntry = Entry(self.jointMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.J3CoordLabel = Label(self.jointMoveFrame, text="J3:", bg=self.colorBG2, fg=self.colorFG)
+        self.J3CoordEntry = Entry(self.jointMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.J4CoordLabel = Label(self.jointMoveFrame, text="J4:", bg=self.colorBG2, fg=self.colorFG)
+        self.J4CoordEntry = Entry(self.jointMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.J5CoordLabel = Label(self.jointMoveFrame, text="J5:", bg=self.colorBG2, fg=self.colorFG)
+        self.J5CoordEntry = Entry(self.jointMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
+        self.J6CoordLabel = Label(self.jointMoveFrame, text="J6:", bg=self.colorBG2, fg=self.colorFG)
+        self.J6CoordEntry = Entry(self.jointMoveFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
         # Display them
         self.J1CoordLabel.grid(row=1, column=0, padx=(5, 0), pady=5)
         self.J1CoordEntry.grid(row=1, column=1, padx=(0, 5), pady=5)
@@ -624,44 +661,44 @@ class TkWindow(Tk):
         self.J6CoordLabel.grid(row=2, column=4, padx=(5, 0), pady=5)
         self.J6CoordEntry.grid(row=2, column=5, padx=(0, 5), pady=5)
         #Move to safe position button
-        self.moveToSafeButton = Button(self.moveFrame, text="Move to Safe Position", command=self.armController.prepMoveSafe, width=20)
+        self.moveToSafeButton = Button(self.moveFrame, text="Move to Safe Position", command=self.armController.prepMoveSafe, width=20, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.moveToSafeButton.grid(row=6, column=0, columnspan=6, padx=5, pady=5)
-        self.moveToHomeButton = Button(self.moveFrame, text="Move to Home Position", command=self.armController.prepMoveHome, width=20)
+        self.moveToHomeButton = Button(self.moveFrame, text="Move to Home Position", command=self.armController.prepMoveHome, width=20, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.moveToHomeButton.grid(row=7, column=0, columnspan=6, padx=5, pady=5)
         # ==========| Loop Frame |==========
-        self.loopFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.loopFrame = Frame(self.armTab, bg=self.colorBG2)
         self.loopFrame.grid(row=0, column=3, padx=5, pady=5, sticky=W+E+N+S)
-        self.loopFrameLabel = Label(self.loopFrame, text="Loop Mode:")
+        self.loopFrameLabel = Label(self.loopFrame, text="Loop Mode:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.loopFrameLabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        self.openLoopButton = Button(self.loopFrame, text="Open Loop", command=self.armController.setOpenLoop)
+        self.openLoopButton = Button(self.loopFrame, text="Open Loop", command=self.armController.setOpenLoop, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.openLoopButton.grid(row=1, column=0, padx=5, pady=5)
-        self.closedLoopButton = Button(self.loopFrame, text="Closed Loop", command=self.armController.setClosedLoop)
+        self.closedLoopButton = Button(self.loopFrame, text="Closed Loop", command=self.armController.setClosedLoop, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.closedLoopButton.grid(row=1, column=1, padx=5, pady=5)
-        self.loopStatusLabel = Label(self.loopFrame, text="Status:")
+        self.loopStatusLabel = Label(self.loopFrame, text="Status:", bg=self.colorBG2, fg=self.colorFG)
         self.loopStatusLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W)
-        self.loopStatus = Label(self.loopFrame, text="Unknown")
+        self.loopStatus = Label(self.loopFrame, text="Unknown", bg=self.colorBG2, fg=self.colorFG)
         self.loopStatus.grid(row=2, column=1, padx=5, pady=5, sticky=W)
 
         # ==========| Origin Frame |==========
-        self.originFrame = Frame(self.armTab, highlightthickness=2, highlightbackground="#000000")
+        self.originFrame = Frame(self.armTab, bg=self.colorBG2)
         self.originFrame.grid(row=1, column=3, padx=5, pady=5, sticky=W+E+N+S)
-        self.originFrameLabel = Label(self.originFrame, text="Origin:")
+        self.originFrameLabel = Label(self.originFrame, text="Origin:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.originFrameLabel.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=W)
         # Send command button
-        self.setOrigin = Button(self.originFrame, text="Set Origin At Current Position", command=self.armController.setOrigin)
+        self.setOrigin = Button(self.originFrame, text="Set Origin At Current Position", command=self.armController.setOrigin, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.setOrigin.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky=W)
 
         # Coordinate labels and text boxes
         # Create them
-        self.xyzOriginFrame = Frame(self.originFrame, highlightthickness=1, highlightbackground="#000000")
+        self.xyzOriginFrame = Frame(self.originFrame, highlightthickness=1, highlightbackground=self.colorFG, bg=self.colorBG2)
         self.xyzOriginFrame.grid(row=2, column=0, padx=5, pady=5)
         # Create the widgets
-        self.xCurCoordOriginLabel = Label(self.xyzOriginFrame, text="X:")
-        self.xCurCoordOrigin = Label(self.xyzOriginFrame, text="xxx") # 'xxx' until value reported
-        self.yCurCoordOriginLabel = Label(self.xyzOriginFrame, text="Y:")
-        self.yCurCoordOrigin = Label(self.xyzOriginFrame, text="xxx") # 'xxx' until value reported
-        self.zCurCoordOriginLabel = Label(self.xyzOriginFrame, text="Z:")
-        self.zCurCoordOrigin = Label(self.xyzOriginFrame, text="xxx") # 'xxx' until value reported
+        self.xCurCoordOriginLabel = Label(self.xyzOriginFrame, text="X:", bg=self.colorBG2, fg=self.colorFG)
+        self.xCurCoordOrigin      = Label(self.xyzOriginFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.yCurCoordOriginLabel = Label(self.xyzOriginFrame, text="Y:", bg=self.colorBG2, fg=self.colorFG)
+        self.yCurCoordOrigin      = Label(self.xyzOriginFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.zCurCoordOriginLabel = Label(self.xyzOriginFrame, text="Z:", bg=self.colorBG2, fg=self.colorFG)
+        self.zCurCoordOrigin      = Label(self.xyzOriginFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
         # Display the widgets
         self.xCurCoordOriginLabel.grid(row=0, column=0, padx=5, pady=5)
         self.xCurCoordOrigin.grid(row=0, column=1, padx=5, pady=5)
@@ -670,25 +707,25 @@ class TkWindow(Tk):
         self.zCurCoordOriginLabel.grid(row=0, column=4, padx=5, pady=5)
         self.zCurCoordOrigin.grid(row=0, column=5, padx=5, pady=5)
         #Move to Origin
-        self.moveToOrigin = Button(self.originFrame, text="Move To Origin", command=self.armController.moveOrigin)
+        self.moveToOrigin = Button(self.originFrame, text="Move To Origin", command=self.armController.moveOrigin, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.moveToOrigin.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        self.moveToRecommendedOrigin = Button(self.originFrame, text="Move To Default Origin", command=self.armController.moveRecommendedOrigin)
+        self.moveToRecommendedOrigin = Button(self.originFrame, text="Move To Default Origin", command=self.armController.moveRecommendedOrigin, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.moveToRecommendedOrigin.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky=W)
 
         #Delta Origin
-        self.deltaOriginLabel = Label(self.originFrame, text="Delta from Origin:")
+        self.deltaOriginLabel = Label(self.originFrame, text="Delta from Origin:", bg=self.colorBG2, fg=self.colorFG)
         self.deltaOriginLabel.grid(row=5, column=0, columnspan=6, padx=5, pady=5, sticky=W)
         
         #Delta coordinates
-        self.originDeltaFrame = Frame(self.originFrame, highlightthickness=1, highlightbackground="#000000")
+        self.originDeltaFrame = Frame(self.originFrame, highlightthickness=1, highlightbackground=self.colorFG, bg=self.colorBG2)
         self.originDeltaFrame.grid(row=6, column=0, padx=5, pady=5)
 
-        self.xDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔX:")
-        self.xDeltaOrigin = Label(self.originDeltaFrame, text="xxx") # 'xxx' until value reported
-        self.yDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔY:")
-        self.yDeltaOrigin = Label(self.originDeltaFrame, text="xxx") # 'xxx' until value reported
-        self.zDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔZ:")
-        self.zDeltaOrigin = Label(self.originDeltaFrame, text="xxx") # 'xxx' until value reported
+        self.xDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔX:", bg=self.colorBG2, fg=self.colorFG)
+        self.xDeltaOrigin      = Label(self.originDeltaFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.yDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔY:", bg=self.colorBG2, fg=self.colorFG)
+        self.yDeltaOrigin      = Label(self.originDeltaFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
+        self.zDeltaOriginLabel = Label(self.originDeltaFrame, text="ΔZ:", bg=self.colorBG2, fg=self.colorFG)
+        self.zDeltaOrigin      = Label(self.originDeltaFrame, text="xxx", bg=self.colorBG2, fg=self.colorFG) # 'xxx' until value reported
         self.xDeltaOriginLabel.grid(row=3, column=0, padx=5, pady=5)
         self.xDeltaOrigin.grid(row=3, column=1, padx=5, pady=5)
         self.yDeltaOriginLabel.grid(row=3, column=2, padx=5, pady=5)
@@ -737,81 +774,80 @@ class TkWindow(Tk):
         self.toolJogSetRy.grid(row=2, column=1, padx=5, pady=5)
         self.toolJogSetRx.grid(row=2, column=2, padx=5, pady=5)'''
         # ========= Extruder Frame ===========
-        self.extruderFrame = Frame(self.toolTab, highlightthickness=2, highlightbackground="#000000")
+        self.extruderFrame = Frame(self.toolTab, bg=self.colorBG2)
         self.extruderFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+N+E+S)
 
-        self.extruderLabel = Label(self.extruderFrame, text="Extruder Control For Testing")
+        self.extruderLabel = Label(self.extruderFrame, text="Extruder Control For Testing", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.extruderLabel.grid(row=0,column=0, columnspan=2)
-        self.J7CoordLabel2 = Label(self.extruderFrame, text="J7:")
-        self.J7CoordEntry2 = Entry(self.extruderFrame, width=6)
+        self.J7CoordLabel2 = Label(self.extruderFrame, text="J7:", bg=self.colorBG2, fg=self.colorFG)
+        self.J7CoordEntry2 = Entry(self.extruderFrame, width=6, bg=self.colorBG2, fg=self.colorFG)
         self.J7CoordLabel2.grid(row=1, column=0, padx=(0, 5), pady=5)
         self.J7CoordEntry2.grid(row=1, column=1, padx=(0, 5), pady=5)
-        self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrudeButton)
+        self.extrudeButton = Button(self.extruderFrame, text = "Extrude", command=self.armController.extrudeButton, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.extrudeButton.grid(row=2, column=0,padx=(0, 5), pady=5)
-        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7)
+        self.zeroJ7Button = Button(self.extruderFrame, text = "Zero", command=self.armController.zeroJ7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.zeroJ7Button.grid(row=2,column=1,padx=(0, 5), pady=5)
 
-        self.loadButton = Button(self.extruderFrame, text = "Load", command=self.armController.loadFilament)
+        self.loadButton = Button(self.extruderFrame, text = "Load", command=self.armController.loadFilament, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.loadButton.grid(row=3, column=0,padx=(0, 5), pady=5)
-        self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament)
+        self.unloadButton = Button(self.extruderFrame, text = "Unload", command=self.armController.unloadFilament, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.unloadButton.grid(row=3, column=1,padx=(0, 5), pady=5)
-        self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:")
+        self.currentJ7Label2 = Label(self.extruderFrame,text="Extruded:", bg=self.colorBG2, fg=self.colorFG)
         self.currentJ7Label2.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)
-        self.currentJ72 = Label(self.extruderFrame,text="0 mm")
+        self.currentJ72 = Label(self.extruderFrame,text="0 mm", bg=self.colorBG2, fg=self.colorFG)
         self.currentJ72.grid(row=6,column=1, padx=5, pady=5, sticky=N+S)
 
 
     def fillDebugTab(self):
         # ==========| Variables Frame |==========
-        self.debugVarFrame = Frame(self.debugTab, highlightthickness=2, highlightbackground="#000000", width=300, height=460)
+        self.debugVarFrame = Frame(self.debugTab, width=300, height=620, bg=self.colorBG2)
         self.debugVarFrame.grid(row=0, column=0, padx=5, pady=5)
         self.debugVarFrame.grid_propagate(False)
         # ===| SerialController Variables |===
-        self.serDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000")
+        self.serDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000", bg=self.colorBG2)
         self.serDebugFrame.grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        self.serDebugLabel = Label(self.serDebugFrame, text="SerialController:")
+        self.serDebugLabel = Label(self.serDebugFrame, text="SerialController:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.serDebugLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
         # boardConnected
-        self.serDebugBoardLabel = Label(self.serDebugFrame, text="boardConnected = ")
+        self.serDebugBoardLabel = Label(self.serDebugFrame, text="boardConnected = ", bg=self.colorBG2, fg=self.colorFG)
         self.serDebugBoardLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
         # responseReady
-        self.serDebugRespLabel = Label(self.serDebugFrame, text="responseReady = ")
+        self.serDebugRespLabel = Label(self.serDebugFrame, text="responseReady = ", bg=self.colorBG2, fg=self.colorFG)
         self.serDebugRespLabel.grid(row=3, column=0, padx=5, pady=5, sticky=W)
         #Override calibration button
-        self.printQueueButton = Button(self.serDebugFrame,text="Print Serial Queue", command=self.serialController.printQueue)
+        self.printQueueButton = Button(self.serDebugFrame,text="Print Serial Queue", command=self.serialController.printQueue, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.printQueueButton.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky=W)
-        #TODO add more debug variables
 
         # ===| ArmController Variables |===
-        self.armDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000")
+        self.armDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000", bg=self.colorBG2)
         self.armDebugFrame.grid(row=1, column=0, padx=5, pady=5, sticky=W)
-        self.armDebugLabel = Label(self.armDebugFrame, text="ArmController:")
+        self.armDebugLabel = Label(self.armDebugFrame, text="ArmController:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.armDebugLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
         # armCalibrated
-        self.armDebugCalLabel = Label(self.armDebugFrame, text="armCalibrated = ")
+        self.armDebugCalLabel = Label(self.armDebugFrame, text="armCalibrated = ", bg=self.colorBG2, fg=self.colorFG)
         self.armDebugCalLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
         # calibrationinProgress
-        self.armDebugCalInProgLabel = Label(self.armDebugFrame, text="calibrationInProgress = ")
+        self.armDebugCalInProgLabel = Label(self.armDebugFrame, text="calibrationInProgress = ", bg=self.colorBG2, fg=self.colorFG)
         self.armDebugCalInProgLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W)
         # calibrationState
-        self.armDebugCalStateLabel = Label(self.armDebugFrame, text="calibrationState = ")
+        self.armDebugCalStateLabel = Label(self.armDebugFrame, text="calibrationState = ", bg=self.colorBG2, fg=self.colorFG)
         self.armDebugCalStateLabel.grid(row=3, column=0, padx=5, pady=5, sticky=W)
         #Override calibration button
-        self.overrideCalibrationButton = Button(self.debugVarFrame,text="Override Calibration", command=self.armController.overrideCalibration)
+        self.overrideCalibrationButton = Button(self.debugVarFrame,text="Override Calibration", command=self.armController.overrideCalibration, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.overrideCalibrationButton.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky=W)
     
         # ===| PrintController Variables |===
-        self.printDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000")
+        self.printDebugFrame = Frame(self.debugVarFrame, highlightthickness=1, highlightbackground="#000000", bg=self.colorBG2)
         self.printDebugFrame.grid(row=4, column=0, padx=5, pady=5, sticky=W)
-        self.printDebugLabel = Label(self.printDebugFrame, text="PrintController:")
+        self.printDebugLabel = Label(self.printDebugFrame, text="PrintController:", font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         self.printDebugLabel.grid(row=0, column=0, padx=5, pady=5, sticky=W)
         # armCalibrated
-        self.printDebugPrintLabel = Label(self.printDebugFrame, text="printing = ")
+        self.printDebugPrintLabel = Label(self.printDebugFrame, text="printing = ", bg=self.colorBG2, fg=self.colorFG)
         self.printDebugPrintLabel.grid(row=1, column=0, padx=5, pady=5, sticky=W)
     
         # ==========| Terminal Frame |==========
 
-        self.termFrame = Frame(self.debugTab, bg="#00FFFF", highlightthickness=2, highlightbackground="#000000")
+        self.termFrame = Frame(self.debugTab, bg=self.colorBG2, highlightthickness=2, highlightbackground="#000000", width=900)
         self.termFrame.grid(row=0, column=1, padx=5, pady=5, sticky=W+E+N+S)
 
         self.termVertScroll = Scrollbar(self.termFrame, orient="vertical")
@@ -819,11 +855,13 @@ class TkWindow(Tk):
 
         self.terminal = Text(self.termFrame,
                             wrap=NONE,
-                            width=65,
-                            height=27,
+                            width=109,
+                            height=37,
                             yscrollcommand=self.termVertScroll.set,
                             xscrollcommand=self.termHorzScroll.set,
-                            state="disabled"
+                            state="disabled",
+                            background=self.colorBG2,
+                            foreground=self.colorFG
                             )
         
         self.termVertScroll.pack(side=RIGHT, fill=Y)
@@ -835,14 +873,9 @@ class TkWindow(Tk):
         self.terminal.pack(fill=BOTH)
 
     def fillSettingsTab(self):
-       
-
-        # Temporary text to inform user that there is nothing here yet
-        #Label(self.settingsTab, text="Nothing to see here at the moment (WIP)").pack(fill="both", expand=True)
-        #NOTE these frames and labels don't need self if they're never accessed after setup
-        self.settingsFrame = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
+        self.settingsFrame = Frame(self.settingsTab, bg=self.colorBG2)
         self.settingsFrame.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
-        self.settingsFrame2 = Frame(self.settingsTab, highlightthickness=2, highlightbackground="#000000")
+        self.settingsFrame2 = Frame(self.settingsTab, bg=self.colorBG2)
         self.settingsFrame2.pack(side="left", fill="y", padx=10,pady=5)#grid(row=0,column=0)
         maxSettingsPerColumn = 13
 
@@ -854,9 +887,9 @@ class TkWindow(Tk):
             self.settingsLength2 = len(self.settingsDict) - maxSettingsPerColumn
 
         # Headers for all settings
-        header1 = Label(self.settingsFrame, text="Setting",padx=5)
-        header2 = Label(self.settingsFrame, text="Current",padx=5)
-        header3 = Label(self.settingsFrame, text="Change To",padx=5)
+        header1 = Label(self.settingsFrame, text="Setting",padx=5, font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
+        header2 = Label(self.settingsFrame, text="Current",padx=5, font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
+        header3 = Label(self.settingsFrame, text="Change To",padx=5, font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
         horizontalLine1 = ttk.Separator(self.settingsFrame,orient="horizontal")
         verticalLine1 = ttk.Separator(self.settingsFrame,orient="vertical")
         verticalLine2 = ttk.Separator(self.settingsFrame,orient="vertical")
@@ -871,9 +904,9 @@ class TkWindow(Tk):
         
         if self.settingsLength2 > 0:
             # Headers for all settings
-            header1_1 = Label(self.settingsFrame2, text="Setting",padx=5)
-            header2_1 = Label(self.settingsFrame2, text="Current",padx=5)
-            header3_1 = Label(self.settingsFrame2, text="Change To",padx=5)
+            header1_1 = Label(self.settingsFrame2, text="Setting",padx=5, font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
+            header2_1 = Label(self.settingsFrame2, text="Current",padx=5, font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
+            header3_1 = Label(self.settingsFrame2, text="Change To",padx=5, font=("TkDefaultFont", 12, "bold"), bg=self.colorBG2, fg=self.colorFG)
             horizontalLine1_1 = ttk.Separator(self.settingsFrame2,orient="horizontal")
             verticalLine1_1 = ttk.Separator(self.settingsFrame2,orient="vertical")
             verticalLine2_1 = ttk.Separator(self.settingsFrame2,orient="vertical")
@@ -909,17 +942,17 @@ class TkWindow(Tk):
                     object = self
             currentValue = getattr(object,attr)
             if row < maxSettingsPerColumn + 2: #if there is still room in the first column
-                settingLabel = Label(self.settingsFrame, text=item)
-                self.currents[item] = Label(self.settingsFrame, text=str(currentValue))
-                self.entries[item] = Entry(self.settingsFrame,width=10)
+                settingLabel = Label(self.settingsFrame, text=item, bg=self.colorBG2, fg=self.colorFG)
+                self.currents[item] = Label(self.settingsFrame, text=str(currentValue), bg=self.colorBG2, fg=self.colorFG)
+                self.entries[item] = Entry(self.settingsFrame,width=10, bg=self.colorBG2, fg=self.colorFG)
                 #Place
                 settingLabel.grid(row=row, column=0)
                 self.currents[item].grid(row=row, column=2)
                 self.entries[item].grid(row=row, column=4,padx=5,pady=5)
             else:
-                settingLabel = Label(self.settingsFrame2, text=item)
-                self.currents[item] = Label(self.settingsFrame2, text=str(currentValue))
-                self.entries[item] = Entry(self.settingsFrame2,width=10)
+                settingLabel = Label(self.settingsFrame2, text=item, bg=self.colorBG2, fg=self.colorFG)
+                self.currents[item] = Label(self.settingsFrame2, text=str(currentValue), bg=self.colorBG2, fg=self.colorFG)
+                self.entries[item] = Entry(self.settingsFrame2,width=10, bg=self.colorBG2, fg=self.colorFG)
             
                 #Place and adjust row number for second column
                 settingLabel.grid(row=row-maxSettingsPerColumn, column=0)
@@ -928,7 +961,7 @@ class TkWindow(Tk):
             row += 1
 
 
-        self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings)
+        self.setAllSettingsButton = Button(self.settingsFrame,text="Set All Settings",command=self.setAllSettings, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.setAllSettingsButton.grid(row=maxSettingsPerColumn+4,column=0,columnspan=5,padx=5,pady=5) #Settings will always be at the bottom
 
     #endregion Tabs

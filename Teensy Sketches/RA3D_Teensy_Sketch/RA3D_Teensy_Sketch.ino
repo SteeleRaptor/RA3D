@@ -173,13 +173,13 @@ float J9StepDeg = 14.2857;
 float J1_BacklashFix = 0;
 float J2_BacklashFix = 0;
 float J3_BacklashFix = 0;
-float J4_BacklashFix = 1;
-float J5_BacklashFix = 10;
+float J4_BacklashFix = 0;
+float J5_BacklashFix = 2;
 float J6_BacklashFix = 0;
 
 //Gravity Compensation in degrees
-float J2_GravityComp = 1;
-float J3_GravityComp = 1;
+float J2_GravityComp = .6;
+float J3_GravityComp = .5;
 float J5_GravityComp = 3;
 int J2_GravityCompSteps = J2_GravityComp*J2StepDeg;
 int J3_GravityCompSteps = J3_GravityComp*J3StepDeg;

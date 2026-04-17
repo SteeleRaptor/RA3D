@@ -40,7 +40,8 @@ class TkWindow(Tk):
             "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC"),
             "Coolend Mode": ("coolendMode","self"),
             "Drop Height": ("dropHeight","PC"),
-            "Default Angle": ("defaultAngle","PC")
+            "Default Angle": ("defaultAngle","PC"),
+            "J5 Backlash Fix" : ("J5BacklashFix","custom")
         }
         self.DebugMode = True #Will display important debug prints but not all of them
         self.PrintDebugMode = True #Will display gcode lines and print coordinates
@@ -944,7 +945,12 @@ class TkWindow(Tk):
             valueToSet = self.entries[item].get().strip()
            
             attr, object = self.settingsDict[item]
-
+            if object == "custom":
+                match attr:
+                    case "J5BacklashFix":
+                        command = f"BFA{valueToSet*43.720}\n"
+                        self.serialController.sendSerial(command)
+                continue
             match object:
                 case "PC":
                     object = PC

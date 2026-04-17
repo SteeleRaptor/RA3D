@@ -702,8 +702,8 @@ class PrintController:
         return True
     
     def calculateBacklashOffset(self, x, relative=False):
-        w1 = .1185
-        w0 = -.0756
+        w1 = 0# .1185
+        w0 = 0#-.0756
         if not relative:
             backlash = w0 + w1*(x - self.origin.x)
         else:

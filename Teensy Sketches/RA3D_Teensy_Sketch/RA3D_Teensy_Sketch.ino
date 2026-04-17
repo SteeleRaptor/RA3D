@@ -2365,8 +2365,9 @@ void moveJ(String inData, bool response, bool precalc, bool simspeed) {
       }
       checkEncoders();
       if (response == true) {
-        sendRobotPos("MJ");
+        
       }
+      sendRobotPos("MJ");
     } else if (KinematicError == 1) {
       Alarm = "ER";
       delay(5);
@@ -5359,8 +5360,9 @@ void loop() {
 
       checkEncoders();
       if (splineTrue == false) {
-        sendRobotPos("ML");
+        
       }
+      sendRobotPos("ML");
       inData = "";  // Clear recieved buffer
       ////////MOVE COMPLETE///////////
     }

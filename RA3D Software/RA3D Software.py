@@ -932,7 +932,7 @@ class TkWindow(Tk):
         for item in self.settingsDict:
              
             attr, object = self.settingsDict[item]
-
+            custom = False
             match object:
                 case "PC":
                     object = PC
@@ -942,7 +942,12 @@ class TkWindow(Tk):
                     object = SC
                 case "self":
                     object = self
-            currentValue = getattr(object,attr)
+                case "custom":
+                    custom = True
+            if not custom:
+                currentValue = getattr(object,attr)
+            else:
+                currentValue = 0
             if row < maxSettingsPerColumn + 2: #if there is still room in the first column
                 settingLabel = Label(self.settingsFrame, text=item, bg=self.colorBG2, fg=self.colorFG)
                 self.currents[item] = Label(self.settingsFrame, text=str(currentValue), bg=self.colorBG2, fg=self.colorFG)

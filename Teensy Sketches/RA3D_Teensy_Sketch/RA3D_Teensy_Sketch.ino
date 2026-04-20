@@ -1,9 +1,10 @@
-//VERSION 6.2
-
+//RA3D teensy sketch, upload to teensy with arduino IDE
+//Original creator
 /*  AR4 Robot Control Software
     Copyright (c) 2024, Chris Annin
     All rights reserved.
 */
+//Modified by the RA3D team
 /* Outline
 1. Global variables and definitions
 2. Robot data structure and kinematics functions
@@ -16,6 +17,15 @@
 2. Jog functions
 3. Move functions
 */
+//Main modifications to file include improving encoder reading process, adding custom post calibration and extrude command, adding turn hazard check,
+//improving serial processing, adding labels to send position, implementing wrist conditions, and checking and weighting all kinematic solutions
+
+//There is also a commented out closed loop function which is true closed loop control. However this closed loop system was not effective enough
+//because it did not measure the majority of error (because of where the encoders are placed). Warning the arm may behave dangerously if it is used
+//There is a variation of this file that attempts to account the backlash but we encountered problem while doing that
+
+//See RA3D kinematic model (standard DH).xlsx for adjusting Inverse Kinematic parameters
+
 #include <math.h>
 #include <limits>
 #include <avr/pgmspace.h>
@@ -2472,6 +2482,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(EstopPin), EstopProg, LOW);
 
   //Currently not being used
+  //To stop when a limit switch is pressed
   //attachInterrupt(digitalPinToInterrupt(J1calPin), limitTriggered, RISING);
   /*attachInterrupt(digitalPinToInterrupt(J2calPin), limitTriggered, RISING);
   attachInterrupt(digitalPinToInterrupt(J3calPin), limitTriggered, RISING);
@@ -5181,11 +5192,11 @@ void loop() {
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
           
-          //IMPORTANT
+          /IMPORTANT
           float turnTolerance = 250; //max degrees that can be moved to avoid hazard turn
           //This should only affect if one waypoint jumps angles not the entire move
-          if (abs(J4stepDif) > turnTolerance || abs(J5stepDif) > turnTolerance || abs(J6stepDif) > turnTolerance){
-            Alarm = "Turn Hazard: J4:" + String(J4stepDif) + " J5:" + String(J5stepDif) + " J6:" + String(J6stepDif);
+          if (fabs((float)J4stepDif/J4StepDeg) > turnTolerance || fabs((float)J6stepDif/J6StepDeg) > turnTolerance){
+            Alarm = "Turn Hazard: J4:" + String(fabs((float)J4stepDif/J4StepDeg)) + " J5:" + String(fabs((float)J5stepDif/J5StepDeg)) + " J6:" + String(fabs((float)J6stepDif/J6StepDeg));
             Serial.println(Alarm);
             break;
           }

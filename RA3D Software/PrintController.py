@@ -1,3 +1,5 @@
+'''Print controller. Exectues gcode commands. Contains main print loop, and bed leveling related commands
+ such as bed calibration and corner sweep'''
 from tkinter import *
 from tkinter import filedialog
 import os, re, copy, threading, time, math
@@ -19,10 +21,10 @@ class PrintController:
         self.printOpenLoopControl = 0 #Thus closed cloop
         self.defaultPrintParameters = MoveParameters(self.speed,self.acceleration,self.decceleration,self.ramp,self.printOpenLoopControl,"m") #50mm/s print speed
         self.timeoutExtra = 60 #Extra timeout added to every timeout estimation
-        self.ignoreFlags = True #ignores flags and unrecognized gcode lines and boundary check
+        self.ignoreFlags = False #ignores flags and unrecognized gcode lines and boundary check
         self.checkBoundaryTrue = True #enables/disable boundary checks
 
-        self.plateHeight = 253 #Change bed height relative to pen
+        self.plateHeight = 265 #Change bed height relative to pen
         self.dropHeight = 0.0 #mm, drop all layers by amount, z will not go negative
         #boundarys for corner calibration/setting recommended origin
         #These boundaries are for better printing
@@ -55,7 +57,8 @@ class PrintController:
         
         #Assume origin is at recommended origin
         self.origin = self.recommendedOrigin
-        self.defaultAngle = self.calculateBacklashOffset((self.XEdge[0]+self.XEdge[1])/2)
+        self.defaultAngle = 90-self.backlashAngleOffset
+        #self.defaultAngle = self.calculateBacklashOffset((self.XEdge[0]+self.XEdge[1])/2)
         self.recommendedOriginPosition.Ry = self.defaultAngle
 
         # Calibration corners
@@ -195,6 +198,7 @@ class PrintController:
             #Must be at hotened before extruding
             if not self.root.temperatureController.HotendTargetReached():
                 self.flag = "Hotend not at target temperature"
+            #If a feedrate was spec
             if self.feedRate != None and self.feedRate != 0:
                 moveParameters = copy.deepcopy(self.defaultPrintParameters)
                 moveParameters.speedType = "m"
@@ -202,14 +206,16 @@ class PrintController:
                 moveParameters.speed = self.feedRate / 60
             else:
                 #Use default extrusion parameters rather default print parameters
-                moveParameters = None
+                moveParameters = copy.deepcopy(self.defaultPrintParameters)
             if self.flag is None:
                 self.root.armController.extrude(self.extrudeRate,moveParameters=moveParameters,timeoutMultiplier=2, RelativeExtrude = self.relativeExtrusion)
         else:
             self.root.warningPrint("Unexpected message from interpretGcode")
         #endregion message handling
+
         #must be last thing to do, copy last position
         self.lastPos = copy.deepcopy(self.printPos)
+
         #Signifies thread has ended to start next thread
         self.root.printThreadStarted = False #Do NOT return anywhere else in this function
 
@@ -236,6 +242,7 @@ class PrintController:
             self.root.terminalPrint("Using absolute extrusion")
             self.relativeExtrusion = False
             return ""
+        
         #Temperature control command
         #Set Hot End Temperature
         elif lineToConvert[:4] == "M104":
@@ -264,6 +271,7 @@ class PrintController:
                 time.sleep(1) # Wait for 1 second before checking again
             self.root.terminalPrint("Hotend reached target temperature")
             return ""
+        
         #Wait for Bed Temperature
         elif lineToConvert[:4] == "M190":
             self.root.terminalPrint("Waiting for bed to reach target temperature...")
@@ -271,6 +279,7 @@ class PrintController:
                 time.sleep(1) # Wait for 1 second before checking again
             self.root.terminalPrint("Bed reached target temperature")
             return ""
+        
         elif lineToConvert[:3] == "G28": # Home the printer
             return "Home" + lineToConvert[3:]
         elif lineToConvert[:3] == "G90": # Absolute positioning
@@ -282,6 +291,7 @@ class PrintController:
             self.relativePositioning = True
             self.root.terminalPrint("Using relative positioning")
             return ""
+        
         #Zero extruder axis
         elif lineToConvert == "G92 E0\n":
             self.root.armController.zeroJ7()
@@ -329,11 +339,9 @@ class PrintController:
                 if z is not None:
                     z += self.lastPos.GetRelativeZ()
 
-
             #print("z read:", z)
             f = float(fMatch.group(1)) if fMatch else None
             e = float(eMatch.group(1)) if eMatch else None
-
            
             #NOTE 5 axis g code is not fully implemented
             if self.axis5:
@@ -348,8 +356,6 @@ class PrintController:
                     Rz,Ry,Rx = self.aer_to_euler_zyx(v,u,0) # 3 options for transformation
 
             NoMove = False #For some commands they only specify E
-            
-          
 
             if x == None and y==None and z==None:
                 NoMove = True
@@ -369,8 +375,6 @@ class PrintController:
                 else:
                     self.printPos.SetRelative(x,y,z,0,self.calculateBacklashOffset(x,relative=True),0)
             
-
-           
             #Do not extrude if not told to
             #Handle If E or F or both are missing
             if not NoMove:
@@ -400,7 +404,7 @@ class PrintController:
                 if self.printPos.x < self.XEdge[0]:
                     atBoundary = True
                 if atBoundary:
-                    self.root.terminalPrint("Warning moving/printing at boundaries, print will continue")
+                    self.root.terminalPrint("Warning moving/printing near boundaries, print will continue")
             
             #G0 moves printer at max speed
             if lineToConvert[0:2] == "G0":
@@ -424,9 +428,8 @@ class PrintController:
         else:
             if not self.ignoreFlags:
                 return "Error unrecognized gcode line"
-    
-        #newLine = f"MLX{x}Y{y}Z{z}Rz{Rz}Ry{Ry}Rx{Rx}J70.00J80.00J90.00Sp{self.root.armController.speed}Ac{self.root.armController.acceleration}Dc{self.root.armController.deceleration}Rm{self.root.armController.ramp}Rnd0WFLm000000Q0\n"
-        #return newLine
+
+        #Return nothing
         return ""
     
     #Function used when end of print is reached or when print is cancelled to end any related processes
@@ -494,7 +497,7 @@ class PrintController:
         except:
             self.root.terminalPrint(f"Failed to automatically select file: {filepath}")
     
-
+    #Start the print
     def startPrint(self):
         
         self.syncOrigin()#Get origin from arm controller
@@ -512,6 +515,7 @@ class PrintController:
             self.root.warningPrint("Boundary check disabled, arm may move dangerously")
         if self.root.coolendMode:
             self.root.warningPrint("Printing in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
+        
         #Print starts here if no problems
         self.root.LEDOn = True # Solid LED to signify print in progress, will be turned off when print is paused or finished
 
@@ -529,14 +533,10 @@ class PrintController:
         self.flag = None
         self.root.serialController.clearQueue() #clear queue so it is not backed up
 
-        
-        #print(self.origin.z, "test2")
         self.printPos.origin = self.origin
         self.printPos = self.origin.toPosition(angle=self.calculateBacklashOffset(self.origin.x)) #Reset print position to origin
         #Last position starts at origin
         self.lastPos = Position(self.origin.x,self.origin.y,self.origin.z,0,self.calculateBacklashOffset(self.origin.x),0,self.origin)
-        
-        #print(self.lastPos.z)
 
         #Reset feedrate and extruderate
         self.lastF = 0.0
@@ -545,6 +545,7 @@ class PrintController:
         self.root.statusPrint("Starting print...")
         self.root.printStatusHomeLabel.config(text="PRINTING...")
 
+    #Use to step the print one line at a time
     def stepPrint(self):
         if self.checkIfPrinterBusy():
             self.root.terminalPrint("Cannot step print, printer busy")
@@ -553,6 +554,7 @@ class PrintController:
         #will perform one print loop only
         self.printLoop()
     
+    #Pause the print
     def pausePrint(self):
         # Check if we are actually printing
         if self.printing:
@@ -561,6 +563,7 @@ class PrintController:
             self.root.printStatusHomeLabel.config(text="PAUSED...")
             self.printPaused = True
 
+    #Cancel the print
     def cancelPrint(self,moveHome = True):
         self.endPrint(moveHome=moveHome) #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
@@ -569,6 +572,7 @@ class PrintController:
 
     # Bed Calibration and sweeps ==========================
 
+    #Start the print bed calibration
     def startPrintBedCalibration(self):
         self.flag = None #set flag to none only on start
         #If anything is busy cannot start arm
@@ -585,7 +589,7 @@ class PrintController:
         self.plateHeight = self.origin.z
         for corner in self.calibrationCorners:
             corner.z = self.origin.z
-        
+        #Move to next step (1)
         self.nextBedCalibration()
 
     #user controlled next button
@@ -600,7 +604,8 @@ class PrintController:
         if self.bedCalibrationInProgress == True:
             bedCalibrationThread = threading.Thread(target=self.bedCalibrationStep, name= "Bed Calibration Thread")
             bedCalibrationThread.start()
-        
+    
+    #start the corner sweep
     def startCornerSweep(self):
         self.flag = None #reset flag
         
@@ -627,13 +632,12 @@ class PrintController:
 
     #will cancel any related printing setup functions
     def cancelAny(self):
+        #just in case someone thinks this will cancel the print
         if self.printing:
             self.cancelPrint()
+        #Start on thread
         threading.Thread(target=self.endSweepOrCal, name="End Sweep or Calibration Thread").start() #On thread because move command is on there
-        #just in case someone thinks this will cancel the print
         
-
-    
     #endregion gui
 
     #region ===============| Other Functions |=================
@@ -674,8 +678,10 @@ class PrintController:
         
         return False
 
+    #Set origin to arm controller origin
     def syncOrigin(self):
         self.origin = self.root.armController.origin
+
     #change recommened origin based on plate height
     def changeRecommendedOrigin(self, PlateHeight):
         self.recommendedOriginPosition.z = PlateHeight
@@ -701,6 +707,7 @@ class PrintController:
             return False
         return True
     
+    #Caclulate pitch offset based on backlash using a linear equation
     def calculateBacklashOffset(self, x, relative=False):
         w1 = 0# .1185
         w0 = 0#-.0756
@@ -747,6 +754,7 @@ class PrintController:
 
         #Move to corner to touch plate
         self.root.armController.sendMJ(currentCornerPos,moveParameters=self.defaultPrintParameters,timeout=self.timeoutExtra)
+        
         self.checkFlag()
         self.root.statusPrint(f"Corner {self.bedCalStep} calibration complete")
         self.bedCalStep += 1
@@ -790,6 +798,7 @@ class PrintController:
             self.endSweepOrCal()
     
     #End any corner sweep or bed calibration
+    #Moving home is on by default
     def endSweepOrCal(self, move=True):
         
         self.cornerSweeping = False
@@ -810,7 +819,6 @@ class PrintController:
             self.endSweepOrCal(move=False) #end sweep without moving
         if self.printing:
             self.pausePrint()
-        
 
     #sweep multiple layers 20mm at a time
     def fullCornerSweep(self):

@@ -1,4 +1,6 @@
 """
+NOTE This file is not in use
+This file was attempt to solve InverseKinematics on the Pi ratherthan the teensy, but it seemed unviable to do so
 Inverse Kinematics Module for RA3D Robot Arm
 Provides functions to calculate joint angles from desired end-effector positions
 and orientations, as well as path planning capabilities.

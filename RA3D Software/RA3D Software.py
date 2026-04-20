@@ -1,3 +1,8 @@
+'''This is the main RA3D software. Run this file to use the program.
+NOTE This program can only be run on a Raspberry Pi.
+This program uses ArmController.py, SerialController.Py, PrintController.py, and TemperatureController.py
+This program sets up the controllers and contains the code for all the GUI'''
+
 from tkinter import *
 from tkinter import messagebox
 import tkinter.ttk as ttk
@@ -31,21 +36,20 @@ class TkWindow(Tk):
             "Default Plate Height" : ("plateHeight","PC"),
             "Ignore Flags" : ("ignoreFlags","PC"),
             "deg/mm": ("extruder_deg_per_mm","AC"),
-            "Sync Print Parameters": ("syncWithPrintParameters","AC"), #arm controller
+            "Sync Print Parameters": ("syncWithPrintParameters","AC"), #set the default arm controller parameters to the printing parameters
             "Debug Mode": ("DebugMode","self"),
             "Print Debug Mode": ("PrintDebugMode", "self"),
-            "Current Gcode Feedrate" : ("feedRate", "PC"),
+            #"Current Gcode Feedrate" : ("feedRate", "PC"),
             "Printing Timeout Extra": ("timeoutExtra","PC"),
             "Hard code printer speed to default": ("hardCodePrinterSpeed","PC"),
-            "Solid LED": ("LEDOn","self"),
             "Heated Filament Multiplier": ("heatedFilamentMultiplier","AC"),
             "Coolend Mode": ("coolendMode","self"),
-            "Drop Height": ("dropHeight","PC"),
-            "Default Angle": ("defaultAngle","PC"),
-            "J5 Backlash Fix" : ("J5BacklashFix","custom")
+            #"Drop Height": ("dropHeight","PC"),
+            "Default Angle": ("defaultAngle","PC") #Default pitch angle while printing
+            #"J5 Backlash Fix" : ("J5BacklashFix","custom")#Used to adjust the teensy fix, not currently implemented on teensy
         }
-        self.DebugMode = True #Will display important debug prints but not all of them
-        self.PrintDebugMode = True #Will display gcode lines and print coordinates
+        self.DebugMode = False #Will display important debug prints but not all of them
+        self.PrintDebugMode = False #Will display gcode lines and print coordinates
         #Debug modes off will NOT hide errors
 
         self.coolendMode = False #use for testing the arm and extrusion without requiring the hotend to be at temperature
@@ -68,6 +72,7 @@ class TkWindow(Tk):
         self.colorDarkGray = "#565a5c"
         self.colorLightGray = "#a2a4a3"
         self.colorWhite = "#ffffff"
+
         # Variables used to generalize colorations across the software
         self.colorBG = self.colorCUBlack    # Background color
         self.colorBG2 = self.colorDarkGray  # Background 2 color (used for backgrounds that should stick out more)
@@ -460,6 +465,7 @@ class TkWindow(Tk):
         self.J5OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
         self.J6OffsetLabel = Label(self.calOffsetFrame,text="J6:", bg=self.colorBG2, fg=self.colorFG)
         self.J6OffsetEntry = Entry(self.calOffsetFrame, width=4, bg=self.colorBG2, fg=self.colorFG)
+        
         # Grid the widgets
         self.J1OffsetLabel.grid(row=1, column=0, padx=5, pady=5)
         self.J1OffsetEntry.grid(row=1, column=1, padx=5, pady=5)
@@ -473,6 +479,7 @@ class TkWindow(Tk):
         self.J5OffsetEntry.grid(row=2, column=3, padx=5, pady=5)
         self.J6OffsetLabel.grid(row=2, column=4, padx=5, pady=5)
         self.J6OffsetEntry.grid(row=2, column=5, padx=5, pady=5)
+        
         # Auto fill a value of '0'
         self.J1OffsetEntry.insert(0, "0")
         self.J2OffsetEntry.insert(0, "0")
@@ -492,7 +499,7 @@ class TkWindow(Tk):
         self.calJ2Button = Button(self.indivCalFrame, text="Cal J2", command=lambda: self.armController.startSpecificCalibration(0, 1, 0, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calJ3Button = Button(self.indivCalFrame, text="Cal J3", command=lambda: self.armController.startSpecificCalibration(0, 0, 1, 0, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         self.calJ4Button = Button(self.indivCalFrame, text="Cal J4", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 1, 0, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
-        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
+        self.calJ5Button = Button(self.indivCalFrame, text="Cal J5", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 1, 0), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"), state="disabled")
         self.calJ6Button = Button(self.indivCalFrame, text="Cal J6", command=lambda: self.armController.startSpecificCalibration(0, 0, 0, 0, 0, 1), width=7, bg=self.colorAccent, fg=self.colorBG, font=("TkDefaultFont", 10, "bold"))
         # Place buttons
         self.calJ1Button.grid(row=1, column=0, padx=5, pady=5,)
@@ -983,6 +990,7 @@ class TkWindow(Tk):
             valueToSet = self.entries[item].get().strip()
            
             attr, object = self.settingsDict[item]
+            #Custom attribute to send a command to change the teensy's backlash variable
             if object == "custom":
                 match attr:
                     case "J5BacklashFix":
@@ -1194,7 +1202,7 @@ class TkWindow(Tk):
         hs = self.winfo_screenheight() # Get screen height
         x = int((ws/2) - (200/2)) # Calculate x position for window to be in the center of the screen
         y = int((hs/2) - (200/2)) # Calculate y position for window to be in the center of the screen
-        popup.geometry(f"250x300+{x}+{y}")
+        popup.geometry(f"350x300+{x}+{y}")
         # Ensure the popup stays on top of the main window
         popup.grab_set() 
         popup.lift()

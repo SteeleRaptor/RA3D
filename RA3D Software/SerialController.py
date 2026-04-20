@@ -1,3 +1,4 @@
+'''Serial controller. Sends and recevies serial commands'''
 import serial
 import serial.tools.list_ports
 from serial import SerialException
@@ -134,17 +135,10 @@ class SerialController:
                     pass
             else:
                 time.sleep(0.05)
-            #self.checkResponseQueue()
-            #Debugging
-            time.sleep(.002)
+            
+            time.sleep(.002) #wait to give serial time to process
             self.peekQueue()#Should remove all queue elements that should process immediately
-            #self.peekQueueForErrors() #If an error enters the queue is should be processed immediately
-            if not self.responseQueue.empty():
-                #print("Response Queue:", list(self.responseQueue.queue))
-                pass
-            if self.waiting_responses:
-                #print("Waiting response", str(self.waiting_responses))
-                pass
+           
 
     #used for debugging to display the response queue
     def printQueue(self):
@@ -153,11 +147,11 @@ class SerialController:
         else:
             self.root.terminalPrint("Queue is empty")
 
+    #remove all items from queue
     def clearQueue(self):
         self.responseQueue.queue.clear()
 
     #queue is cleaned of a specified item by rebuilding the queue
-    #This function might be obsolete now
     def cleanQueue(self, item):
 
         new_items = []
@@ -181,7 +175,7 @@ class SerialController:
                     #remove item from queue
                     self.sortResponse(item)
                     self.responseQueue.queue.remove(item)
-                    self.RaiseError(item)
+                    self.RaiseError(item) #Raise error to tell processes to not wait for a response
                     return
                 if item[:2] not in self.WaitToProcess:
                     self.root.terminalPrint(item + " not in wait to process")
@@ -201,7 +195,7 @@ class SerialController:
         self.root.terminalPrint("Error processed, resuming normal operation")
         self.clearQueue() #Clear queue of any responses that may have come in during error
         
-    #Advances the response queue every .01 seconds    
+    #Advances the response queue every .002 seconds    
     def processResponses(self):
         #exit this thread if serial is not connected
         while self.running:
@@ -318,7 +312,7 @@ class SerialController:
         if flag is not None:
             PC.flag = flag
     
-    
+    #Get next response in queue
     def getNextResponse(self):
         try:
             return self.responseQueue.get_nowait()
@@ -338,6 +332,7 @@ class SerialController:
             print("timeout is negative or zero")
             timeout = 2
         self.waiting_responses.add(uniqueCode)
+        #While less than timeout and no error is raised
         while time.time() - start < timeout and self.ErrorRaised==False:
             try:
                 response = self.responseQueue.queue[0]#peek queue

@@ -1,0 +1,2 @@
+This folder contains the current progress on the non planar slicer. We attempted to make a slice from scratch but that was too complicated.
+The best solution is to use rhino/grasshopper and modify the open5x slicer.

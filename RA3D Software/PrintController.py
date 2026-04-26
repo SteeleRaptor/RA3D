@@ -426,8 +426,11 @@ class PrintController:
                 self.root.warningPrint("Moving of bounds")
                 return "Error moving out of bounds"
         else:
-            if not self.ignoreFlags:
-                return "Error unrecognized gcode line"
+            pass
+            #Currently most gcode commands are implemented
+            #Uncomment this line if you need this safeguard
+            #if not self.ignoreFlags:
+            #   return "Error unrecognized gcode line"
 
         #Return nothing
         return ""

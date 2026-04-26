@@ -743,14 +743,23 @@ class ArmController:
             self.root.printController.flag = "Hotend target temperature not reached"
             return
         elif self.root.coolendMode:
-            self.root.warningPrint("Extruding in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
+            if not self.root.printController.ignoreFlags:
+                self.root.warningPrint("Extruding in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
 
         timeoutMin = 8 #minimum timeout
         #If no parameters set to default
         if moveParameters is None:
             moveParameters = self.defaultExtrudeParameters
-        #Convert extruderate to J7 degrees
-        J7 = extrudeRate*self.extruder_deg_per_mm
+        
+        #if in cool end mode or extrusion is less than 0
+        #For large multipliers, the negative extrusion launches the filament out the back
+        if self.root.coolendMode or extrudeRate < 0:
+            #Convert extruderate to J7 degrees
+            J7 = extrudeRate*self.extruder_deg_per_mm_cool
+        else:
+            #Convert extruderate to J7 degrees
+            J7 = extrudeRate*self.extruder_deg_per_mm
+
         timeout = timeoutMultiplier*abs(extrudeRate)/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
 
         if self.checkIfBusy(message="E7 extrude"):

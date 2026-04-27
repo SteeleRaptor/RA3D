@@ -570,11 +570,13 @@ class PrintController:
     #Pause the print
     def pausePrint(self):
         # Check if we are actually printing
-        if self.printing:
+        if self.printing and not self.printPaused:
             self.root.LEDOn = False # Turn off LED to signify print is paused
             self.root.terminalPrint("Pausing Print")
             self.root.printStatusHomeLabel.config(text="PAUSED...")
             self.printPaused = True
+            #Move safe so hot end does not burn bed
+            self.root.armController.moveSafe()
 
     #Cancel the print
     def cancelPrint(self,moveSafe = True):
@@ -833,8 +835,7 @@ class PrintController:
             self.endSweepOrCal(move=False) #end sweep without moving
         if self.printing:
             self.pausePrint()
-            #Move safe so hot end does not burn bed
-            self.root.armController.moveSafe()
+            
 
     #sweep multiple layers 20mm at a time
     def fullCornerSweep(self):

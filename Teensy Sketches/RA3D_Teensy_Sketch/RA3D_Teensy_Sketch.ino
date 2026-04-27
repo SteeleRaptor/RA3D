@@ -5192,7 +5192,7 @@ void loop() {
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
           
-          /IMPORTANT
+          //IMPORTANT
           float turnTolerance = 250; //max degrees that can be moved to avoid hazard turn
           //This should only affect if one waypoint jumps angles not the entire move
           if (fabs((float)J4stepDif/J4StepDeg) > turnTolerance || fabs((float)J6stepDif/J6StepDeg) > turnTolerance){

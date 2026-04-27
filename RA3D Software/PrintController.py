@@ -444,7 +444,9 @@ class PrintController:
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled or ended
         #Move Home when complete
-        self.root.armController.moveHome()
+        if moveHome:
+            self.root.armController.moveHome()
+        self.root.printStatusHomeLabel.config(text="IDLE...")
 
     #endregion main functions
 
@@ -525,6 +527,8 @@ class PrintController:
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
+            self.root.printThreadStarted = False
+            self.root.printStatusHomeLabel.config(text="PRINTING...")
             return #all other initialization ignored when resuming print
         
         self.currentInstruction = 0 # Reset the currentInstruction counter to start of file
@@ -545,6 +549,7 @@ class PrintController:
         self.lastF = 0.0
         self.lastE = 0.0
         self.printing = True
+        self.root.printThreadStarted = False #Print thread should not be started
         self.root.statusPrint("Starting print...")
         self.root.printStatusHomeLabel.config(text="PRINTING...")
 
@@ -570,7 +575,6 @@ class PrintController:
     def cancelPrint(self,moveHome = True):
         self.endPrint(moveHome=moveHome) #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
-        self.root.printStatusHomeLabel.config(text="IDLE...")
         pass
 
     # Bed Calibration and sweeps ==========================

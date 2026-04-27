@@ -221,12 +221,12 @@ class TkWindow(Tk):
         self.selectedFileHomeLabel = Label(self.printInfoHomeFrame, text="Please select a file", bg=self.colorBG2, fg=self.colorFG)
         self.selectedFileHomeLabel.grid(row=4, column=1, padx=5, pady=5, sticky=W)
         # Progress label
-        self.progressHomeLabel = Label(self.printInfoHomeFrame, text="0%", bg=self.colorBG2, fg=self.colorFG)
+        self.progressHomeLabel = Label(self.printInfoHomeFrame, text="--%", bg=self.colorBG2, fg=self.colorFG)
         self.progressHomeLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W+S)
         # Progress bar
-        self.printProgressBarHome = ttk.Progressbar(self.printInfoHomeFrame, orient=HORIZONTAL, length=printInfoWidth - 20, mode="determinate", value=0)
+        self.printProgressBarHome = ttk.Progressbar(self.printInfoHomeFrame, orient=HORIZONTAL, length=printInfoWidth - 20, mode="indeterminate")
         self.printProgressBarHome.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky=W+E)
-        self.printProgressBarHome['value'] = 50
+        self.printProgressBarHome['value'] = 100
 
         self.currentJ7 = Label(self.printInfoHomeFrame,text="Extruded: 0 mm", bg=self.colorBG2, fg=self.colorFG)
         self.currentJ7.grid(row=6,column=0, padx=5, pady=5, sticky=N+S)

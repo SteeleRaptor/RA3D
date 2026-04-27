@@ -447,6 +447,7 @@ class PrintController:
         if moveHome:
             self.root.armController.moveHome()
         self.root.printStatusHomeLabel.config(text="IDLE...")
+        self.root.printProgressBarHome['value'] = 1
 
     #endregion main functions
 

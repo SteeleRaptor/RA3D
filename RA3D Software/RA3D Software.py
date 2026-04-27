@@ -224,7 +224,7 @@ class TkWindow(Tk):
         self.progressHomeLabel = Label(self.printInfoHomeFrame, text="0%", bg=self.colorBG2, fg=self.colorFG)
         self.progressHomeLabel.grid(row=2, column=0, padx=5, pady=5, sticky=W+S)
         # Progress bar
-        self.printProgressBarHome = ttk.Progressbar(self.printInfoHomeFrame, orient=HORIZONTAL, length=printInfoWidth - 20, mode="determinate")
+        self.printProgressBarHome = ttk.Progressbar(self.printInfoHomeFrame, orient=HORIZONTAL, length=printInfoWidth - 20, mode="determinate", value=0)
         self.printProgressBarHome.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky=W+E)
         self.printProgressBarHome['value'] = 50
 

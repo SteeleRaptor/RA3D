@@ -82,7 +82,7 @@ class ArmController:
 
         #Extruder variables
         self.extruder_deg_per_mm_cool = 10.90909
-        self.heatedFilamentMultiplier = 0.7 #multiplier for extrusion when filament is heated, determined experimentally
+        self.heatedFilamentMultiplier = 5 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
         self.loadLength = 450 #length of filament to load fst, determined experimentally
         self.defaultExtrudeParameters = MoveParameters(30,10,10,30,0,'m')

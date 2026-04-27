@@ -236,7 +236,7 @@ class SerialController:
         #self.root.terminalPrint(f"Received Response: {sortResponse}")
         self.root.terminalPrint("Warning! Sorting response\nReponses handled by sorting signfy a problem")
         if sortResponse[:5]== "Estop":
-            PC.printing = False
+            
             flag = "Estop"
             PC.pauseAll() #This will pause the program regardless if ignore flags is on
             R.warningPrint("Estop pushed, stopping print")

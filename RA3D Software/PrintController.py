@@ -437,7 +437,7 @@ class PrintController:
         return ""
     
     #Function used when end of print is reached or when print is cancelled to end any related processes
-    def endPrint(self, moveHome = True):
+    def endPrint(self, moveSafe = True):
         self.root.temperatureController.disableHotendControl()
         self.root.temperatureController.disableBedControl()
         self.root.LEDOn = False # Turn off LED to signify print is cancelled
@@ -445,9 +445,9 @@ class PrintController:
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled or ended
 
-        if moveHome:
-            #Move Home when complete
-            self.root.armController.moveHome(checkBusy = False)
+        if moveSafe:
+            #Move Safe when complete
+            self.root.armController.moveSafe()
         
         self.root.printStatusHomeLabel.config(text="IDLE...")
         self.root.printProgressBarHome['value'] = 1
@@ -577,10 +577,10 @@ class PrintController:
             self.printPaused = True
 
     #Cancel the print
-    def cancelPrint(self,moveHome = True):
+    def cancelPrint(self,moveSafe = True):
         #cancel move actions
         self.root.armController.cancelActions()
-        self.endPrint(moveHome=moveHome) #Do any necessary processes to end the print
+        self.endPrint(moveSafe=moveSafe) #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
         pass
 
@@ -833,6 +833,8 @@ class PrintController:
             self.endSweepOrCal(move=False) #end sweep without moving
         if self.printing:
             self.pausePrint()
+            #Move safe so hot end does not burn bed
+            self.root.armController.moveSafe()
 
     #sweep multiple layers 20mm at a time
     def fullCornerSweep(self):

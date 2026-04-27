@@ -447,7 +447,7 @@ class PrintController:
 
         if moveSafe:
             #Move Safe when complete
-            self.root.armController.moveSafe()
+            self.root.armController.prepMoveSafe()
         
         self.root.printStatusHomeLabel.config(text="IDLE...")
         self.root.printProgressBarHome['value'] = 1
@@ -576,7 +576,7 @@ class PrintController:
             self.root.printStatusHomeLabel.config(text="PAUSED...")
             self.printPaused = True
             #Move safe so hot end does not burn bed
-            self.root.armController.moveSafe()
+            self.root.armController.prepMoveSafe()
 
     #Cancel the print
     def cancelPrint(self,moveSafe = True):

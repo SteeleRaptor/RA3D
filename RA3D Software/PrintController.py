@@ -450,7 +450,7 @@ class PrintController:
             self.root.armController.prepMoveSafe()
         
         self.root.printStatusHomeLabel.config(text="IDLE...")
-        self.root.printProgressBarHome['value'] = 1
+        self.root.printProgressBarHome['value'] = 100
         self.root.progressHomeLabel.config(text=f"--%")
 
     #endregion main functions

@@ -1112,6 +1112,14 @@ class ArmController:
     # A message is optional to streamline error messages
     def checkIfBusy(self, message = None, display = True):
         value = self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingPosResponse
+        
+        if self.calibrationInProgress:
+            self.root.terminalPrint("Calibration in progress")
+        if self.awaitingMoveResponse:
+            self.root.terminalPrint("Awaiting Move Response")
+        if self.awaitingPosResponse:
+            self.root.terminalPrint("Awaiting Position Response")
+        
         if value:
             if message and display:
                 self.root.terminalPrint("Cannot " + message + ", Arm busy")

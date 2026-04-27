@@ -4800,7 +4800,8 @@ void loop() {
       xyzuvw_Temp[3] = inData.substring(rzStart + 2, ryStart).toFloat();
       xyzuvw_Temp[4] = inData.substring(ryStart + 2, rxStart).toFloat();
       xyzuvw_Temp[5] = inData.substring(rxStart + 2, J7Start).toFloat();
-
+      //You can blame all your suffering on Chris Hansen (Chris Annin)
+      //Frick you Chris Hansen and Good Luck to anyone working on this.
 
       J7_In = inData.substring(J7Start + 2, RelStart).toFloat();
       int J7_Rel = inData.substring(RelStart+3, J8Start).toInt();

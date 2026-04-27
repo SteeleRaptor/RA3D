@@ -942,13 +942,13 @@ class ArmController:
         self.waitForResponseAndProcess("POSRJ",timeout=timeout)
     
     # Moves to the neutral position, all joints at zero degrees
-    def moveHome(self):
-        if self.awaitingMoveResponse:
+    def moveHome(self, checkBusy = True):
+        if self.awaitingMoveResponse and checkBusy:
             self.root.statusPrint("Cannot send HM command as currently awaiting response from a previous move command")
             self.root.printController.flag = "Already moving"
             return
         # Check if a board is connected or if the arm is not calibrated
-        if self.notNominalCheck(message="move home"):
+        if self.notNominalCheck(message="move home") and checkBusy:
             self.root.printController.flag = "Arm busy"
             return
         self.awaitingMoveResponse = True # Set the awaiting move response flag 

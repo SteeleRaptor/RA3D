@@ -444,11 +444,11 @@ class PrintController:
         self.currentInstruction=0
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled or ended
-        while self.root.armController.checkIfBusy():
-            self.root.armController.cancelActions()
-        #Move Home when complete
+
         if moveHome:
-            self.root.armController.moveHome()
+            #Move Home when complete
+            self.root.armController.moveHome(checkBusy = False)
+        
         self.root.printStatusHomeLabel.config(text="IDLE...")
         self.root.printProgressBarHome['value'] = 1
         self.root.progressHomeLabel.config(text=f"--%")

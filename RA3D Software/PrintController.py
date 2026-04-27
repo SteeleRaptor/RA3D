@@ -141,7 +141,7 @@ class PrintController:
         #Display gcode lines for debugging and if a lineToConvert exists
         if lineToConvert and self.root.PrintDebugMode:
             self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
-        
+        self.root.statusPrint(f"Printing: {message}")
         #region -----------Message Processing--------
         #Common commands are handled here, rare commands handled inside interpretGcode
         if message == "":
@@ -443,11 +443,14 @@ class PrintController:
         self.currentInstruction=0
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled or ended
+        while self.root.armController.checkIfBusy():
+            pass
         #Move Home when complete
         if moveHome:
             self.root.armController.moveHome()
         self.root.printStatusHomeLabel.config(text="IDLE...")
         self.root.printProgressBarHome['value'] = 1
+        self.root.progressHomeLabel.config(text=f"--%")
 
     #endregion main functions
 
@@ -574,6 +577,8 @@ class PrintController:
 
     #Cancel the print
     def cancelPrint(self,moveHome = True):
+        #cancel move actions
+        self.root.armController.cancelActions()
         self.endPrint(moveHome=moveHome) #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
         pass

@@ -82,7 +82,7 @@ class ArmController:
 
         #Extruder variables
         self.extruder_deg_per_mm_cool = 10.90909
-        self.heatedFilamentMultiplier = 0.7 #multiplier for extrusion when filament is heated, determined experimentally
+        self.heatedFilamentMultiplier = 5 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
         self.loadLength = 450 #length of filament to load fst, determined experimentally
         self.defaultExtrudeParameters = MoveParameters(30,10,10,30,0,'m')
@@ -743,14 +743,23 @@ class ArmController:
             self.root.printController.flag = "Hotend target temperature not reached"
             return
         elif self.root.coolendMode:
-            self.root.warningPrint("Extruding in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
+            if not self.root.printController.ignoreFlags:
+                self.root.warningPrint("Extruding in coolend mode. Extruder should not be attached to the hotend else damage will occur.")
 
         timeoutMin = 8 #minimum timeout
         #If no parameters set to default
         if moveParameters is None:
             moveParameters = self.defaultExtrudeParameters
-        #Convert extruderate to J7 degrees
-        J7 = extrudeRate*self.extruder_deg_per_mm
+        
+        #if in cool end mode or extrusion is less than 0
+        #For large multipliers, the negative extrusion launches the filament out the back
+        if self.root.coolendMode or extrudeRate < 0:
+            #Convert extruderate to J7 degrees
+            J7 = extrudeRate*self.extruder_deg_per_mm_cool
+        else:
+            #Convert extruderate to J7 degrees
+            J7 = extrudeRate*self.extruder_deg_per_mm
+
         timeout = timeoutMultiplier*abs(extrudeRate)/moveParameters.speed + timeoutMin #timeout is proportional to amount of extrusion
 
         if self.checkIfBusy(message="E7 extrude"):
@@ -933,13 +942,13 @@ class ArmController:
         self.waitForResponseAndProcess("POSRJ",timeout=timeout)
     
     # Moves to the neutral position, all joints at zero degrees
-    def moveHome(self):
-        if self.awaitingMoveResponse:
+    def moveHome(self, checkBusy = True):
+        if self.awaitingMoveResponse and checkBusy:
             self.root.statusPrint("Cannot send HM command as currently awaiting response from a previous move command")
             self.root.printController.flag = "Already moving"
             return
         # Check if a board is connected or if the arm is not calibrated
-        if self.notNominalCheck(message="move home"):
+        if self.notNominalCheck(message="move home") and checkBusy:
             self.root.printController.flag = "Arm busy"
             return
         self.awaitingMoveResponse = True # Set the awaiting move response flag 
@@ -1103,6 +1112,14 @@ class ArmController:
     # A message is optional to streamline error messages
     def checkIfBusy(self, message = None, display = True):
         value = self.calibrationInProgress or self.awaitingMoveResponse or self.testingLimitSwitches or self.testingEncoders or self.awaitingPosResponse
+        
+        if self.calibrationInProgress:
+            self.root.terminalPrint("Calibration in progress")
+        if self.awaitingMoveResponse:
+            self.root.terminalPrint("Awaiting Move Response")
+        if self.awaitingPosResponse:
+            self.root.terminalPrint("Awaiting Position Response")
+        
         if value:
             if message and display:
                 self.root.terminalPrint("Cannot " + message + ", Arm busy")

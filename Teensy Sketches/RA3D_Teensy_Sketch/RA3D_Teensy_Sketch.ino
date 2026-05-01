@@ -229,7 +229,7 @@ float J1calBaseOff = -1;
 float J2calBaseOff = 1.5;
 float J3calBaseOff = 4.1;
 float J4calBaseOff = -2;
-float J5calBaseOff = 3.1;
+float J5calBaseOff = 30; //This value is incredibly high, possibly investigate changing the axis limits instead
 float J6calBaseOff = -.5;
 float J7calBaseOff = 0;
 float J8calBaseOff = 0;
@@ -4800,7 +4800,8 @@ void loop() {
       xyzuvw_Temp[3] = inData.substring(rzStart + 2, ryStart).toFloat();
       xyzuvw_Temp[4] = inData.substring(ryStart + 2, rxStart).toFloat();
       xyzuvw_Temp[5] = inData.substring(rxStart + 2, J7Start).toFloat();
-
+      //You can blame all your suffering on Chris Hansen (Chris Annin)
+      //Frick you Chris Hansen and Good Luck to anyone working on this.
 
       J7_In = inData.substring(J7Start + 2, RelStart).toFloat();
       int J7_Rel = inData.substring(RelStart+3, J8Start).toInt();
@@ -5192,7 +5193,7 @@ void loop() {
           }
           TotalAxisFault = J1axisFault + J2axisFault + J3axisFault + J4axisFault + J5axisFault + J6axisFault + J7axisFault + J8axisFault + J9axisFault;
           
-          /IMPORTANT
+          //IMPORTANT
           float turnTolerance = 250; //max degrees that can be moved to avoid hazard turn
           //This should only affect if one waypoint jumps angles not the entire move
           if (fabs((float)J4stepDif/J4StepDeg) > turnTolerance || fabs((float)J6stepDif/J6StepDeg) > turnTolerance){

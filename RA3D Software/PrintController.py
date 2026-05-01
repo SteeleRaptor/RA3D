@@ -141,7 +141,8 @@ class PrintController:
         #Display gcode lines for debugging and if a lineToConvert exists
         if lineToConvert and self.root.PrintDebugMode:
             self.root.terminalPrint(f"Line: {lineToConvert}")# Print the line we're converting
-        
+        if message != "":
+            self.root.statusPrint(f"Printing: {message}")
         #region -----------Message Processing--------
         #Common commands are handled here, rare commands handled inside interpretGcode
         if message == "":
@@ -426,22 +427,31 @@ class PrintController:
                 self.root.warningPrint("Moving of bounds")
                 return "Error moving out of bounds"
         else:
-            if not self.ignoreFlags:
-                return "Error unrecognized gcode line"
+            pass
+            #Currently most gcode commands are implemented
+            #Uncomment this line if you need this safeguard
+            #if not self.ignoreFlags:
+            #   return "Error unrecognized gcode line"
 
         #Return nothing
         return ""
     
     #Function used when end of print is reached or when print is cancelled to end any related processes
-    def endPrint(self, moveHome = True):
+    def endPrint(self, moveSafe = True):
         self.root.temperatureController.disableHotendControl()
         self.root.temperatureController.disableBedControl()
         self.root.LEDOn = False # Turn off LED to signify print is cancelled
         self.currentInstruction=0
         self.printing = False
         self.printPaused = False #If print was paused, it is no longer paused if it is cancelled or ended
-        #Move Home when complete
-        self.root.armController.moveHome()
+
+        if moveSafe:
+            #Move Safe when complete
+            self.root.armController.prepMoveSafe()
+        
+        self.root.printStatusHomeLabel.config(text="IDLE...")
+        self.root.printProgressBarHome['value'] = 100
+        self.root.progressHomeLabel.config(text=f"--%")
 
     #endregion main functions
 
@@ -522,6 +532,8 @@ class PrintController:
         #Resume print if paused
         if self.printPaused == True and self.printing == True:
             self.printPaused = False
+            self.root.printThreadStarted = False
+            self.root.printStatusHomeLabel.config(text="PRINTING...")
             return #all other initialization ignored when resuming print
         
         self.currentInstruction = 0 # Reset the currentInstruction counter to start of file
@@ -542,6 +554,7 @@ class PrintController:
         self.lastF = 0.0
         self.lastE = 0.0
         self.printing = True
+        self.root.printThreadStarted = False #Print thread should not be started
         self.root.statusPrint("Starting print...")
         self.root.printStatusHomeLabel.config(text="PRINTING...")
 
@@ -557,17 +570,20 @@ class PrintController:
     #Pause the print
     def pausePrint(self):
         # Check if we are actually printing
-        if self.printing:
+        if self.printing and not self.printPaused:
             self.root.LEDOn = False # Turn off LED to signify print is paused
             self.root.terminalPrint("Pausing Print")
             self.root.printStatusHomeLabel.config(text="PAUSED...")
             self.printPaused = True
+            #Move safe so hot end does not burn bed
+            self.root.armController.prepMoveSafe()
 
     #Cancel the print
-    def cancelPrint(self,moveHome = True):
-        self.endPrint(moveHome=moveHome) #Do any necessary processes to end the print
+    def cancelPrint(self,moveSafe = True):
+        #cancel move actions
+        self.root.armController.cancelActions()
+        self.endPrint(moveSafe=moveSafe) #Do any necessary processes to end the print
         self.root.statusPrint("Print cancelled")
-        self.root.printStatusHomeLabel.config(text="IDLE...")
         pass
 
     # Bed Calibration and sweeps ==========================
@@ -819,6 +835,7 @@ class PrintController:
             self.endSweepOrCal(move=False) #end sweep without moving
         if self.printing:
             self.pausePrint()
+            
 
     #sweep multiple layers 20mm at a time
     def fullCornerSweep(self):

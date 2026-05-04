@@ -85,7 +85,7 @@ class ArmController:
         self.heatedFilamentMultiplier = 5 #multiplier for extrusion when filament is heated, determined experimentally
         self.extruder_deg_per_mm = self.extruder_deg_per_mm_cool * self.heatedFilamentMultiplier
         self.loadLength = 450 #length of filament to load fst, determined experimentally
-        self.defaultExtrudeParameters = MoveParameters(30,10,10,30,0,'m')
+        self.defaultExtrudeParameters = MoveParameters(5,10,10,30,0,'m')
         self.unloadParameters = MoveParameters(80,10,10,30,0,'p')
 
     #endregion init
